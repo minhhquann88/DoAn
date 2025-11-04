@@ -31,7 +31,7 @@ public class User {
     private String avatarUrl;
 
     @Lob
-    private String bio; // @Lob cho phép lưu text dài
+    private String bio;
 
     private LocalDateTime createdAt;
 
