@@ -69,6 +69,12 @@ public class WebSecurityConfig {
                                 // đều phải có quyền ADMIN hoặc LECTURER"
                                 .requestMatchers("/api/manage/content/**").hasAnyRole("ADMIN", "LECTURER")
 
+                                // Giảng viên/Admin: Tạo/Update/Delete Test, xem thống kê, chấm bài
+                                .requestMatchers("/api/manage/tests/**").hasAnyRole("ADMIN", "LECTURER")
+
+                                // Học viên: Làm bài, xem kết quả
+                                .requestMatchers("/api/tests/**").hasRole("STUDENT")
+
                                 .anyRequest().authenticated()
                 );
 

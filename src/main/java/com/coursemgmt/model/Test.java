@@ -2,6 +2,7 @@ package com.coursemgmt.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDateTime; // <-- THÊM IMPORT NÀY
 import java.util.List;
 
 @Entity
@@ -21,6 +22,11 @@ public class Test {
     private ETestType type; // Enum: MULTIPLE_CHOICE, ESSAY
 
     private Integer timeLimitInMinutes;
+
+    // --- THÊM 2 DÒNG NÀY VÀO ---
+    private LocalDateTime openTime;  // Thời gian mở test
+    private LocalDateTime closeTime; // Thời gian đóng test
+    // -------------------------
 
     // (n-1) Nhiều Test thuộc 1 Lesson
     @ManyToOne(fetch = FetchType.LAZY)
