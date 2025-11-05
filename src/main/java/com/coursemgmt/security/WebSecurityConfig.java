@@ -6,6 +6,7 @@ import com.coursemgmt.security.services.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -59,9 +60,16 @@ public class WebSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/api/auth/**").permitAll() // Cho phép tất cả truy cập API auth
-                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
-                                .requestMatchers("/api/test/**").permitAll() // (Tạm thời, để test)
-                                .anyRequest().authenticated() // Tất cả các request khác đều cần xác thực
+                                .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/content/**").authenticated()
+                                .requestMatchers(HttpMethod.POST, "/api/content/**").authenticated()
+
+                                // THAY TẤT CẢ CÁC DÒNG QUẢN LÝ BẰNG 1 DÒNG NÀY:
+                                // "Tất cả request (GET, POST, PUT, DELETE) tới /api/manage/content/
+                                // đều phải có quyền ADMIN hoặc LECTURER"
+                                .requestMatchers("/api/manage/content/**").hasAnyRole("ADMIN", "LECTURER")
+
+                                .anyRequest().authenticated()
                 );
 
         http.authenticationProvider(authenticationProvider());
