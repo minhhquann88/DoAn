@@ -1,18 +1,30 @@
 package com.coursemgmt.repository;
 
 import com.coursemgmt.model.Course;
+import com.coursemgmt.model.ECourseStatus;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor; // Thêm cái này
 import org.springframework.stereotype.Repository;
 
-@Repository // Đánh dấu đây là một Spring Bean (cho tầng Repository)
-public interface CourseRepository extends JpaRepository<Course, Long> {
-    // JpaRepository<TênModel, KiểuDữLiệuCủaKhóaChính>
+import java.util.List;
 
-    // Chỉ cần định nghĩa interface này, Spring Data JPA sẽ tự động
-    // cung cấp cho bạn các hàm:
-    // 1. save()           (Tạo mới / Cập nhật)
-    // 2. findById()       (Tìm theo ID)
-    // 3. findAll()        (Lấy tất cả)
-    // 4. deleteById()     (Xóa theo ID)
-    // 5. ... và rất nhiều hàm khác
+@Repository
+// Thêm JpaSpecificationExecutor để hỗ trợ lọc động
+public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecificationExecutor<Course> {
+
+    // Tạo Specification để lọc theo tiêu đề (keyword)
+    static Specification<Course> titleContains(String keyword) {
+        return (course, cq, cb) -> cb.like(course.get("title"), "%" + keyword + "%");
+    }
+
+    // Tạo Specification để lọc theo categoryId
+    static Specification<Course> hasCategory(Long categoryId) {
+        return (course, cq, cb) -> cb.equal(course.get("category").get("id"), categoryId);
+    }
+
+    // Tạo Specification để lọc các khóa học đã PUBLISHED
+    static Specification<Course> isPublished() {
+        return (course, cq, cb) -> cb.equal(course.get("status"), ECourseStatus.PUBLISHED);
+    }
 }

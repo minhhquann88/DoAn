@@ -59,6 +59,7 @@ public class WebSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/api/auth/**").permitAll() // Cho phép tất cả truy cập API auth
+                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll() // (Tạm thời, để test)
                                 .anyRequest().authenticated() // Tất cả các request khác đều cần xác thực
                 );

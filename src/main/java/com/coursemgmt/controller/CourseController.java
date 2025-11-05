@@ -1,64 +1,87 @@
 package com.coursemgmt.controller;
 
+import com.coursemgmt.dto.CourseRequest;
+import com.coursemgmt.dto.CourseResponse;
+import com.coursemgmt.dto.CourseStatisticsResponse;
+import com.coursemgmt.dto.MessageResponse;
 import com.coursemgmt.model.Course;
+import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.CourseService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
-@RestController // Đánh dấu đây là 1 REST Controller (trả về JSON)
-@RequestMapping("/api/v1/courses") // Tiền tố chung cho tất cả API trong class này
+@CrossOrigin(origins = "*", maxAge = 3600)
+@RestController
+@RequestMapping("/api/courses")
 public class CourseController {
 
     @Autowired
     private CourseService courseService;
 
-    // 1. API tạo mới khóa học (CREATE)
-    // URL: POST http://localhost:8080/api/v1/courses
+    // 1. Tạo khóa học (Admin, Giảng viên)
     @PostMapping
-    public Course createCourse(@RequestBody Course course) {
-        return courseService.createCourse(course);
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
+    public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request,
+                                                       @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        Course course = courseService.createCourse(request, userDetails);
+        return ResponseEntity.ok(CourseResponse.fromEntity(course));
     }
 
-    // 2. API lấy tất cả khóa học (READ)
-    // URL: GET http://localhost:8080/api/v1/courses
-    @GetMapping
-    public List<Course> getAllCourses() {
-        return courseService.getAllCourses();
-    }
-
-    // 3. API lấy 1 khóa học theo ID (READ)
-    // URL: GET http://localhost:8080/api/v1/courses/1 (ví dụ 1 là id)
-    @GetMapping("/{id}")
-    public ResponseEntity<Course> getCourseById(@PathVariable Long id) {
-        return courseService.getCourseById(id)
-                .map(ResponseEntity::ok) // Nếu tìm thấy, trả về 200 OK
-                .orElse(ResponseEntity.notFound().build()); // Nếu không, trả về 404 Not Found
-    }
-
-    // 4. API cập nhật khóa học (UPDATE)
-    // URL: PUT http://localhost:8080/api/v1/courses/1
+    // 2. Cập nhật khóa học (Admin hoặc Giảng viên sở hữu)
     @PutMapping("/{id}")
-    public ResponseEntity<Course> updateCourse(@PathVariable Long id, @RequestBody Course courseDetails) {
-        try {
-            Course updatedCourse = courseService.updateCourse(id, courseDetails);
-            return ResponseEntity.ok(updatedCourse);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
+    public ResponseEntity<CourseResponse> updateCourse(@PathVariable Long id,
+                                                       @Valid @RequestBody CourseRequest request) {
+        Course updatedCourse = courseService.updateCourse(id, request);
+        return ResponseEntity.ok(CourseResponse.fromEntity(updatedCourse));
     }
 
-    // 5. API xóa khóa học (DELETE)
-    // URL: DELETE http://localhost:8080/api/v1/courses/1
+    // 3. Xóa khóa học (Admin hoặc Giảng viên sở hữu)
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteCourse(@PathVariable Long id) {
-        try {
-            courseService.deleteCourse(id);
-            return ResponseEntity.noContent().build(); // Trả về 204 No Content
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
+    public ResponseEntity<MessageResponse> deleteCourse(@PathVariable Long id) {
+        courseService.deleteCourse(id);
+        return ResponseEntity.ok(new MessageResponse("Course deleted successfully!"));
+    }
+
+    // 4. Duyệt khóa học (Admin)
+    @PatchMapping("/{id}/approve") // Dùng PATCH vì chỉ cập nhật 1 phần (status)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CourseResponse> approveCourse(@PathVariable Long id) {
+        Course approvedCourse = courseService.approveCourse(id);
+        return ResponseEntity.ok(CourseResponse.fromEntity(approvedCourse));
+    }
+
+    // 5. Lấy chi tiết 1 khóa học (Public)
+    @GetMapping("/{id}")
+    public ResponseEntity<CourseResponse> getCourseById(@PathVariable Long id) {
+        CourseResponse course = courseService.getCourseById(id);
+        return ResponseEntity.ok(course);
+    }
+
+    // 6. Tìm kiếm, lọc, sắp xếp khóa học (Public)
+    @GetMapping
+    public ResponseEntity<Page<CourseResponse>> getAllCourses(
+            @RequestParam(required = false) String keyword, // Từ khóa tìm kiếm
+            @RequestParam(required = false) Long categoryId, // Lọc theo danh mục
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort // Sắp xếp
+    ) {
+        Page<CourseResponse> courses = courseService.getAllPublishedCourses(keyword, categoryId, page, size, sort);
+        return ResponseEntity.ok(courses);
+    }
+
+    // 7. Thống kê (Admin hoặc Giảng viên sở hữu)
+    @GetMapping("/{id}/statistics")
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
+    public ResponseEntity<CourseStatisticsResponse> getCourseStatistics(@PathVariable Long id) {
+        CourseStatisticsResponse stats = courseService.getCourseStatistics(id);
+        return ResponseEntity.ok(stats);
     }
 }
