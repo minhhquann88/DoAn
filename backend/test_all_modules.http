@@ -1,0 +1,385 @@
+### 🧪 TESTING MODULE 8 & 9 INTEGRATION
+### Complete User Journey Test
+
+### Variables
+@baseUrl = http://localhost:8080/api/v1
+@userId = 1
+@courseId = 1
+@instructorId = 1
+
+###############################################
+### 📊 SCENARIO 1: DASHBOARD MONITORING
+###############################################
+
+### Step 1: Check initial dashboard stats
+GET {{baseUrl}}/statistics/dashboard
+Accept: application/json
+
+### Expected Response:
+# {
+#   "totalCourses": X,
+#   "totalStudents": X,
+#   "totalRevenue": X,
+#   "monthlyRevenue": X,
+#   ...
+# }
+
+
+###############################################
+### 💰 SCENARIO 2: PAYMENT FLOW
+###############################################
+
+### Step 1: Tạo giao dịch thanh toán
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "courseId": 1,
+  "amount": 299000,
+  "paymentGateway": "VNPAY"
+}
+
+### Step 2: Callback từ VNPay (simulate)
+GET {{baseUrl}}/transactions/vnpay/callback?vnp_TxnRef=TXN123456&vnp_ResponseCode=00&vnp_Amount=29900000
+
+### Step 3: Kiểm tra transaction đã success
+GET {{baseUrl}}/transactions/TXN123456
+
+### Step 4: Verify dashboard revenue tăng
+GET {{baseUrl}}/statistics/dashboard
+
+### Step 5: Check course stats
+GET {{baseUrl}}/statistics/course/1
+
+
+###############################################
+### 🎓 SCENARIO 3: CERTIFICATE ISSUANCE
+###############################################
+
+### Step 1: Request certificate
+POST {{baseUrl}}/certificates
+Content-Type: application/json
+
+{
+  "enrollmentId": 1,
+  "issuerName": "Admin"
+}
+
+### Step 2: Get certificate
+GET {{baseUrl}}/certificates/1
+
+### Step 3: Download PDF
+GET {{baseUrl}}/certificates/1/download
+
+### Step 4: Verify certificate count increased
+GET {{baseUrl}}/statistics/dashboard
+
+### Step 5: Check student stats
+GET {{baseUrl}}/statistics/student/1
+
+
+###############################################
+### 📈 SCENARIO 4: REVENUE ANALYTICS
+###############################################
+
+### Step 1: Get monthly revenue
+GET {{baseUrl}}/statistics/revenue?startDate=2025-11-01T00:00:00&endDate=2025-11-30T23:59:59
+
+### Step 2: Get all transactions
+GET {{baseUrl}}/transactions?page=0&size=10
+
+### Step 3: Filter successful transactions
+GET {{baseUrl}}/transactions?status=SUCCESS&page=0&size=10
+
+### Step 4: Get transactions by user
+GET {{baseUrl}}/transactions/user/1?page=0&size=10
+
+### Step 5: Get transactions by course
+GET {{baseUrl}}/transactions/course/1?page=0&size=10
+
+
+###############################################
+### 📚 SCENARIO 5: COURSE PERFORMANCE
+###############################################
+
+### Step 1: Get course statistics
+GET {{baseUrl}}/statistics/course/1
+
+### Step 2: Get course certificates
+GET {{baseUrl}}/certificates?courseId=1&page=0&size=10
+
+### Step 3: Compare with another course
+GET {{baseUrl}}/statistics/course/2
+
+
+###############################################
+### 👨‍🏫 SCENARIO 6: INSTRUCTOR ANALYTICS
+###############################################
+
+### Step 1: Get instructor stats
+GET {{baseUrl}}/statistics/instructor/1
+
+### Step 2: Get instructor's courses
+# (Would need Course API from Module 2)
+
+### Step 3: Get transactions for instructor's courses
+GET {{baseUrl}}/transactions/course/1?page=0&size=10
+
+
+###############################################
+### 👨‍🎓 SCENARIO 7: STUDENT PROGRESS
+###############################################
+
+### Step 1: Get student stats
+GET {{baseUrl}}/statistics/student/1
+
+### Step 2: Get student's transactions
+GET {{baseUrl}}/transactions/user/1?page=0&size=10
+
+### Step 3: Get student's certificates
+GET {{baseUrl}}/certificates?userId=1&page=0&size=10
+
+
+###############################################
+### 📊 SCENARIO 8: COMPLETION REPORTS
+###############################################
+
+### Step 1: Get completion report
+GET {{baseUrl}}/statistics/completion
+
+### Step 2: Verify completion rate calculation
+# Expected: totalEnrollments, completedEnrollments, rate
+
+
+###############################################
+### 🔄 SCENARIO 9: COMPLETE USER JOURNEY
+###############################################
+
+### Journey Step 1: Initial dashboard state
+GET {{baseUrl}}/statistics/dashboard
+
+### Journey Step 2: User pays for course
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "userId": 2,
+  "courseId": 1,
+  "amount": 299000,
+  "paymentGateway": "VNPAY"
+}
+
+### Journey Step 3: Payment callback success
+# Simulate VNPay callback
+GET {{baseUrl}}/transactions/vnpay/callback?vnp_TxnRef=TXN789012&vnp_ResponseCode=00&vnp_Amount=29900000
+
+### Journey Step 4: Check updated dashboard
+GET {{baseUrl}}/statistics/dashboard
+# Should see:
+# - totalRevenue increased by 299000
+# - monthlyRevenue increased by 299000
+# - successfulTransactions increased by 1
+
+### Journey Step 5: User completes course
+# (Would update enrollment progress to 100%)
+
+### Journey Step 6: Certificate issued
+POST {{baseUrl}}/certificates
+Content-Type: application/json
+
+{
+  "enrollmentId": 2,
+  "issuerName": "Admin"
+}
+
+### Journey Step 7: Final dashboard check
+GET {{baseUrl}}/statistics/dashboard
+# Should see:
+# - totalCertificates increased by 1
+# - completionRate may change
+
+### Journey Step 8: Course stats updated
+GET {{baseUrl}}/statistics/course/1
+# Should see:
+# - totalEnrollments increased
+# - certificatesIssued increased
+# - totalRevenue increased
+
+
+###############################################
+### ❌ SCENARIO 10: ERROR HANDLING
+###############################################
+
+### Test 1: Invalid transaction (non-existent user)
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "userId": 99999,
+  "courseId": 1,
+  "amount": 299000,
+  "paymentGateway": "VNPAY"
+}
+
+### Test 2: Certificate for non-existent enrollment
+POST {{baseUrl}}/certificates
+Content-Type: application/json
+
+{
+  "enrollmentId": 99999,
+  "issuerName": "Admin"
+}
+
+### Test 3: Get non-existent transaction
+GET {{baseUrl}}/transactions/INVALID_CODE
+
+### Test 4: Get non-existent certificate
+GET {{baseUrl}}/certificates/99999
+
+### Test 5: Invalid date range
+GET {{baseUrl}}/statistics/revenue?startDate=2025-12-31T23:59:59&endDate=2025-01-01T00:00:00
+
+
+###############################################
+### 🔐 SCENARIO 11: SECURITY (Future)
+###############################################
+
+### Note: These will work after implementing authentication
+
+### Test 1: Admin accesses dashboard
+# GET /api/v1/statistics/dashboard
+# Authorization: Bearer {admin_token}
+
+### Test 2: Student accesses own stats only
+# GET /api/v1/statistics/student/1
+# Authorization: Bearer {student_token}
+
+### Test 3: Instructor accesses own stats only
+# GET /api/v1/statistics/instructor/1
+# Authorization: Bearer {instructor_token}
+
+
+###############################################
+### 📊 SCENARIO 12: BULK OPERATIONS
+###############################################
+
+### Test 1: Multiple transactions
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "courseId": 2,
+  "amount": 499000,
+  "paymentGateway": "VNPAY"
+}
+
+###
+
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "courseId": 3,
+  "amount": 399000,
+  "paymentGateway": "MOMO"
+}
+
+### Test 2: Check aggregated stats
+GET {{baseUrl}}/statistics/student/1
+
+### Test 3: Check overall dashboard
+GET {{baseUrl}}/statistics/dashboard
+
+
+###############################################
+### 🎯 SUCCESS CRITERIA
+###############################################
+
+# ✅ All API endpoints return 200 OK
+# ✅ Dashboard stats update after transactions
+# ✅ Certificate counts update correctly
+# ✅ Revenue calculations accurate
+# ✅ Completion rates calculated correctly
+# ✅ Error handling works (404, 400)
+# ✅ Data consistency across modules
+# ✅ Performance < 2s per request
+
+
+###############################################
+### 📝 TESTING CHECKLIST
+###############################################
+
+# Module 8 - Payment & Certificate:
+# [ ] Create transaction
+# [ ] VNPay callback
+# [ ] MoMo callback
+# [ ] Bank transfer
+# [ ] Get transaction by code
+# [ ] List transactions
+# [ ] Filter by status
+# [ ] Filter by user
+# [ ] Filter by course
+# [ ] Issue certificate
+# [ ] Get certificate
+# [ ] Download certificate PDF
+# [ ] List certificates
+# [ ] Filter certificates
+# [ ] Verify certificate
+# [ ] Revoke certificate
+# [ ] Re-issue certificate
+
+# Module 7 - Statistics:
+# [ ] Dashboard overview
+# [ ] Course statistics
+# [ ] Instructor statistics
+# [ ] Student statistics
+# [ ] Revenue report
+# [ ] Completion report
+
+# Integration:
+# [ ] Transaction → Dashboard revenue updates
+# [ ] Certificate → Dashboard cert count updates
+# [ ] Payment → Course stats update
+# [ ] Certificate → Student stats update
+# [ ] All data consistent across queries
+
+
+###############################################
+### 🚀 PERFORMANCE BENCHMARKS
+###############################################
+
+# Expected Response Times:
+# Dashboard:        < 2000ms
+# Course stats:     < 1000ms
+# Create transaction: < 500ms
+# Issue certificate:  < 1000ms (PDF generation)
+# Get certificate:    < 300ms
+# Revenue report:     < 3000ms
+# Completion report:  < 2000ms
+
+# Database Queries:
+# Simple selects:   < 100ms
+# Aggregations:     < 500ms
+# Complex joins:    < 1000ms
+
+
+###############################################
+### 💡 TIPS
+###############################################
+
+# 1. Run tests in order (scenarios build on each other)
+# 2. Check response times
+# 3. Verify data consistency
+# 4. Check logs for errors
+# 5. Monitor database queries
+# 6. Test with realistic data volumes
+# 7. Test concurrent requests
+# 8. Test edge cases
+
+###############################################
+### END OF TEST FILE
+###############################################
+
