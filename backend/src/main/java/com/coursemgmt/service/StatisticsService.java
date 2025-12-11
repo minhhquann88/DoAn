@@ -52,9 +52,9 @@ public class StatisticsService {
         stats.setYearlyRevenue(transactionRepository.calculateRevenueByDateRange(startOfYear, now));
         
         // Khóa học theo status
-        stats.setActiveCourses(courseRepository.countByStatus("PUBLISHED"));
-        stats.setPendingCourses(courseRepository.countByStatus("PENDING_APPROVAL"));
-        stats.setDraftCourses(courseRepository.countByStatus("DRAFT"));
+        stats.setActiveCourses(courseRepository.countByStatus(ECourseStatus.PUBLISHED));
+        stats.setPendingCourses(courseRepository.countByStatus(ECourseStatus.PENDING_APPROVAL));
+        stats.setDraftCourses(courseRepository.countByStatus(ECourseStatus.DRAFT));
         
         // Giao dịch theo status
         stats.setSuccessfulTransactions(transactionRepository.countByStatus("SUCCESS"));
@@ -63,7 +63,7 @@ public class StatisticsService {
         
         // Tỷ lệ hoàn thành
         Long totalEnrollments = enrollmentRepository.count();
-        Long completedEnrollments = enrollmentRepository.countByStatus("COMPLETED");
+        Long completedEnrollments = enrollmentRepository.countByStatus(EEnrollmentStatus.COMPLETED);
         
         stats.setCompletedEnrollments(completedEnrollments);
         stats.setInProgressEnrollments(totalEnrollments - completedEnrollments);
@@ -299,7 +299,7 @@ public class StatisticsService {
         
         // Overall stats
         Long totalEnrollments = enrollmentRepository.count();
-        Long completedEnrollments = enrollmentRepository.countByStatus("COMPLETED");
+        Long completedEnrollments = enrollmentRepository.countByStatus(EEnrollmentStatus.COMPLETED);
         
         report.setTotalEnrollments(totalEnrollments);
         report.setCompletedEnrollments(completedEnrollments);

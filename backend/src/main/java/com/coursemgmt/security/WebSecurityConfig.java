@@ -17,6 +17,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.Arrays;
 
 @Configuration
 @EnableMethodSecurity // Kích hoạt @PreAuthorize
@@ -26,6 +30,9 @@ public class WebSecurityConfig {
 
     @Autowired
     private AuthEntryPointJwt unauthorizedHandler;
+    
+    @Autowired
+    private CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
@@ -54,29 +61,53 @@ public class WebSecurityConfig {
     }
 
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000", "http://localhost:5177"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+        http
+                // CORS phải được cấu hình trước
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/api/auth/**").permitAll() // Cho phép tất cả truy cập API auth
+                        auth
+                                // QUAN TRỌNG: Đặt permitAll TRƯỚC .anyRequest().authenticated()
+                                // Cho phép OPTIONS requests (CORS preflight)
+                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                
+                                // Cho phép test các Module 6, 7, 8, 9 - TẤT CẢ METHODS
+                                .requestMatchers("/api/v1/**").permitAll()
+                                
+                                // Cho phép tất cả truy cập API auth
+                                .requestMatchers("/api/auth/**").permitAll()
+                                
+                                // Cho phép GET courses
                                 .requestMatchers(HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                                
+                                // Các endpoint cần authentication
                                 .requestMatchers(HttpMethod.GET, "/api/content/**").authenticated()
                                 .requestMatchers(HttpMethod.POST, "/api/content/**").authenticated()
-
-                                // THAY TẤT CẢ CÁC DÒNG QUẢN LÝ BẰNG 1 DÒNG NÀY:
-                                // "Tất cả request (GET, POST, PUT, DELETE) tới /api/manage/content/
-                                // đều phải có quyền ADMIN hoặc LECTURER"
                                 .requestMatchers("/api/manage/content/**").hasAnyRole("ADMIN", "LECTURER")
-
-                                // Giảng viên/Admin: Tạo/Update/Delete Test, xem thống kê, chấm bài
                                 .requestMatchers("/api/manage/tests/**").hasAnyRole("ADMIN", "LECTURER")
-
-                                // Học viên: Làm bài, xem kết quả
                                 .requestMatchers("/api/tests/**").hasRole("STUDENT")
 
+                                // Tất cả request khác cần authentication
                                 .anyRequest().authenticated()
-                );
+                )
+                // Không set exception handler - để Spring Security tự xử lý permitAll
+                ;
 
         http.authenticationProvider(authenticationProvider());
 

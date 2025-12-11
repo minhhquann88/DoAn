@@ -133,9 +133,7 @@ public class TransactionService {
         if (isValid && "00".equals(responseCode)) {
             // Payment success
             transaction.setStatus(ETransactionStatus.SUCCESS);
-            transaction.setCompletedAt(LocalDateTime.now());
-            transaction.setBankCode(params.get("vnp_BankCode"));
-            transaction.setCardType(params.get("vnp_CardType"));
+            // Note: completedAt, bankCode, cardType are not in Transaction model
             
             // Tự động tạo enrollment khi thanh toán thành công
             createEnrollmentAfterPayment(transaction);
@@ -227,10 +225,8 @@ public class TransactionService {
         dto.setPaymentGateway(transaction.getPaymentGateway().toString());
         dto.setTransactionStatus(transaction.getStatus().toString());
         dto.setTransactionCode(transaction.getTransactionCode());
-        dto.setBankCode(transaction.getBankCode());
-        dto.setCardType(transaction.getCardType());
         dto.setCreatedAt(transaction.getCreatedAt());
-        dto.setCompletedAt(transaction.getCompletedAt());
+        // Note: bankCode, cardType, completedAt are not in Transaction model
         return dto;
     }
 }

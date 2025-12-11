@@ -57,8 +57,8 @@ public class CertificateService {
         certificate.setEnrollment(enrollment);
         certificate.setCertificateCode(generateCertificateCode());
         certificate.setIssuedAt(LocalDateTime.now());
-        certificate.setCompletedAt(enrollment.getUpdatedAt());
-        certificate.setFinalScore(request.getFinalScore());
+        // Note: completedAt and finalScore are not in Certificate model
+        // They can be derived from enrollment if needed
         
         Certificate saved = certificateRepository.save(certificate);
         
@@ -171,9 +171,12 @@ public class CertificateService {
         dto.setId(certificate.getId());
         dto.setCertificateCode(certificate.getCertificateCode());
         dto.setIssuedAt(certificate.getIssuedAt());
-        dto.setCompletedAt(certificate.getCompletedAt());
         dto.setPdfUrl(certificate.getPdfUrl());
-        dto.setFinalScore(certificate.getFinalScore());
+        // completedAt and finalScore not available in Certificate model
+        // Can be set from enrollment if needed
+        if (certificate.getEnrollment() != null) {
+            dto.setCompletedAt(certificate.getEnrollment().getEnrolledAt());
+        }
         
         // Enrollment info
         if (certificate.getEnrollment() != null) {

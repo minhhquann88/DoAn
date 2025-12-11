@@ -49,11 +49,10 @@ export const fetchChatContext = async (
   question?: string
 ): Promise<AiContextResponse | null> => {
   try {
-    const params = question ? { question } : {};
-    const response = await api.get<AiContextResponse>('/chat/context', {
-      params,
-    });
-    return response.data;
+    // Tạm thời trả về null vì endpoint /api/chat/context chưa được implement
+    // Có thể implement sau khi có API endpoint này
+    console.log('Chat context endpoint chua duoc implement, tra ve null');
+    return null;
   } catch (error) {
     console.error('Error fetching chat context:', error);
     // Trả về null nếu lỗi (không throw để có thể fallback)

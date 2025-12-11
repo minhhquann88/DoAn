@@ -4,14 +4,21 @@ import com.coursemgmt.model.Course;
 import com.coursemgmt.model.ECourseStatus;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor; // Thêm cái này
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
-// Thêm JpaSpecificationExecutor để hỗ trợ lọc động
 public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecificationExecutor<Course> {
+
+    List<Course> findByInstructorId(Long instructorId);
+    
+    Long countByStatus(ECourseStatus status);
+    
+    @Query("SELECT COUNT(DISTINCT c.instructor.id) FROM Course c")
+    Long countDistinctInstructors();
 
     // Tạo Specification để lọc theo tiêu đề (keyword)
     static Specification<Course> titleContains(String keyword) {

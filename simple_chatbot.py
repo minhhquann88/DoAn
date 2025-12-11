@@ -20,11 +20,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import os
+from dotenv import load_dotenv
 
-# Cau hinh Gemini Pro API - API KEY MOI
-GEMINI_API_KEY = "AIzaSyBiapjuxYl6vXOJQc4I0eJcDO7DZAOxn6U"
+# Load environment variables from .env file
+load_dotenv()
+
+# Cau hinh Gemini Pro API - Doc tu bien moi truong
+# IMPORTANT: Khong hardcode API key trong code!
+# Set GEMINI_API_KEY trong file .env hoac bien moi truong
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError(
+        "GEMINI_API_KEY chua duoc cau hinh! "
+        "Vui long tao file .env hoac set bien moi truong GEMINI_API_KEY. "
+        "Xem file .env.example de biet cach cau hinh."
+    )
+
 # Dùng Gemini 2.5 Flash - model mới nhất
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Tao FastAPI app
 app = FastAPI(title="Elearning Chatbot AI")
@@ -215,7 +228,8 @@ if __name__ == "__main__":
     print("=" * 50)
     print("Khoi chay Elearning Chatbot AI - Test Version")
     print("=" * 50)
-    print(f"API Key: {GEMINI_API_KEY[:20]}...")
+    # Không in API key ra console để bảo mật
+    print(f"API Key: {'*' * 20}... (đã được cấu hình)")
     print(f"Model: {GEMINI_MODEL}")
     print(f"API Type: {'New (google-genai)' if USE_NEW_API else 'Old (google-generativeai)'}")
     print("Server se chay tai: http://localhost:8000")
