@@ -42,14 +42,18 @@ public class StatisticsService {
         stats.setTotalEnrollments(enrollmentRepository.count());
         stats.setTotalCertificates(certificateRepository.count());
         
-        // Doanh thu
+        // Doanh thu - handle NULL values
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfMonth = now.with(TemporalAdjusters.firstDayOfMonth()).withHour(0).withMinute(0);
         LocalDateTime startOfYear = now.with(TemporalAdjusters.firstDayOfYear()).withHour(0).withMinute(0);
         
-        stats.setTotalRevenue(calculateTotalRevenue());
-        stats.setMonthlyRevenue(transactionRepository.calculateRevenueByDateRange(startOfMonth, now));
-        stats.setYearlyRevenue(transactionRepository.calculateRevenueByDateRange(startOfYear, now));
+        Double totalRevenue = calculateTotalRevenue();
+        Double monthlyRevenue = transactionRepository.calculateRevenueByDateRange(startOfMonth, now);
+        Double yearlyRevenue = transactionRepository.calculateRevenueByDateRange(startOfYear, now);
+        
+        stats.setTotalRevenue(totalRevenue != null ? totalRevenue : 0.0);
+        stats.setMonthlyRevenue(monthlyRevenue != null ? monthlyRevenue : 0.0);
+        stats.setYearlyRevenue(yearlyRevenue != null ? yearlyRevenue : 0.0);
         
         // Khóa học theo status
         stats.setActiveCourses(courseRepository.countByStatus(ECourseStatus.PUBLISHED));
@@ -57,9 +61,9 @@ public class StatisticsService {
         stats.setDraftCourses(courseRepository.countByStatus(ECourseStatus.DRAFT));
         
         // Giao dịch theo status
-        stats.setSuccessfulTransactions(transactionRepository.countByStatus("SUCCESS"));
-        stats.setPendingTransactions(transactionRepository.countByStatus("PENDING"));
-        stats.setFailedTransactions(transactionRepository.countByStatus("FAILED"));
+        stats.setSuccessfulTransactions(transactionRepository.countByStatus(ETransactionStatus.SUCCESS));
+        stats.setPendingTransactions(transactionRepository.countByStatus(ETransactionStatus.PENDING));
+        stats.setFailedTransactions(transactionRepository.countByStatus(ETransactionStatus.FAILED));
         
         // Tỷ lệ hoàn thành
         Long totalEnrollments = enrollmentRepository.count();

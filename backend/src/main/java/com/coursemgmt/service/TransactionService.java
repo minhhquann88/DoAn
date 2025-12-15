@@ -48,25 +48,26 @@ public class TransactionService {
                     "Course not found with id: " + request.getCourseId()
                 ));
         
+        // Tắm validation để demo dễ dàng
         // Check if user already enrolled in this course
-        Optional<Enrollment> existingEnrollment = enrollmentRepository
-                .findByUserIdAndCourseId(user.getId(), course.getId());
+        // Optional<Enrollment> existingEnrollment = enrollmentRepository
+        //         .findByUserIdAndCourseId(user.getId(), course.getId());
         
-        if (existingEnrollment.isPresent()) {
-            throw new RuntimeException("User already enrolled in this course");
-        }
+        // if (existingEnrollment.isPresent()) {
+        //     throw new RuntimeException("User already enrolled in this course");
+        // }
         
         // Check if there's pending transaction
-        Optional<Transaction> pendingTx = transactionRepository
-                .findByUserIdAndCourseIdAndStatus(
-                    user.getId(), 
-                    course.getId(), 
-                    "PENDING"
-                );
+        // Optional<Transaction> pendingTx = transactionRepository
+        //         .findByUserIdAndCourseIdAndStatus(
+        //             user.getId(), 
+        //             course.getId(), 
+        //             ETransactionStatus.PENDING
+        //         );
         
-        if (pendingTx.isPresent()) {
-            throw new RuntimeException("There's already a pending transaction for this course");
-        }
+        // if (pendingTx.isPresent()) {
+        //     throw new RuntimeException("There's already a pending transaction for this course");
+        // }
         
         // Create transaction
         Transaction transaction = new Transaction();

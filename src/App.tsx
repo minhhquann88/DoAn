@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import ChatPage from './pages/ChatPage';
 import TestModulesPage from './pages/TestModulesPage';
+import ModuleTestPage from './pages/ModuleTestPage';
 import './App.css';
 
 const Navigation: React.FC = () => {
@@ -26,6 +27,12 @@ const Navigation: React.FC = () => {
           >
             🧪 Test Modules
           </Link>
+          <Link 
+            to="/module-test" 
+            className={location.pathname === '/module-test' ? 'nav-link active' : 'nav-link'}
+          >
+            📊 API Test Dashboard
+          </Link>
         </div>
       </div>
     </nav>
@@ -40,6 +47,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<ChatPage />} />
           <Route path="/test-modules" element={<TestModulesPage />} />
+          <Route path="/module-test" element={<ModuleTestPage />} />
         </Routes>
       </div>
     </BrowserRouter>

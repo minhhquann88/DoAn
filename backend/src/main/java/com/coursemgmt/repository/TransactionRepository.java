@@ -1,5 +1,6 @@
 package com.coursemgmt.repository;
 
+import com.coursemgmt.model.ETransactionStatus;
 import com.coursemgmt.model.Transaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,17 +26,17 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     Optional<Transaction> findByTransactionCode(String transactionCode);
     
     // Tìm theo status
-    Page<Transaction> findByStatus(String status, Pageable pageable);
+    Page<Transaction> findByStatus(ETransactionStatus status, Pageable pageable);
     
     // Đếm theo status
     @Query("SELECT COUNT(t) FROM Transaction t WHERE t.status = :status")
-    Long countByStatus(@Param("status") String status);
+    Long countByStatus(@Param("status") ETransactionStatus status);
     
     // Tìm giao dịch của user cho 1 course cụ thể
     Optional<Transaction> findByUserIdAndCourseIdAndStatus(
         Long userId, 
         Long courseId, 
-        String status
+        ETransactionStatus status
     );
     
     // Thống kê doanh thu theo khoảng thời gian

@@ -27,19 +27,17 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(AuthTokenFilter.class);
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        // Skip filter hoàn toàn cho các endpoint permitAll
+        return path.startsWith("/api/v1/") || path.startsWith("/api/auth/");
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         
-        String path = request.getRequestURI();
-        
-        // Bỏ qua hoàn toàn filter cho các endpoint /api/v1/** và /api/auth/**
-        // Để Spring Security tự xử lý permitAll
-        if (path.startsWith("/api/v1/") || path.startsWith("/api/auth/")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-        
-        // Chỉ xử lý JWT cho các endpoint khác
+        // Chỉ xử lý JWT cho các endpoint cần authentication
         try {
             String jwt = parseJwt(request);
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
@@ -57,7 +55,6 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e);
-            // Không throw exception để cho phép request tiếp tục
         }
 
         filterChain.doFilter(request, response);
