@@ -128,7 +128,7 @@ export const getQuickResponse = async (
   }
 
   try {
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Build prompt với context
     const contextSection = buildContextSection(context);
@@ -179,7 +179,7 @@ export const sendMessageToGemini = async (
   }
 
   try {
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Build conversation history
     const chatHistory = history || [];

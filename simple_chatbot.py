@@ -3,6 +3,13 @@ Elearning Chatbot AI - Simple Test Version (Updated for new Gemini API)
 """
 
 import time
+import sys
+import codecs
+
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+
 try:
     from google import genai as genai_new
     USE_NEW_API = True
@@ -36,8 +43,8 @@ if not GEMINI_API_KEY:
         "Xem file .env.example de biet cach cau hinh."
     )
 
-# Dùng Gemini 2.5 Flash - model mới nhất
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Dùng Gemini 2.0 Flash Exp - model mới nhất available
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
 
 # Tao FastAPI app
 app = FastAPI(title="Elearning Chatbot AI")
@@ -226,13 +233,13 @@ async def get_sample_courses():
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("Khoi chay Elearning Chatbot AI - Test Version")
+    print("Starting Elearning Chatbot AI - Test Version")
     print("=" * 50)
     # Không in API key ra console để bảo mật
-    print(f"API Key: {'*' * 20}... (đã được cấu hình)")
+    print(f"API Key: {'*' * 20}... (configured)")
     print(f"Model: {GEMINI_MODEL}")
     print(f"API Type: {'New (google-genai)' if USE_NEW_API else 'Old (google-generativeai)'}")
-    print("Server se chay tai: http://localhost:8000")
+    print("Server running at: http://localhost:8000")
     print("API docs: http://localhost:8000/docs")
     print("=" * 50)
     
