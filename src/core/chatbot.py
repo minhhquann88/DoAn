@@ -2,7 +2,19 @@
 Core Chatbot Implementation using Gemini Pro API
 """
 
-import google.generativeai as genai
+try:
+    # Try new API client first (google-genai package)
+    from google import genai as genai_new
+    USE_NEW_API = True
+except ImportError:
+    try:
+        # Fallback to old SDK (google-generativeai)
+        import google.generativeai as genai
+        USE_NEW_API = False
+    except ImportError:
+        logger.error("Neither google-genai nor google-generativeai is installed!")
+        raise
+
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import json
@@ -20,16 +32,25 @@ class ElearningChatbot:
     
     def __init__(self):
         self.model = None
+        self.client = None
         self.rag_system = None
         self.session_manager = SessionManager()
         self.is_initialized = False
+        self.use_new_api = USE_NEW_API
         
     async def initialize(self):
         """Initialize the chatbot with Gemini Pro API"""
         try:
-            # Configure Gemini Pro API
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+            if self.use_new_api:
+                # Use new API client (gemini-2.5-flash)
+                # API key được tự động lấy từ env variable GEMINI_API_KEY
+                self.client = genai_new.Client()
+                logger.info(f"Using new Gemini API client with model: {settings.GEMINI_MODEL}")
+            else:
+                # Configure Gemini Pro API (old SDK)
+                genai.configure(api_key=settings.GEMINI_API_KEY)
+                self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+                logger.info(f"Using old Gemini SDK with model: {settings.GEMINI_MODEL}")
             
             # Initialize RAG system
             self.rag_system = RAGSystem()
@@ -121,14 +142,24 @@ class ElearningChatbot:
         prompt = self._build_prompt(message, context, history, user_id)
         
         try:
-            # Generate response using Gemini Pro
-            response = await asyncio.to_thread(
-                self.model.generate_content, 
-                prompt
-            )
-            
-            # Parse response
-            response_text = response.text
+            # Generate response using Gemini API
+            if self.use_new_api and self.client:
+                # Use new API client (gemini-2.5-flash)
+                response = await asyncio.to_thread(
+                    self.client.models.generate_content,
+                    model=settings.GEMINI_MODEL,
+                    contents=prompt
+                )
+                response_text = response.text
+            elif self.model:
+                # Use old SDK
+                response = await asyncio.to_thread(
+                    self.model.generate_content, 
+                    prompt
+                )
+                response_text = response.text
+            else:
+                raise RuntimeError("Neither new API client nor old model is initialized")
             
             # Extract structured information if available
             suggestions = self._extract_suggestions(response_text)

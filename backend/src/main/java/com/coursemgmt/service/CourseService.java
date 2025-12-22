@@ -3,6 +3,7 @@ package com.coursemgmt.service;
 import com.coursemgmt.dto.CourseRequest;
 import com.coursemgmt.dto.CourseResponse;
 import com.coursemgmt.dto.CourseStatisticsResponse;
+import com.coursemgmt.exception.ResourceNotFoundException;
 import com.coursemgmt.model.*;
 import com.coursemgmt.repository.CategoryRepository;
 import com.coursemgmt.repository.CourseRepository;
@@ -122,7 +123,7 @@ public class CourseService {
     // Chức năng 5: Lấy 1 khóa học
     public CourseResponse getCourseById(Long courseId) {
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found!"));
+                .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
         return CourseResponse.fromEntity(course);
     }
 

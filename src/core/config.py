@@ -8,7 +8,7 @@ from typing import Optional
 class Settings(BaseSettings):
     # Gemini Pro API Configuration
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-pro"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     
     # Database Configuration
     DATABASE_URL: str = "sqlite:///./elearning_chatbot.db"

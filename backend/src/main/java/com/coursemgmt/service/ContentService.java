@@ -4,6 +4,7 @@ import com.coursemgmt.dto.ChapterRequest;
 import com.coursemgmt.dto.ChapterResponse;
 import com.coursemgmt.dto.LessonRequest;
 import com.coursemgmt.dto.LessonResponse;
+import com.coursemgmt.exception.ResourceNotFoundException;
 import com.coursemgmt.model.*;
 import com.coursemgmt.repository.*;
 import com.coursemgmt.security.services.UserDetailsImpl;
@@ -111,11 +112,14 @@ public class ContentService {
 
     // Lấy toàn bộ nội dung (chapters + lessons) của 1 khóa học
     public List<ChapterResponse> getCourseContent(Long courseId, UserDetailsImpl userDetails) {
-        User user = userRepository.findById(userDetails.getId()).orElse(null);
-        Course course = courseRepository.findById(courseId).orElseThrow(() -> new RuntimeException("Course not found!"));
+        User user = userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userDetails.getId()));
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
 
         // Kiểm tra xem user có phải là chủ khóa học không
-        boolean isInstructor = course.getInstructor().getId().equals(user.getId());
+        boolean isInstructor = course.getInstructor() != null && 
+                               course.getInstructor().getId().equals(user.getId());
 
         // Lấy thông tin Enrollment
         Enrollment enrollment = enrollmentRepository.findByUserAndCourse(user, course).orElse(null);
