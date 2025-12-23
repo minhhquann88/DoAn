@@ -330,7 +330,7 @@ CREATE TABLE chat_messages (
     session_id VARCHAR(255),
     message_content TEXT NOT NULL,
     response_content TEXT,
-    feedback_rating TINYINT UNSIGNED CHECK (feedback_rating BETWEEN 1 AND 5),
+    feedback_rating INT CHECK (feedback_rating BETWEEN 1 AND 5),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

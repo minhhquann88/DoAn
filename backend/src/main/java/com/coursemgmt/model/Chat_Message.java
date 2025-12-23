@@ -24,7 +24,7 @@ public class Chat_Message {
     @Column(name = "response_content")
     private String responseContent; // Bot trả lời
 
-    @Column(name = "feedback_rating")
+    @Column(name = "feedback_rating", columnDefinition = "TINYINT UNSIGNED")
     private Integer feedbackRating; // 1-5 sao
 
     @Column(name = "created_at")
