@@ -17,11 +17,11 @@ public class Chat_Message {
     private String sessionId; // Để nhóm các tin nhắn trong 1 phiên
 
     @Lob
-    @Column(name = "message_content", nullable = false)
+    @Column(name = "message_content", nullable = false, columnDefinition = "LONGTEXT")
     private String messageContent; // User gửi
 
     @Lob
-    @Column(name = "response_content")
+    @Column(name = "response_content", columnDefinition = "LONGTEXT")
     private String responseContent; // Bot trả lời
 
     @Column(name = "feedback_rating")
