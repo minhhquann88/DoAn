@@ -25,17 +25,26 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column(name = "full_name", nullable = false)
     private String fullName;
 
+    @Column(name = "avatar_url")
     private String avatarUrl;
 
     @Lob
     private String bio;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "is_enabled")
     private Boolean isEnabled = false; // Mặc định là false để kích hoạt
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+    
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     // (n-n) User có nhiều Role
     @ManyToMany(fetch = FetchType.EAGER) // Tải Role ngay khi tải User

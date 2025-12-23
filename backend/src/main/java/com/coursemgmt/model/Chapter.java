@@ -2,6 +2,7 @@ package com.coursemgmt.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -17,6 +18,12 @@ public class Chapter {
     private String title;
 
     private Integer position; // Thứ tự chương
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     // (n-1) Nhiều Chapter thuộc 1 Course
     @ManyToOne(fetch = FetchType.LAZY)

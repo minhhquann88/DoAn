@@ -2,6 +2,7 @@ package com.coursemgmt.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "roles")
@@ -16,4 +17,9 @@ public class Role {
     @Enumerated(EnumType.STRING)
     @Column(length = 20, unique = true, nullable = false)
     private ERole name;
+    
+    private String description;
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 }

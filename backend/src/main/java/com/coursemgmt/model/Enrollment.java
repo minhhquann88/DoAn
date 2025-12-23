@@ -14,7 +14,14 @@ public class Enrollment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "enrolled_at")
     private LocalDateTime enrolledAt;
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+    
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
 
     private Double progress = 0.0; // Mặc định là 0%
 

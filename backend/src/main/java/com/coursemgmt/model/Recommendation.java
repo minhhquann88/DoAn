@@ -13,10 +13,12 @@ public class Recommendation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "recommendation_score")
     private Double recommendationScore;
 
     private String reason; // Lý do gợi ý
 
+    @Column(name = "generated_at")
     private LocalDateTime generatedAt;
 
     // (n-1) Gợi ý cho 1 User

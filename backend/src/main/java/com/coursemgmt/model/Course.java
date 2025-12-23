@@ -23,16 +23,37 @@ public class Course {
     @Column(nullable = false)
     private Double price;
 
+    @Column(name = "image_url")
     private String imageUrl;
 
+    @Column(name = "total_duration_in_hours")
     private Integer totalDurationInHours;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
     private ECourseStatus status; // Enum: DRAFT, PENDING_APPROVAL, PUBLISHED
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+    
+    // Denormalized stats fields
+    @Column(name = "total_enrollments")
+    private Integer totalEnrollments = 0;
+    
+    @Column(name = "total_lessons")
+    private Integer totalLessons = 0;
+    
+    @Column(name = "average_rating")
+    private Double averageRating = 0.0;
+    
+    @Column(name = "total_reviews")
+    private Integer totalReviews = 0;
 
     // (n-1) Nhiều Course thuộc 1 Giảng viên (User)
     @ManyToOne(fetch = FetchType.LAZY)

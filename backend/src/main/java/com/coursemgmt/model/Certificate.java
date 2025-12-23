@@ -13,12 +13,17 @@ public class Certificate {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "certificate_code", unique = true, nullable = false)
     private String certificateCode; // Mã chứng chỉ
 
+    @Column(name = "pdf_url")
     private String pdfUrl; // Đường dẫn PDF
 
+    @Column(name = "issued_at")
     private LocalDateTime issuedAt; // Ngày cấp
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
     // (1-1) Nối với Enrollment
     @OneToOne(fetch = FetchType.LAZY)

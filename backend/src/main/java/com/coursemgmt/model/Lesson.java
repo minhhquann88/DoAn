@@ -2,6 +2,7 @@ package com.coursemgmt.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -17,11 +18,13 @@ public class Lesson {
     private String title;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
-    private EContentType contentType; // Enum: VIDEO, TEXT, DOCUMENT, TEST
+    @Column(name = "content_type", length = 20)
+    private EContentType contentType; // Enum: VIDEO, TEXT, DOCUMENT
 
+    @Column(name = "video_url")
     private String videoUrl;
 
+    @Column(name = "document_url")
     private String documentUrl;
 
     @Lob // Dùng cho nội dung text dài
@@ -29,7 +32,14 @@ public class Lesson {
 
     private Integer position; // Thứ tự bài học
 
+    @Column(name = "duration_in_minutes")
     private Integer durationInMinutes;
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     // (n-1) Nhiều Lesson thuộc 1 Chapter
     @ManyToOne(fetch = FetchType.LAZY)

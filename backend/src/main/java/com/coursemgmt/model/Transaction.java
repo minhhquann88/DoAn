@@ -21,11 +21,17 @@ public class Transaction {
     private ETransactionStatus status; // Enum: PENDING, SUCCESS, FAILED
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 20)
+    @Column(name = "payment_gateway", length = 20)
     private EPaymentGateway paymentGateway; // Enum: VNPAY, MOMO
 
+    @Column(name = "transaction_code")
     private String transactionCode; // Mã giao dịch từ cổng thanh toán
+    
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     // (n-1) Giao dịch của 1 User
     @ManyToOne(fetch = FetchType.LAZY)
