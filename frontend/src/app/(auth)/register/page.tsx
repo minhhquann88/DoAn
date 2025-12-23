@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Eye, EyeOff, BookOpen, User, GraduationCap } from 'lucide-react';
@@ -42,6 +42,7 @@ export default function RegisterPage() {
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -263,7 +264,19 @@ export default function RegisterPage() {
               
               {/* Terms */}
               <div className="flex items-start space-x-2">
-                <Checkbox id="acceptTerms" {...register('acceptTerms')} />
+                <Controller
+                  name="acceptTerms"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="acceptTerms"
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked === true);
+                      }}
+                    />
+                  )}
+                />
                 <Label 
                   htmlFor="acceptTerms" 
                   className="text-sm font-normal cursor-pointer leading-relaxed"
