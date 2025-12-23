@@ -87,6 +87,23 @@ CREATE TABLE password_reset_tokens (
 ) ENGINE=InnoDB;
 
 -- ============================================
+-- PASSWORD RESET TOKENS
+-- ============================================
+
+CREATE TABLE password_reset_token (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    user_id BIGINT UNSIGNED NOT NULL,
+    expiry_date DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_token (token),
+    INDEX idx_user_id (user_id),
+    INDEX idx_expiry_date (expiry_date)
+) ENGINE=InnoDB;
+
+-- ============================================
 -- 2. CATEGORIES
 -- ============================================
 
