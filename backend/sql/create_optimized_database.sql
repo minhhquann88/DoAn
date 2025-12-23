@@ -118,7 +118,7 @@ CREATE TABLE courses (
     category_id BIGINT UNSIGNED NOT NULL,
     
     -- Pricing
-    price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    price DOUBLE NOT NULL DEFAULT 0.00,
     
     -- Media
     image_url VARCHAR(500),
@@ -135,7 +135,7 @@ CREATE TABLE courses (
     -- Stats (denormalized for performance)
     total_enrollments INT UNSIGNED DEFAULT 0,
     total_lessons INT UNSIGNED DEFAULT 0,
-    average_rating DECIMAL(3,2) DEFAULT 0.00,
+    average_rating DOUBLE DEFAULT 0.00,
     total_reviews INT UNSIGNED DEFAULT 0,
     
     -- Timestamps
@@ -214,7 +214,7 @@ CREATE TABLE enrollments (
     course_id BIGINT UNSIGNED NOT NULL,
     
     -- Progress
-    progress DECIMAL(5,2) DEFAULT 0.00 COMMENT 'Percentage 0-100',
+    progress DOUBLE DEFAULT 0.00 COMMENT 'Percentage 0-100',
     
     -- Status
     status ENUM('IN_PROGRESS', 'COMPLETED') DEFAULT 'IN_PROGRESS',
@@ -271,7 +271,7 @@ CREATE TABLE transactions (
     course_id BIGINT UNSIGNED NOT NULL,
     
     -- Amount
-    amount DECIMAL(10,2) NOT NULL,
+    amount DOUBLE NOT NULL,
     
     -- Payment Gateway
     payment_gateway ENUM('VNPAY', 'MOMO') NOT NULL,
@@ -347,7 +347,7 @@ CREATE TABLE recommendations (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NOT NULL,
     course_id BIGINT UNSIGNED NOT NULL,
-    recommendation_score DECIMAL(5,2) DEFAULT 0.00,
+    recommendation_score DOUBLE DEFAULT 0.00,
     reason TEXT,
     generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
