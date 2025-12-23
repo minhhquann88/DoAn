@@ -41,7 +41,7 @@ CREATE TABLE users (
     full_name VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     avatar_url VARCHAR(500),
-    bio TEXT,
+    bio LONGTEXT,
     
     -- Status & verification
     is_enabled BOOLEAN DEFAULT FALSE,
@@ -93,7 +93,7 @@ CREATE TABLE password_reset_tokens (
 CREATE TABLE categories (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL UNIQUE,
-    description TEXT,
+    description LONGTEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
@@ -112,7 +112,7 @@ CREATE TABLE courses (
     
     -- Basic info
     title VARCHAR(200) NOT NULL,
-    description TEXT,
+    description LONGTEXT,
     
     -- Classification
     category_id BIGINT UNSIGNED NOT NULL,

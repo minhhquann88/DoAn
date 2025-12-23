@@ -27,7 +27,8 @@ public class Lesson {
     @Column(name = "document_url")
     private String documentUrl;
 
-    @Lob // Dùng cho nội dung text dài
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String content;
 
     private Integer position; // Thứ tự bài học

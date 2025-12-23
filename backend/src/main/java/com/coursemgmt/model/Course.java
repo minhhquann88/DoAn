@@ -17,7 +17,8 @@ public class Course {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Lob // Dùng @Lob thay cho columnDefinition
+    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
 
     @Column(nullable = false)

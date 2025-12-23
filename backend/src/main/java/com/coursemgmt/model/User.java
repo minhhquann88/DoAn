@@ -32,6 +32,7 @@ public class User {
     private String avatarUrl;
 
     @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String bio;
 
     @Column(name = "created_at")
