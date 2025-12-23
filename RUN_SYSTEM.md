@@ -87,7 +87,57 @@ NEXT_PUBLIC_API_URL=http://localhost:8080/api
 
 ---
 
-## 🔄 3. CHẠY CẢ HAI CÙNG LÚC
+## 🤖 3. CHATBOT SERVICE (Python FastAPI)
+
+**Lưu ý:** Chatbot là một service riêng biệt, chạy độc lập với backend và frontend.
+
+### Cài đặt Dependencies
+
+```bash
+# Cài đặt Python dependencies
+pip install -r requirements.txt
+```
+
+### Chạy Chatbot
+
+**Windows:**
+```bash
+# Cách 1: Sử dụng script có sẵn
+.\start_chatbot.ps1
+
+# Cách 2: Chạy trực tiếp
+cd src
+python main.py
+```
+
+**Linux/Mac:**
+```bash
+cd src
+python3 main.py
+```
+
+**Hoặc sử dụng uvicorn:**
+```bash
+uvicorn src.main:app --reload --port 8000
+```
+
+**Chatbot sẽ chạy tại:** `http://localhost:8000`
+
+**API Documentation:** `http://localhost:8000/docs`
+
+### Cấu hình Chatbot
+
+**File:** `.env` (tạo nếu chưa có)
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.0-flash-exp
+DATABASE_URL=sqlite:///./chatbot.db
+```
+
+---
+
+## 🔄 4. CHẠY CẢ BA SERVICES CÙNG LÚC
 
 ### Windows PowerShell
 
@@ -101,6 +151,12 @@ cd C:\Users\Admin\Downloads\DATN\backend
 ```powershell
 cd C:\Users\Admin\Downloads\DATN\frontend
 npm run dev
+```
+
+**Terminal 3 - Chatbot:**
+```powershell
+cd C:\Users\Admin\Downloads\DATN
+.\start_chatbot.ps1
 ```
 
 ### Windows CMD
@@ -131,13 +187,21 @@ cd frontend
 npm run dev
 ```
 
+**Terminal 3 - Chatbot:**
+```bash
+cd src
+python3 main.py
+# hoặc
+uvicorn src.main:app --reload --port 8000
+```
+
 ---
 
 ## 📝 4. SCRIPTS TIỆN ÍCH
 
 ### Windows PowerShell Script
 
-Tạo file `start-dev.ps1`:
+Tạo file `start-all.ps1`:
 
 ```powershell
 # Start Backend
@@ -148,16 +212,22 @@ Start-Sleep -Seconds 5
 
 # Start Frontend
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd frontend; npm run dev"
+
+# Wait 5 seconds
+Start-Sleep -Seconds 5
+
+# Start Chatbot
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd $PSScriptRoot; .\start_chatbot.ps1"
 ```
 
 Chạy:
 ```powershell
-.\start-dev.ps1
+.\start-all.ps1
 ```
 
 ### Linux/Mac Bash Script
 
-Tạo file `start-dev.sh`:
+Tạo file `start-all.sh`:
 
 ```bash
 #!/bin/bash
@@ -169,13 +239,21 @@ BACKEND_PID=$!
 # Wait 5 seconds
 sleep 5
 
-# Start Frontend
+# Start Frontend in background
 cd frontend && npm run dev &
 FRONTEND_PID=$!
 
-echo "Backend PID: $BACKEND_PID"
-echo "Frontend PID: $FRONTEND_PID"
-echo "Press Ctrl+C to stop both"
+# Wait 5 seconds
+sleep 5
+
+# Start Chatbot in background
+cd src && python3 main.py &
+CHATBOT_PID=$!
+
+echo "Backend PID: $BACKEND_PID (port 8080)"
+echo "Frontend PID: $FRONTEND_PID (port 3000)"
+echo "Chatbot PID: $CHATBOT_PID (port 8000)"
+echo "Press Ctrl+C to stop all"
 
 # Wait for user interrupt
 wait
@@ -183,8 +261,8 @@ wait
 
 Chạy:
 ```bash
-chmod +x start-dev.sh
-./start-dev.sh
+chmod +x start-all.sh
+./start-all.sh
 ```
 
 ---
@@ -204,25 +282,48 @@ Hoặc mở: `http://localhost:8080/api/courses`
 
 Mở browser: `http://localhost:3000`
 
+### Chatbot Health Check
+
+Mở browser hoặc dùng curl:
+```bash
+curl http://localhost:8000/api/health
+```
+
+Hoặc mở: `http://localhost:8000/docs` (API documentation)
+
+### Tất cả Services
+
+| Service | URL | Status Check |
+|---------|-----|--------------|
+| Backend | http://localhost:8080 | `/api/courses` |
+| Frontend | http://localhost:3000 | Home page |
+| Chatbot | http://localhost:8000 | `/api/health` |
+
 ---
 
 ## 🛑 6. DỪNG HỆ THỐNG
 
-### Dừng Backend
-- Nhấn `Ctrl + C` trong terminal backend
-
-### Dừng Frontend
-- Nhấn `Ctrl + C` trong terminal frontend
+### Dừng từng Service
+- **Backend:** Nhấn `Ctrl + C` trong terminal backend
+- **Frontend:** Nhấn `Ctrl + C` trong terminal frontend
+- **Chatbot:** Nhấn `Ctrl + C` trong terminal chatbot
 
 ### Dừng tất cả (Windows PowerShell)
 ```powershell
-Get-Process | Where-Object {$_.ProcessName -like "*java*" -or $_.ProcessName -like "*node*"} | Stop-Process
+Get-Process | Where-Object {
+    $_.ProcessName -like "*java*" -or 
+    $_.ProcessName -like "*node*" -or 
+    $_.ProcessName -like "*python*" -or
+    $_.ProcessName -like "*uvicorn*"
+} | Stop-Process
 ```
 
 ### Dừng tất cả (Linux/Mac)
 ```bash
 pkill -f "spring-boot:run"
 pkill -f "next dev"
+pkill -f "uvicorn"
+pkill -f "python.*main.py"
 ```
 
 ---
@@ -277,6 +378,33 @@ pkill -f "next dev"
 Nếu gặp CORS error, kiểm tra:
 - Backend đã cấu hình CORS trong `WebSecurityConfig.java`
 - Frontend đang gọi đúng API URL
+- Chatbot đã cấu hình CORS trong FastAPI
+
+### Chatbot không chạy được
+
+1. **Kiểm tra Python version:**
+   ```bash
+   python --version  # Phải là Python 3.8+
+   ```
+
+2. **Kiểm tra dependencies:**
+   ```bash
+   pip list | grep fastapi
+   pip list | grep uvicorn
+   ```
+
+3. **Kiểm tra .env file:**
+   - Có file `.env` trong root directory?
+   - `GEMINI_API_KEY` đã được set chưa?
+
+4. **Kiểm tra port 8000:**
+   ```bash
+   # Windows
+   netstat -ano | findstr :8000
+   
+   # Linux/Mac
+   lsof -i :8000
+   ```
 
 ---
 
@@ -320,17 +448,30 @@ npm start
 
 **Nhanh nhất để chạy hệ thống:**
 
-1. **Terminal 1:**
+1. **Terminal 1 - Backend:**
    ```bash
    cd backend && .\mvnw.cmd spring-boot:run
    ```
 
-2. **Terminal 2:**
+2. **Terminal 2 - Frontend:**
    ```bash
    cd frontend && npm run dev
    ```
 
-3. **Mở browser:** `http://localhost:3000`
+3. **Terminal 3 - Chatbot:**
+   ```bash
+   .\start_chatbot.ps1
+   ```
+
+4. **Mở browser:** 
+   - Frontend: `http://localhost:3000`
+   - Backend API: `http://localhost:8080/api/courses`
+   - Chatbot API: `http://localhost:8000/docs`
+
+**Hoặc sử dụng script tự động:**
+```powershell
+.\start-all.ps1
+```
 
 ---
 
