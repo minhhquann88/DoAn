@@ -52,9 +52,6 @@ public class User {
     @OneToMany(mappedBy = "user")
     private List<Enrollment> enrollments;
 
-    // (1-n) 1 Học viên có nhiều Bài nộp
-    @OneToMany(mappedBy = "user")
-    private List<Test_Result> testResults;
 
     // (1-n) 1 User có nhiều Giao dịch
     @OneToMany(mappedBy = "user")

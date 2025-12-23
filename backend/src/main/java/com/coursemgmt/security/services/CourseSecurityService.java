@@ -17,8 +17,6 @@ public class CourseSecurityService {
     @Autowired private LessonRepository lessonRepository;
     @Autowired private EnrollmentRepository enrollmentRepository;
     @Autowired private UserRepository userRepository;
-    @Autowired private TestRepository testRepository;
-    @Autowired private TestResultRepository testResultRepository;
 
     // Kiểm tra chủ khóa học
     public boolean isInstructor(Authentication authentication, Long courseId) {
@@ -47,23 +45,6 @@ public class CourseSecurityService {
         return lesson.getChapter().getCourse().getInstructor().getId().equals(userDetails.getId());
     }
 
-    // Kiểm tra chủ bài test
-    public boolean isInstructorOfTest(Authentication authentication, Long testId) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        Test test = testRepository.findById(testId).orElse(null);
-        if (test == null) return false;
-
-        return test.getLesson().getChapter().getCourse().getInstructor().getId().equals(userDetails.getId());
-    }
-
-    // Kiểm tra chủ bài nộp
-    public boolean isOwnerOfResult(Authentication authentication, Long resultId) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        Test_Result result = testResultRepository.findById(resultId).orElse(null);
-        if (result == null || result.getUser() == null) return false;
-
-        return result.getUser().getId().equals(userDetails.getId());
-    }
 
     // Kiểm tra đã ghi danh (cho bài học)
     public boolean isEnrolled(Authentication authentication, Long lessonId) {
@@ -77,15 +58,4 @@ public class CourseSecurityService {
         return enrollmentRepository.findByUserAndCourse(user, course).isPresent();
     }
 
-    // Kiểm tra đã ghi danh (cho bài test)
-    public boolean isEnrolledInTest(Authentication authentication, Long testId) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        User user = userRepository.findById(userDetails.getId()).orElse(null);
-        Test test = testRepository.findById(testId).orElse(null);
-
-        if (user == null || test == null) return false;
-
-        Course course = test.getLesson().getChapter().getCourse();
-        return enrollmentRepository.findByUserAndCourse(user, course).isPresent();
-    }
 }

@@ -80,21 +80,7 @@ export const approveCourse = async (id: string): Promise<Course> => {
   return response.data;
 };
 
-/**
- * Get course statistics (Instructor/Admin)
- */
-export const getCourseStatistics = async (id: string) => {
-  const response = await apiClient.get(`/courses/${id}/statistics`);
-  return response.data;
-};
 
-/**
- * Get instructor's courses
- */
-export const getInstructorCourses = async (): Promise<Course[]> => {
-  const response = await apiClient.get<Course[]>('/courses/instructor/my-courses');
-  return response.data;
-};
 
 /**
  * Get pending courses (Admin)

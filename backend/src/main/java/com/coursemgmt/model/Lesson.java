@@ -36,9 +36,6 @@ public class Lesson {
     @JoinColumn(name = "chapter_id", nullable = false)
     private Chapter chapter;
 
-    // (1-n) 1 Lesson có nhiều Bài kiểm tra
-    @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Test> tests;
 
     // (1-n) 1 Lesson có nhiều Tiến độ
     @OneToMany(mappedBy = "lesson")

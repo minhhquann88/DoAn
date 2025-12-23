@@ -11,7 +11,7 @@ public class LessonRequest {
     private String title;
 
     @NotNull
-    private EContentType contentType; // VIDEO, TEXT, DOCUMENT, TEST
+    private EContentType contentType; // VIDEO, TEXT, DOCUMENT
 
     private String videoUrl;
     private String documentUrl;

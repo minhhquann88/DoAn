@@ -124,10 +124,6 @@ export default function LearningPage() {
         return <PlayCircle className="h-4 w-4" />;
       case 'ARTICLE':
         return <FileText className="h-4 w-4" />;
-      case 'QUIZ':
-        return <ClipboardList className="h-4 w-4" />;
-      case 'ASSIGNMENT':
-        return <BookOpen className="h-4 w-4" />;
       default:
         return <Circle className="h-4 w-4" />;
     }

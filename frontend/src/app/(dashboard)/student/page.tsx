@@ -67,13 +67,6 @@ const mockRecentActivity = [
     time: '2 hours ago',
   },
   {
-    id: 2,
-    type: 'QUIZ_PASSED',
-    title: 'Quiz passed with 95% score',
-    course: 'TypeScript Advanced Patterns',
-    time: '1 day ago',
-  },
-  {
     id: 3,
     type: 'CERTIFICATE_EARNED',
     title: 'Certificate earned',
@@ -295,7 +288,6 @@ export default function StudentDashboard() {
                     >
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                         {activity.type === 'LESSON_COMPLETED' && <PlayCircle className="h-5 w-5 text-primary" />}
-                        {activity.type === 'QUIZ_PASSED' && <Target className="h-5 w-5 text-accent" />}
                         {activity.type === 'CERTIFICATE_EARNED' && <Award className="h-5 w-5 text-secondary" />}
                       </div>
                       <div className="flex-1 min-w-0">

@@ -149,7 +149,7 @@ export interface Lesson {
   id: number;
   title: string;
   description?: string;
-  type: 'VIDEO' | 'ARTICLE' | 'QUIZ' | 'ASSIGNMENT' | 'LIVE_SESSION';
+  type: 'VIDEO' | 'ARTICLE' | 'LIVE_SESSION';
   order: number;
   duration?: number; // in minutes
   sectionId: number;
@@ -169,83 +169,6 @@ export interface Resource {
   lessonId: number;
 }
 
-// Quiz Types
-export interface Quiz {
-  id: number;
-  title: string;
-  description?: string;
-  courseId?: number;
-  lessonId?: number;
-  timeLimit?: number; // in minutes
-  passingScore: number;
-  attemptsAllowed: number;
-  showCorrectAnswers: boolean;
-  randomizeQuestions: boolean;
-  questions: Question[];
-  openDate?: string;
-  closeDate?: string;
-}
-
-export interface Question {
-  id: number;
-  quizId: number;
-  question: string;
-  type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'ESSAY';
-  options?: string[];
-  correctAnswer?: string | string[];
-  points: number;
-  order: number;
-  explanation?: string;
-}
-
-export interface QuizAttempt {
-  id: number;
-  quizId: number;
-  studentId: number;
-  answers: QuestionAnswer[];
-  score: number;
-  totalPoints: number;
-  startTime: string;
-  endTime?: string;
-  status: 'IN_PROGRESS' | 'COMPLETED' | 'GRADED';
-}
-
-export interface QuestionAnswer {
-  questionId: number;
-  answer: string | string[];
-  isCorrect?: boolean;
-  pointsEarned?: number;
-}
-
-// Assignment Types
-export interface Assignment {
-  id: number;
-  title: string;
-  description: string;
-  courseId?: number;
-  lessonId?: number;
-  maxScore: number;
-  openDate?: string;
-  dueDate?: string;
-  allowLateSubmission: boolean;
-  instructions?: string;
-  attachments?: Resource[];
-}
-
-export interface AssignmentSubmission {
-  id: number;
-  assignmentId: number;
-  studentId: number;
-  studentName?: string;
-  content?: string;
-  attachments?: Resource[];
-  submittedAt: string;
-  status: 'SUBMITTED' | 'GRADED' | 'RETURNED';
-  score?: number;
-  feedback?: string;
-  gradedBy?: number;
-  gradedAt?: string;
-}
 
 // Enrollment Types
 export interface Enrollment {
@@ -271,8 +194,6 @@ export interface Progress {
   progressPercentage: number;
   timeSpent?: number; // in minutes
   lastAccessedLesson?: Lesson;
-  quizScores?: { quizId: number; score: number }[];
-  assignmentScores?: { assignmentId: number; score: number }[];
 }
 
 // Certificate Types

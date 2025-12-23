@@ -1,18 +1,14 @@
 // API Integration Test Script
 // Run this in browser console after logging in
 
-import { 
-  authService,
-  courseService,
-  contentService,
-  quizService,
-  assignmentService,
-  enrollmentService,
-  instructorService,
-  statisticsService,
-  paymentService,
-  chatbotService,
-} from '@/services';
+import * as authService from '@/services/authService';
+import * as courseService from '@/services/courseService';
+import * as contentService from '@/services/contentService';
+import * as enrollmentService from '@/services/enrollmentService';
+import * as instructorService from '@/services/instructorService';
+import * as statisticsService from '@/services/statisticsService';
+import * as paymentService from '@/services/paymentService';
+import * as chatbotService from '@/services/chatbotService';
 
 interface TestResult {
   module: string;
@@ -134,82 +130,28 @@ async function testAllModules(): Promise<void> {
   }
   console.log('');
 
-  // Module 4: Quiz/Test
-  try {
-    console.log('📝 Module 4: Quiz/Test');
-    
-    if (testCourseId) {
-      const quizzes = await quizService.getCourseQuizzes(testCourseId);
-      
-      results.push({
-        module: 'Quiz/Test',
-        status: 'PASS',
-        message: `Loaded ${quizzes?.length || 0} quizzes`,
-        data: quizzes,
-      });
-      console.log('  ✅ Quizzes loaded:', quizzes?.length || 0);
-    } else {
-      results.push({
-        module: 'Quiz/Test',
-        status: 'SKIP',
-        message: 'No test course available',
-      });
-      console.log('  ⊘ Skipped (no test course)');
-    }
-  } catch (error: any) {
-    results.push({
-      module: 'Quiz/Test',
-      status: 'FAIL',
-      message: error.message || 'Failed to load quizzes',
-    });
-    console.log('  ❌ Error:', error.message);
-  }
-  console.log('');
-
-  // Module 5: Assignment
-  try {
-    console.log('📋 Module 5: Assignment');
-    
-    if (testCourseId) {
-      const assignments = await assignmentService.getCourseAssignments(testCourseId);
-      
-      results.push({
-        module: 'Assignment',
-        status: 'PASS',
-        message: `Loaded ${assignments?.length || 0} assignments`,
-        data: assignments,
-      });
-      console.log('  ✅ Assignments loaded:', assignments?.length || 0);
-    } else {
-      results.push({
-        module: 'Assignment',
-        status: 'SKIP',
-        message: 'No test course available',
-      });
-      console.log('  ⊘ Skipped (no test course)');
-    }
-  } catch (error: any) {
-    results.push({
-      module: 'Assignment',
-      status: 'FAIL',
-      message: error.message || 'Failed to load assignments',
-    });
-    console.log('  ❌ Error:', error.message);
-  }
-  console.log('');
-
   // Module 6: Enrollment
   try {
     console.log('🎓 Module 6: Student/Enrollment');
-    const enrollments = await enrollmentService.getMyEnrollments();
-    
-    results.push({
-      module: 'Student/Enrollment',
-      status: 'PASS',
-      message: `Enrolled in ${enrollments?.length || 0} courses`,
-      data: enrollments,
-    });
-    console.log('  ✅ My enrollments:', enrollments?.length || 0);
+    const currentUser = authService.getCurrentUser();
+    if (currentUser && currentUser.id) {
+      const enrollments = await enrollmentService.getMyEnrollments(currentUser.id);
+      
+      results.push({
+        module: 'Student/Enrollment',
+        status: 'PASS',
+        message: `Enrolled in ${enrollments?.length || 0} courses`,
+        data: enrollments,
+      });
+      console.log('  ✅ My enrollments:', enrollments?.length || 0);
+    } else {
+      results.push({
+        module: 'Student/Enrollment',
+        status: 'SKIP',
+        message: 'Not logged in',
+      });
+      console.log('  ⊘ Skipped (not logged in)');
+    }
   } catch (error: any) {
     results.push({
       module: 'Student/Enrollment',
@@ -276,17 +218,27 @@ async function testAllModules(): Promise<void> {
   // Module 9: Payment & Certificate
   try {
     console.log('💳 Module 9: Payment & Certificate');
-    const transactions = await paymentService.getMyTransactions({ page: 0, size: 5 });
-    const certificates = await paymentService.getMyCertificates({ page: 0, size: 5 });
-    
-    results.push({
-      module: 'Payment & Certificate',
-      status: 'PASS',
-      message: `${transactions.totalElements} transactions, ${certificates.totalElements} certificates`,
-      data: { transactions, certificates },
-    });
-    console.log('  ✅ Transactions:', transactions.totalElements);
-    console.log('  ✅ Certificates:', certificates.totalElements);
+    const currentUser = authService.getCurrentUser();
+    if (currentUser && currentUser.id) {
+      const transactions = await paymentService.getMyTransactions(currentUser.id, { page: 0, size: 5 });
+      const certificates = await paymentService.getMyCertificates(currentUser.id, { page: 0, size: 5 });
+      
+      results.push({
+        module: 'Payment & Certificate',
+        status: 'PASS',
+        message: `${transactions.totalElements} transactions, ${certificates.totalElements} certificates`,
+        data: { transactions, certificates },
+      });
+      console.log('  ✅ Transactions:', transactions.totalElements);
+      console.log('  ✅ Certificates:', certificates.totalElements);
+    } else {
+      results.push({
+        module: 'Payment & Certificate',
+        status: 'SKIP',
+        message: 'Not logged in',
+      });
+      console.log('  ⊘ Skipped (not logged in)');
+    }
   } catch (error: any) {
     results.push({
       module: 'Payment & Certificate',
