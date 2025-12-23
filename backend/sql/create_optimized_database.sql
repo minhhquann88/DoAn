@@ -328,8 +328,8 @@ CREATE TABLE chat_messages (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NOT NULL,
     session_id VARCHAR(255),
-    message_content TEXT NOT NULL,
-    response_content TEXT,
+    message_content LONGTEXT NOT NULL,
+    response_content LONGTEXT,
     feedback_rating INT CHECK (feedback_rating BETWEEN 1 AND 5),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
