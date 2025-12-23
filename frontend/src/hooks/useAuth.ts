@@ -17,7 +17,11 @@ export const useAuth = () => {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginRequest): Promise<AuthResponse> => {
-      const response = await apiClient.post('/auth/login', credentials);
+      // Backend expects 'usernameOrEmail' field, not 'username'
+      const response = await apiClient.post('/auth/login', {
+        usernameOrEmail: credentials.username,
+        password: credentials.password,
+      });
       return response.data;
     },
     onSuccess: (data) => {

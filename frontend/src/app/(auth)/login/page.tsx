@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Eye, EyeOff, BookOpen } from 'lucide-react';
@@ -29,9 +29,13 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      rememberMe: false,
+    },
   });
   
   const onSubmit = (data: LoginFormData) => {
@@ -103,7 +107,19 @@ export default function LoginPage() {
               {/* Remember Me & Forgot Password */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Checkbox id="rememberMe" {...register('rememberMe')} />
+                  <Controller
+                    name="rememberMe"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="rememberMe"
+                        checked={field.value}
+                        onCheckedChange={(checked) => {
+                          field.onChange(checked === true);
+                        }}
+                      />
+                    )}
+                  />
                   <Label 
                     htmlFor="rememberMe" 
                     className="text-sm font-normal cursor-pointer"
