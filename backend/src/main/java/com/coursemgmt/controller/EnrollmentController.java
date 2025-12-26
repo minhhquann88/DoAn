@@ -45,7 +45,7 @@ public class EnrollmentController {
      * Security: Only Admin or the student themselves can access
      */
     @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('STUDENT') and #studentId == authentication.principal.id)")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('STUDENT') and @courseSecurityService.isStudentOwner(authentication, #studentId))")
     public ResponseEntity<Page<EnrollmentDTO>> getEnrollmentsByStudent(
         @PathVariable Long studentId,
         @RequestParam(defaultValue = "0") int page,
@@ -108,7 +108,7 @@ public class EnrollmentController {
      * Security: Only Admin or the student themselves can access
      */
     @GetMapping("/student/{studentId}/history")
-    @PreAuthorize("hasRole('ADMIN') or (hasRole('STUDENT') and #studentId == authentication.principal.id)")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('STUDENT') and @courseSecurityService.isStudentOwner(authentication, #studentId))")
     public ResponseEntity<StudentLearningHistoryDTO> getStudentLearningHistory(
         @PathVariable Long studentId,
         @AuthenticationPrincipal UserDetailsImpl userDetails

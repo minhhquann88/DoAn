@@ -20,6 +20,23 @@ apiClient.interceptors.request.use(
       const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        // Debug logging for enrollment endpoints
+        if (config.url?.includes('/enrollments/')) {
+          console.log('Enrollment Request - Token attached:', {
+            url: `${config.baseURL}${config.url}`,
+            method: config.method?.toUpperCase(),
+            hasToken: !!token,
+            tokenLength: token.length,
+          });
+        }
+      } else {
+        // Log if no token is found for enrollment requests
+        if (config.url?.includes('/enrollments/')) {
+          console.warn('Enrollment Request - No token found:', {
+            url: `${config.baseURL}${config.url}`,
+            method: config.method?.toUpperCase(),
+          });
+        }
       }
     }
     

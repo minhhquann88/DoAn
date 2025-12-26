@@ -29,8 +29,9 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
-        // Skip filter hoàn toàn cho các endpoint permitAll
-        return path.startsWith("/api/v1/") || path.startsWith("/api/auth/");
+        // Only skip filter for public endpoints (auth endpoints)
+        // DO NOT skip for /api/v1/ endpoints as they need authentication
+        return path.startsWith("/api/auth/");
     }
 
     @Override
