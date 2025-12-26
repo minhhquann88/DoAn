@@ -8,9 +8,7 @@ import {
   TrendingUp, 
   Award,
   PlayCircle,
-  BarChart3,
   Calendar,
-  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,63 +18,36 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/authStore';
 import { ROUTES } from '@/lib/constants';
-
-// Mock data
-const mockEnrolledCourses = [
-  {
-    id: 1,
-    title: 'Next.js 14 Complete Course',
-    thumbnail: null,
-    instructor: 'John Doe',
-    progress: 65,
-    totalLessons: 48,
-    completedLessons: 31,
-    lastAccessed: '2024-01-15',
-    category: 'Web Development',
-  },
-  {
-    id: 2,
-    title: 'TypeScript Advanced Patterns',
-    thumbnail: null,
-    instructor: 'Jane Smith',
-    progress: 40,
-    totalLessons: 32,
-    completedLessons: 13,
-    lastAccessed: '2024-01-14',
-    category: 'Programming',
-  },
-  {
-    id: 3,
-    title: 'UI/UX Design Fundamentals',
-    thumbnail: null,
-    instructor: 'Mike Johnson',
-    progress: 85,
-    totalLessons: 24,
-    completedLessons: 20,
-    lastAccessed: '2024-01-13',
-    category: 'Design',
-  },
-];
-
-const mockRecentActivity = [
-  {
-    id: 1,
-    type: 'LESSON_COMPLETED',
-    title: 'Completed: Advanced React Patterns',
-    course: 'Next.js 14 Complete Course',
-    time: '2 hours ago',
-  },
-  {
-    id: 3,
-    type: 'CERTIFICATE_EARNED',
-    title: 'Certificate earned',
-    course: 'UI/UX Design Fundamentals',
-    time: '3 days ago',
-  },
-];
+import { useMyEnrollments } from '@/hooks/useEnrollments';
 
 export default function StudentDashboard() {
   const { user } = useAuthStore();
+  const { enrollments, activeCount, averageProgress, isLoading } = useMyEnrollments();
+  
+  // Map enrollments to course format for UI
+  const enrolledCourses = React.useMemo(() => {
+    return enrollments.map((enrollment) => ({
+      id: enrollment.courseId,
+      title: enrollment.courseTitle || enrollment.course?.title || 'Khóa học',
+      thumbnail: enrollment.course?.imageUrl || enrollment.course?.thumbnail || null,
+      instructor: enrollment.instructorName || 'Giảng viên',
+      progress: Math.round(enrollment.progress || 0),
+      totalLessons: enrollment.totalLessons || 0,
+      completedLessons: enrollment.completedLessons || 0,
+      lastAccessed: enrollment.lastAccessedAt 
+        ? new Date(enrollment.lastAccessedAt).toLocaleDateString('vi-VN')
+        : enrollment.enrolledAt 
+        ? new Date(enrollment.enrolledAt).toLocaleDateString('vi-VN')
+        : '',
+      category: enrollment.course?.category || 'Khác',
+      status: enrollment.status,
+    }));
+  }, [enrollments]);
+  
+  // Filter active courses (in progress, not completed)
+  const activeCourses = enrolledCourses.filter(
+    course => (course.progress > 0 && course.progress < 100) || course.status === 'ACTIVE'
+  );
   
   return (
     <div className="min-h-screen bg-background">
@@ -115,9 +86,9 @@ export default function StudentDashboard() {
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
+              <div className="text-2xl font-bold">{activeCount}</div>
               <p className="text-xs text-muted-foreground">
-                +1 từ tuần trước
+                {activeCount === 0 ? 'Chưa có khóa học' : 'Khóa học đang học'}
               </p>
             </CardContent>
           </Card>
@@ -145,9 +116,11 @@ export default function StudentDashboard() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">63%</div>
+              <div className="text-2xl font-bold">{averageProgress}%</div>
               <p className="text-xs text-muted-foreground">
-                +12% từ tháng trước
+                {enrollments.length > 0 
+                  ? `Từ ${enrollments.length} khóa học` 
+                  : 'Chưa có dữ liệu'}
               </p>
             </CardContent>
           </Card>
@@ -178,10 +151,22 @@ export default function StudentDashboard() {
           
           {/* Continue Learning */}
           <TabsContent value="continue" className="space-y-6">
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
+            ) : activeCourses.length === 0 ? (
+              <div className="text-center py-12">
+                <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">Chưa có khóa học đang học</h3>
+                <p className="text-muted-foreground mb-6">
+                  Bắt đầu học một khóa học mới ngay hôm nay!
+                </p>
+                <Button asChild>
+                  <Link href={ROUTES.COURSES}>Khám phá khóa học</Link>
+                </Button>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {mockEnrolledCourses
-                .filter(course => course.progress > 0 && course.progress < 100)
-                .map((course) => (
+                {activeCourses.map((course) => (
                   <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
                       <PlayCircle className="h-16 w-16 text-primary/50" />
@@ -232,12 +217,27 @@ export default function StudentDashboard() {
                   </Card>
                 ))}
             </div>
+            )}
           </TabsContent>
           
           {/* All Courses */}
           <TabsContent value="all" className="space-y-6">
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
+            ) : enrolledCourses.length === 0 ? (
+              <div className="text-center py-12">
+                <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">Chưa có khóa học nào</h3>
+                <p className="text-muted-foreground mb-6">
+                  Bắt đầu học một khóa học mới ngay hôm nay!
+                </p>
+                <Button asChild>
+                  <Link href={ROUTES.COURSES}>Khám phá khóa học</Link>
+                </Button>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockEnrolledCourses.map((course) => (
+                {enrolledCourses.map((course) => (
                 <Card key={course.id} className="hover:shadow-lg transition-shadow">
                   <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
                     <BookOpen className="h-12 w-12 text-primary/50" />
@@ -268,6 +268,7 @@ export default function StudentDashboard() {
                 </Card>
               ))}
             </div>
+            )}
           </TabsContent>
           
           {/* Recent Activity */}
@@ -280,52 +281,84 @@ export default function StudentDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {isLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Đang tải...</div>
+                ) : enrollments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground mb-4">Chưa có hoạt động nào</p>
+                    <Button asChild>
+                      <Link href={ROUTES.COURSES}>Khám phá khóa học</Link>
+                    </Button>
+                  </div>
+                ) : (
                 <div className="space-y-4">
-                  {mockRecentActivity.map((activity) => (
-                    <div 
-                      key={activity.id}
-                      className="flex items-start gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                        {activity.type === 'LESSON_COMPLETED' && <PlayCircle className="h-5 w-5 text-primary" />}
-                        {activity.type === 'CERTIFICATE_EARNED' && <Award className="h-5 w-5 text-secondary" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium">{activity.title}</p>
-                        <p className="text-sm text-muted-foreground">{activity.course}</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground whitespace-nowrap">
-                        {activity.time}
-                      </p>
-                    </div>
-                  ))}
+                    {enrollments
+                      .filter(e => e.lastAccessedAt || e.enrolledAt)
+                      .sort((a, b) => {
+                        const dateA = a.lastAccessedAt ? new Date(a.lastAccessedAt).getTime() : new Date(a.enrolledAt).getTime();
+                        const dateB = b.lastAccessedAt ? new Date(b.lastAccessedAt).getTime() : new Date(b.enrolledAt).getTime();
+                        return dateB - dateA;
+                      })
+                      .slice(0, 10)
+                      .map((enrollment) => {
+                        const lastAccess = enrollment.lastAccessedAt || enrollment.enrolledAt;
+                        const timeAgo = lastAccess 
+                          ? new Date(lastAccess).toLocaleDateString('vi-VN', { 
+                              day: 'numeric', 
+                              month: 'short',
+                              year: 'numeric'
+                            })
+                          : '';
+                        
+                        return (
+                          <div 
+                            key={enrollment.id}
+                            className="flex items-start gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                              {enrollment.status === 'COMPLETED' ? (
+                                <Award className="h-5 w-5 text-secondary" />
+                              ) : (
+                                <PlayCircle className="h-5 w-5 text-primary" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium">
+                                {enrollment.status === 'COMPLETED' 
+                                  ? `Đã hoàn thành: ${enrollment.courseTitle || 'Khóa học'}`
+                                  : `Đang học: ${enrollment.courseTitle || 'Khóa học'}`}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Tiến độ: {Math.round(enrollment.progress || 0)}%
+                              </p>
+                            </div>
+                            <p className="text-sm text-muted-foreground whitespace-nowrap">
+                              {timeAgo}
+                            </p>
+                          </div>
+                        );
+                      })}
                 </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
         
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <BarChart3 className="h-8 w-8 text-primary mb-2" />
-              <CardTitle>Xem báo cáo tiến độ</CardTitle>
-              <CardDescription>
-                Phân tích chi tiết về quá trình học tập
-              </CardDescription>
-            </CardHeader>
-          </Card>
-          
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <Award className="h-8 w-8 text-accent mb-2" />
-              <CardTitle>Chứng chỉ của tôi</CardTitle>
-              <CardDescription>
-                Xem và tải về các chứng chỉ đã đạt được
-              </CardDescription>
-            </CardHeader>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+          <Link href={ROUTES.STUDENT.CERTIFICATES}>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader>
+                <Award className="h-8 w-8 text-accent mb-2" />
+                <CardTitle>Chứng chỉ của tôi</CardTitle>
+                <CardDescription>
+                  Xem và tải về các chứng chỉ đã đạt được
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
           
           <Card className="hover:shadow-lg transition-shadow cursor-pointer">
             <CardHeader>

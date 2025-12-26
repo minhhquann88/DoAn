@@ -33,7 +33,6 @@ public class StudentLearningHistoryDTO {
     // Activity
     private LocalDateTime lastActivityDate;
     private Integer totalLearningHours;
-    private Integer totalTestsTaken;
     
     // Certificates
     private Integer certificatesEarned;

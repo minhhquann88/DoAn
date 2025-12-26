@@ -11,13 +11,21 @@ const API_PREFIX = '/v1/enrollments';
 export interface EnrollmentResponse {
   id: number;
   courseId: number;
-  userId: number;
   studentId?: number;
   studentName?: string;
-  courseName?: string;
+  studentEmail?: string;
+  courseTitle?: string;
+  instructorName?: string;
   enrolledAt: string;
-  progress: number;
-  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'DROPPED';
+  progress: number; // 0-100%
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED' | 'DROPPED' | 'SUSPENDED';
+  currentScore?: number;
+  completedAt?: string;
+  lastAccessedAt?: string;
+  completedLessons?: number;
+  totalLessons?: number;
+  isPaid?: boolean;
+  paidAmount?: number;
   course?: Course;
 }
 

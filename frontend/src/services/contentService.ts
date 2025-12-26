@@ -55,6 +55,8 @@ export interface LessonResponse {
   orderIndex: number;
   isFree: boolean;
   isCompleted?: boolean;
+  isPreview?: boolean; // Lesson có thể xem trước (cho guests)
+  videoUrl?: string; // Video URL for preview lessons
 }
 
 export interface ChapterRequest {

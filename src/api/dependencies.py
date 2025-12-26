@@ -162,22 +162,24 @@ def rate_limit_check(user_id: str) -> bool:
     return True
 
 async def get_elearning_courses() -> list:
-    """Get courses from Elearning backend"""
+    """Get courses from Elearning backend (Java Spring Boot)"""
     try:
-        async with httpx.AsyncClient() as client:
-            headers = {
-                "Authorization": f"Bearer {settings.ELEARNING_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            
+        async with httpx.AsyncClient(timeout=settings.JAVA_BACKEND_TIMEOUT) as client:
+            # Lấy courses từ Java backend
             response = await client.get(
-                f"{settings.ELEARNING_API_BASE_URL}/courses",
-                headers=headers,
+                f"{settings.JAVA_BACKEND_URL}/api/courses",
                 timeout=10.0
             )
             
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # Java backend trả về dạng Page, cần extract content
+                if isinstance(data, dict) and "content" in data:
+                    return data["content"]
+                elif isinstance(data, list):
+                    return data
+                else:
+                    return []
             else:
                 logger.warning(f"Failed to get courses: {response.status_code}")
                 return []
@@ -186,8 +188,3 @@ async def get_elearning_courses() -> list:
         logger.error(f"Error getting courses: {e}")
         return []
 
-def rate_limit_check(user_id: str) -> bool:
-    """Check if user has exceeded rate limit"""
-    # Implement rate limiting logic here
-    # For now, always return True
-    return True

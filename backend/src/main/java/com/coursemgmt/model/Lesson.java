@@ -18,7 +18,7 @@ public class Lesson {
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
-    private EContentType contentType; // Enum: VIDEO, TEXT, DOCUMENT, TEST
+    private EContentType contentType; // Enum: VIDEO, TEXT, DOCUMENT
 
     private String videoUrl;
 
@@ -30,6 +30,9 @@ public class Lesson {
     private Integer position; // Thứ tự bài học
 
     private Integer durationInMinutes;
+
+    @Column(name = "is_preview")
+    private Boolean isPreview = false; // Lesson có thể xem trước (cho guests)
 
     // (n-1) Nhiều Lesson thuộc 1 Chapter
     @ManyToOne(fetch = FetchType.LAZY)

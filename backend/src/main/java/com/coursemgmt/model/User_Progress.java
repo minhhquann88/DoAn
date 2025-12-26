@@ -18,6 +18,11 @@ public class User_Progress {
 
     private LocalDateTime completedAt;
 
+    // Auto-progress tracking: Track video watch time
+    private Integer lastWatchedTime; // Last watched time in seconds
+
+    private Integer totalDuration; // Total video duration in seconds
+
     // (n-1) Nhiều Tiến độ thuộc 1 Ghi danh
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "enrollment_id", nullable = false)

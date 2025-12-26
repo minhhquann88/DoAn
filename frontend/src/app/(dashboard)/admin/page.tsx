@@ -37,37 +37,40 @@ import {
   Legend,
 } from 'recharts';
 
-// Mock data
-const revenueData = [
-  { month: 'T1', revenue: 45000000, enrollments: 245 },
-  { month: 'T2', revenue: 52000000, enrollments: 298 },
-  { month: 'T3', revenue: 48000000, enrollments: 276 },
-  { month: 'T4', revenue: 61000000, enrollments: 345 },
-  { month: 'T5', revenue: 58000000, enrollments: 312 },
-  { month: 'T6', revenue: 71000000, enrollments: 389 },
-];
-
-const categoryData = [
-  { name: 'Lập trình', value: 45, color: 'hsl(var(--primary))' },
-  { name: 'Design', value: 25, color: 'hsl(var(--secondary))' },
-  { name: 'Marketing', value: 20, color: 'hsl(var(--accent))' },
-  { name: 'Khác', value: 10, color: 'hsl(var(--muted))' },
-];
-
-const pendingCourses = [
-  { id: 1, title: 'Advanced React Patterns', instructor: 'John Doe', submittedAt: '2024-01-18', status: 'PENDING' },
-  { id: 2, title: 'Vue.js Masterclass', instructor: 'Jane Smith', submittedAt: '2024-01-17', status: 'PENDING' },
-  { id: 3, title: 'Python for Data Science', instructor: 'Mike Johnson', submittedAt: '2024-01-16', status: 'PENDING' },
-];
-
-const recentActivities = [
-  { id: 1, type: 'USER_REGISTERED', user: 'Nguyễn Văn A', time: '5 phút trước' },
-  { id: 2, type: 'COURSE_PUBLISHED', course: 'Next.js 14 Complete', time: '12 phút trước' },
-  { id: 3, type: 'PAYMENT_SUCCESS', amount: 499000, time: '23 phút trước' },
-  { id: 4, type: 'INSTRUCTOR_JOINED', instructor: 'Trần Thị B', time: '1 giờ trước' },
-];
-
 export default function AdminDashboard() {
+  const [revenueData, setRevenueData] = React.useState<Array<{ month: string; revenue: number; enrollments: number }>>([]);
+  const [categoryData, setCategoryData] = React.useState<Array<{ name: string; value: number; color: string }>>([]);
+  const [pendingCourses, setPendingCourses] = React.useState<Array<{ id: number; title: string; instructor: string; submittedAt: string; status: string }>>([]);
+  const [recentActivities, setRecentActivities] = React.useState<Array<{ id: number; type: string; user?: string; course?: string; amount?: number; instructor?: string; time: string }>>([]);
+  const [stats, setStats] = React.useState({
+    totalCourses: 0,
+    totalStudents: 0,
+    totalInstructors: 0,
+    totalRevenue: 0,
+  });
+  const [isLoading, setIsLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    // TODO: Fetch data from API
+    // const fetchData = async () => {
+    //   try {
+    //     const [statsRes, revenueRes, categoryRes, pendingRes, activityRes] = await Promise.all([
+    //       // fetch all data
+    //     ]);
+    //     setStats(statsRes);
+    //     setRevenueData(revenueRes);
+    //     setCategoryData(categoryRes);
+    //     setPendingCourses(pendingRes);
+    //     setRecentActivities(activityRes);
+    //   } catch (error) {
+    //     console.error('Error fetching data:', error);
+    //   } finally {
+    //     setIsLoading(false);
+    //   }
+    // };
+    // fetchData();
+    setIsLoading(false);
+  }, []);
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -105,10 +108,9 @@ export default function AdminDashboard() {
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1,234</div>
+              <div className="text-2xl font-bold">{stats.totalCourses.toLocaleString()}</div>
               <div className="flex items-center text-xs text-muted-foreground mt-1">
-                <TrendingUp className="h-3 w-3 mr-1 text-accent" />
-                <span>+12% từ tháng trước</span>
+                <span>Tổng khóa học</span>
               </div>
             </CardContent>
           </Card>
@@ -121,10 +123,9 @@ export default function AdminDashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">45,231</div>
+              <div className="text-2xl font-bold">{stats.totalStudents.toLocaleString()}</div>
               <div className="flex items-center text-xs text-muted-foreground mt-1">
-                <TrendingUp className="h-3 w-3 mr-1 text-accent" />
-                <span>+18% từ tháng trước</span>
+                <span>Tổng học viên</span>
               </div>
             </CardContent>
           </Card>
@@ -137,10 +138,9 @@ export default function AdminDashboard() {
               <GraduationCap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">892</div>
+              <div className="text-2xl font-bold">{stats.totalInstructors.toLocaleString()}</div>
               <div className="flex items-center text-xs text-muted-foreground mt-1">
-                <TrendingUp className="h-3 w-3 mr-1 text-accent" />
-                <span>+5% từ tháng trước</span>
+                <span>Tổng giảng viên</span>
               </div>
             </CardContent>
           </Card>
@@ -153,10 +153,9 @@ export default function AdminDashboard() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">335M</div>
+              <div className="text-2xl font-bold">{(stats.totalRevenue / 1000000).toFixed(1)}M</div>
               <div className="flex items-center text-xs text-muted-foreground mt-1">
-                <TrendingDown className="h-3 w-3 mr-1 text-destructive" />
-                <span>-3% từ tháng trước</span>
+                <span>Tổng doanh thu</span>
               </div>
             </CardContent>
           </Card>
@@ -263,6 +262,11 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
+                {isLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Đang tải...</div>
+                ) : pendingCourses.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">Không có khóa học nào chờ duyệt</div>
+                ) : (
                 <div className="space-y-4">
                   {pendingCourses.map((course) => (
                     <div 
@@ -300,6 +304,7 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -314,6 +319,11 @@ export default function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {isLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Đang tải...</div>
+                ) : recentActivities.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">Chưa có hoạt động nào</div>
+                ) : (
                 <div className="space-y-4">
                   {recentActivities.map((activity) => (
                     <div 
@@ -338,6 +348,7 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -383,7 +394,7 @@ export default function AdminDashboard() {
                 <BookOpen className="h-8 w-8 text-primary mb-2" />
                 <CardTitle>Quản lý khóa học</CardTitle>
                 <CardDescription>
-                  1,234 khóa học
+                  {stats.totalCourses.toLocaleString()} khóa học
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -395,7 +406,7 @@ export default function AdminDashboard() {
                 <GraduationCap className="h-8 w-8 text-accent mb-2" />
                 <CardTitle>Quản lý giảng viên</CardTitle>
                 <CardDescription>
-                  892 giảng viên
+                  {stats.totalInstructors.toLocaleString()} giảng viên
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -407,7 +418,7 @@ export default function AdminDashboard() {
                 <Users className="h-8 w-8 text-secondary mb-2" />
                 <CardTitle>Quản lý học viên</CardTitle>
                 <CardDescription>
-                  45,231 học viên
+                  {stats.totalStudents.toLocaleString()} học viên
                 </CardDescription>
               </CardHeader>
             </Card>

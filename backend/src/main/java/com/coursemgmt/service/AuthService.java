@@ -96,27 +96,35 @@ public class AuthService {
         Set<String> strRoles = registerRequest.getRoles();
         Set<Role> roles = new HashSet<>();
 
+        // Security: Block admin and mod roles from public registration
+        if (strRoles != null && !strRoles.isEmpty()) {
+            if (strRoles.contains("admin") || strRoles.contains("mod")) {
+                throw new RuntimeException("Error: Role is not allowed for public registration.");
+            }
+        }
+
+        // Default role: If roles are null/empty, default to 'user' (Student)
         if (strRoles == null || strRoles.isEmpty()) {
             Role userRole = roleRepository.findByName(ERole.ROLE_STUDENT)
                     .orElseThrow(() -> new RuntimeException("Error: Role 'STUDENT' is not found."));
             roles.add(userRole);
         } else {
+            // Allowed Roles: Only allow 'user' (Student) or 'lecturer' (Instructor)
             strRoles.forEach(role -> {
-                switch (role) {
-                    case "admin":
-                        Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
-                                .orElseThrow(() -> new RuntimeException("Error: Role 'ADMIN' is not found."));
-                        roles.add(adminRole);
-                        break;
+                switch (role.toLowerCase()) {
                     case "lecturer":
-                        Role modRole = roleRepository.findByName(ERole.ROLE_LECTURER)
+                        Role lecturerRole = roleRepository.findByName(ERole.ROLE_LECTURER)
                                 .orElseThrow(() -> new RuntimeException("Error: Role 'LECTURER' is not found."));
-                        roles.add(modRole);
+                        roles.add(lecturerRole);
                         break;
+                    case "user":
+                    case "student":
                     default:
+                        // Default to Student role for any unrecognized role
                         Role userRole = roleRepository.findByName(ERole.ROLE_STUDENT)
                                 .orElseThrow(() -> new RuntimeException("Error: Role 'STUDENT' is not found."));
                         roles.add(userRole);
+                        break;
                 }
             });
         }

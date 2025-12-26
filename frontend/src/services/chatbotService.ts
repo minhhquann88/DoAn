@@ -36,7 +36,7 @@ export interface ChatResponse {
  */
 export const sendChatMessage = async (message: string, context?: any): Promise<ChatResponse> => {
   try {
-    const response = await chatbotClient.post<ChatResponse>('/chat/message', {
+    const response = await chatbotClient.post<ChatResponse>('/v1/chat/message', {
       message,
       context,
     });
@@ -56,7 +56,7 @@ export const sendChatMessage = async (message: string, context?: any): Promise<C
  */
 export const getChatContext = async (userId: string) => {
   try {
-    const response = await chatbotClient.get(`/chat/context/${userId}`);
+    const response = await chatbotClient.get(`/v1/chat/context?userId=${userId}`);
     return response.data;
   } catch (error) {
     return null;
@@ -66,9 +66,9 @@ export const getChatContext = async (userId: string) => {
 /**
  * Clear chat history
  */
-export const clearChatHistory = async (userId: string) => {
+export const clearChatHistory = async (sessionId: string) => {
   try {
-    await chatbotClient.delete(`/chat/history/${userId}`);
+    await chatbotClient.delete(`/v1/chat/history/${sessionId}`);
   } catch (error) {
     console.error('Clear chat history error:', error);
   }

@@ -130,6 +130,39 @@ export const ROUTES = {
   COURSES: '/courses',
   COURSE_DETAIL: (id: string) => `/courses/${id}`,
   LEARN: (id: string) => `/learn/${id}`,
+  
+  // Student Routes - Organized to prevent cross-linking
+  STUDENT: {
+    DASHBOARD: '/student',
+    MY_COURSES: '/student/my-courses',
+    PROGRESS: '/student/progress',
+    CERTIFICATES: '/student/certificates',
+    PROFILE: '/student/profile',
+  },
+  
+  // Instructor Routes - Organized to prevent cross-linking
+  INSTRUCTOR: {
+    DASHBOARD: '/instructor',
+    COURSES: '/instructor/courses',
+    CREATE_COURSE: '/instructor/courses/create',
+    EDIT_COURSE: (id: string) => `/instructor/courses/${id}/edit`,
+    STUDENTS: '/instructor/students',
+    EARNINGS: '/instructor/earnings',
+    PROFILE: '/instructor/profile',
+  },
+  
+  // Admin Routes
+  ADMIN_DASHBOARD: '/admin',
+  ADMIN_COURSES: '/admin/courses',
+  ADMIN_INSTRUCTORS: '/admin/instructors',
+  ADMIN_STUDENTS: '/admin/students',
+  ADMIN_ANALYTICS: '/admin/analytics',
+  ADMIN_SETTINGS: '/admin/settings',
+  
+  // Other Routes
+  CHECKOUT: (courseId: string) => `/checkout/${courseId}`,
+  
+  // Backward compatibility - Keep old flat structure for existing code
   STUDENT_DASHBOARD: '/student',
   STUDENT_MY_COURSES: '/student/my-courses',
   STUDENT_PROGRESS: '/student/progress',
@@ -142,12 +175,5 @@ export const ROUTES = {
   INSTRUCTOR_STUDENTS: '/instructor/students',
   INSTRUCTOR_EARNINGS: '/instructor/earnings',
   INSTRUCTOR_PROFILE: '/instructor/profile',
-  ADMIN_DASHBOARD: '/admin',
-  ADMIN_COURSES: '/admin/courses',
-  ADMIN_INSTRUCTORS: '/admin/instructors',
-  ADMIN_STUDENTS: '/admin/students',
-  ADMIN_ANALYTICS: '/admin/analytics',
-  ADMIN_SETTINGS: '/admin/settings',
-  CHECKOUT: (courseId: string) => `/checkout/${courseId}`,
 } as const;
 

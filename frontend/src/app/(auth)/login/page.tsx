@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 import { ROUTES } from '@/lib/constants';
 
 const loginSchema = z.object({
@@ -23,8 +25,48 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuthStore();
   const [showPassword, setShowPassword] = React.useState(false);
   const { login, isLoginLoading } = useAuth();
+  
+  // Check if user is already logged in on mount
+  React.useEffect(() => {
+    // Check localStorage directly to avoid race conditions
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('auth_token');
+      const storedUser = localStorage.getItem('user_data');
+      
+      if (token && storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          // Redirect based on role
+          if (userData.role === 'ROLE_ADMIN') {
+            router.replace(ROUTES.ADMIN_DASHBOARD);
+          } else if (userData.role === 'ROLE_LECTURER') {
+            router.replace(ROUTES.INSTRUCTOR.DASHBOARD);
+          } else {
+            router.replace(ROUTES.STUDENT.DASHBOARD);
+          }
+        } catch (error) {
+          console.error('Failed to parse stored user data:', error);
+        }
+      }
+    }
+  }, [router]);
+  
+  // Also check store state (secondary check)
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'ROLE_ADMIN') {
+        router.replace(ROUTES.ADMIN_DASHBOARD);
+      } else if (user.role === 'ROLE_LECTURER') {
+        router.replace(ROUTES.INSTRUCTOR.DASHBOARD);
+      } else {
+        router.replace(ROUTES.STUDENT.DASHBOARD);
+      }
+    }
+  }, [isAuthenticated, user, router]);
   
   const {
     register,

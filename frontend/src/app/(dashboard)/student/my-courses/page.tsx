@@ -12,57 +12,45 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ROUTES } from '@/lib/constants';
 
-// Mock data
-const mockCourses = [
-  {
-    id: 1,
-    title: 'Next.js 14 Complete Course',
-    thumbnail: null,
-    instructor: 'John Doe',
-    progress: 65,
-    totalLessons: 48,
-    completedLessons: 31,
-    enrolledAt: '2024-01-01',
-    lastAccessed: '2024-01-15',
-    status: 'IN_PROGRESS',
-    category: 'Web Development',
-  },
-  {
-    id: 2,
-    title: 'TypeScript Advanced Patterns',
-    thumbnail: null,
-    instructor: 'Jane Smith',
-    progress: 40,
-    totalLessons: 32,
-    completedLessons: 13,
-    enrolledAt: '2024-01-05',
-    lastAccessed: '2024-01-14',
-    status: 'IN_PROGRESS',
-    category: 'Programming',
-  },
-  {
-    id: 3,
-    title: 'UI/UX Design Fundamentals',
-    thumbnail: null,
-    instructor: 'Mike Johnson',
-    progress: 100,
-    totalLessons: 24,
-    completedLessons: 24,
-    enrolledAt: '2023-12-15',
-    lastAccessed: '2024-01-10',
-    status: 'COMPLETED',
-    category: 'Design',
-  },
-];
-
 export default function MyCoursesPage() {
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [sortBy, setSortBy] = React.useState('recent');
+  const [courses, setCourses] = React.useState<Array<{
+    id: number;
+    title: string;
+    thumbnail: string | null;
+    instructor: string;
+    progress: number;
+    totalLessons: number;
+    completedLessons: number;
+    enrolledAt: string;
+    lastAccessed: string;
+    status: string;
+    category: string;
+  }>>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    // TODO: Fetch data from API
+    // const fetchCourses = async () => {
+    //   try {
+    //     const response = await fetch('/api/enrollments/my-courses');
+    //     const data = await response.json();
+    //     setCourses(data);
+    //   } catch (error) {
+    //     console.error('Error fetching courses:', error);
+    //   } finally {
+    //     setIsLoading(false);
+    //   }
+    // };
+    // fetchCourses();
+    setIsLoading(false);
+  }, []);
   
   // Filter courses by status
-  const inProgressCourses = mockCourses.filter(c => c.status === 'IN_PROGRESS');
-  const completedCourses = mockCourses.filter(c => c.status === 'COMPLETED');
+  const inProgressCourses = courses.filter(c => c.status === 'IN_PROGRESS');
+  const completedCourses = courses.filter(c => c.status === 'COMPLETED');
   
   return (
     <div className="min-h-screen bg-background">
@@ -136,7 +124,7 @@ export default function MyCoursesPage() {
         <Tabs defaultValue="all" className="space-y-6">
           <TabsList>
             <TabsTrigger value="all">
-              Tất cả ({mockCourses.length})
+              Tất cả ({courses.length})
             </TabsTrigger>
             <TabsTrigger value="in-progress">
               Đang học ({inProgressCourses.length})
@@ -147,9 +135,22 @@ export default function MyCoursesPage() {
           </TabsList>
           
           <TabsContent value="all">
-            {viewMode === 'grid' ? (
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
+            ) : courses.length === 0 ? (
+              <div className="text-center py-12">
+                <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">Chưa có khóa học nào</h3>
+                <p className="text-muted-foreground mb-6">
+                  Bắt đầu học một khóa học mới ngay hôm nay!
+                </p>
+                <Button asChild>
+                  <Link href={ROUTES.COURSES}>Khám phá khóa học</Link>
+                </Button>
+              </div>
+            ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mockCourses.map((course) => (
+                {courses.map((course) => (
                   <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
                       <BookOpen className="h-16 w-16 text-primary/50" />
@@ -200,7 +201,7 @@ export default function MyCoursesPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {mockCourses.map((course) => (
+                {courses.map((course) => (
                   <Card key={course.id} className="hover:shadow-lg transition-shadow">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-6">

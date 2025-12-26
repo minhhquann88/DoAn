@@ -23,19 +23,44 @@ function CoursesContent() {
   const [filters, setFilters] = React.useState<SearchFilters>({
     keyword: searchParams.get('keyword') || '',
     sortBy: 'popular',
+    page: 0,
   });
   
-  const { courses, isLoading, totalElements } = useCourses(filters);
+  const { courses, isLoading, totalElements, totalPages } = useCourses(filters);
   
   const handleSortChange = (value: string) => {
-    setFilters(prev => ({ ...prev, sortBy: value as any }));
+    setFilters(prev => ({ ...prev, sortBy: value as any, page: 0 })); // Reset to first page on sort change
   };
   
   const handleLevelFilter = (level: string) => {
     setFilters(prev => ({ 
       ...prev, 
-      level: prev.level === level ? undefined : level 
+      level: prev.level === level ? undefined : level,
+      page: 0 // Reset to first page on filter change
     }));
+  };
+
+  const handlePriceFilter = (filterType: 'free' | 'paid' | null) => {
+    setFilters(prev => {
+      const newFilters = { ...prev, page: 0 }; // Reset to first page
+      if (filterType === 'free') {
+        newFilters.isFree = prev.isFree ? undefined : true;
+        newFilters.isPaid = undefined; // Clear paid filter
+      } else if (filterType === 'paid') {
+        newFilters.isPaid = prev.isPaid ? undefined : true;
+        newFilters.isFree = undefined; // Clear free filter
+      } else {
+        newFilters.isFree = undefined;
+        newFilters.isPaid = undefined;
+      }
+      return newFilters;
+    });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setFilters(prev => ({ ...prev, page: newPage }));
+    // Scroll to top when page changes
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
   return (
@@ -88,11 +113,21 @@ function CoursesContent() {
                   <h3 className="text-sm font-medium">Giá</h3>
                   <div className="space-y-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" className="rounded border-gray-300" />
+                      <input
+                        type="checkbox"
+                        checked={filters.isFree === true}
+                        onChange={() => handlePriceFilter('free')}
+                        className="rounded border-gray-300"
+                      />
                       <span className="text-sm">Miễn phí</span>
                     </label>
                     <label className="flex items-center space-x-2 cursor-pointer">
-                      <input type="checkbox" className="rounded border-gray-300" />
+                      <input
+                        type="checkbox"
+                        checked={filters.isPaid === true}
+                        onChange={() => handlePriceFilter('paid')}
+                        className="rounded border-gray-300"
+                      />
                       <span className="text-sm">Có phí</span>
                     </label>
                   </div>
@@ -115,7 +150,7 @@ function CoursesContent() {
                 <Button 
                   variant="outline" 
                   className="w-full mt-6"
-                  onClick={() => setFilters({ sortBy: 'popular' })}
+                  onClick={() => setFilters({ sortBy: 'popular', page: 0 })}
                 >
                   Xóa bộ lọc
                 </Button>
@@ -153,15 +188,43 @@ function CoursesContent() {
               <CourseGrid courses={courses} isLoading={isLoading} />
               
               {/* Pagination */}
-              {!isLoading && courses.length > 0 && (
+              {!isLoading && courses.length > 0 && totalPages > 1 && (
                 <div className="flex items-center justify-center mt-8 gap-2">
-                  <Button variant="outline" disabled>
+                  <Button
+                    variant="outline"
+                    disabled={filters.page === 0}
+                    onClick={() => handlePageChange((filters.page || 0) - 1)}
+                  >
                     Trước
                   </Button>
-                  <Button variant="default">1</Button>
-                  <Button variant="outline">2</Button>
-                  <Button variant="outline">3</Button>
-                  <Button variant="outline">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    // Show pages around current page
+                    const currentPage = filters.page || 0;
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i;
+                    } else if (currentPage < 3) {
+                      pageNum = i;
+                    } else if (currentPage > totalPages - 4) {
+                      pageNum = totalPages - 5 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pageNum === currentPage ? 'default' : 'outline'}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum + 1}
+                      </Button>
+                    );
+                  })}
+                  <Button
+                    variant="outline"
+                    disabled={(filters.page || 0) >= totalPages - 1}
+                    onClick={() => handlePageChange((filters.page || 0) + 1)}
+                  >
                     Sau
                   </Button>
                 </div>

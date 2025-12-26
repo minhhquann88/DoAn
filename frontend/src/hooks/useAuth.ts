@@ -18,11 +18,31 @@ export const useAuth = () => {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginRequest): Promise<AuthResponse> => {
       // Backend expects 'usernameOrEmail' field, not 'username'
-      const response = await apiClient.post('/auth/login', {
+      const requestBody = {
         usernameOrEmail: credentials.username,
         password: credentials.password,
+      };
+      
+      console.log('Login Request:', {
+        url: '/auth/login',
+        body: { ...requestBody, password: '***' }, // Hide password in logs
+        headers: { 'Content-Type': 'application/json' },
       });
-      return response.data;
+      
+      try {
+        const response = await apiClient.post('/auth/login', requestBody);
+        return response.data;
+      } catch (error: any) {
+        // Log detailed error information
+        console.error('Login Error:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.response?.data?.message || error.message,
+          validationErrors: error.response?.data?.errors,
+        });
+        throw error;
+      }
     },
     onSuccess: (data) => {
       const userData: User = {
@@ -34,6 +54,7 @@ export const useAuth = () => {
         createdAt: new Date().toISOString(),
       };
       
+      // Save token to both localStorage and cookie
       storeLogin(userData, data.token);
       
       addToast({
@@ -41,14 +62,21 @@ export const useAuth = () => {
         description: 'Đăng nhập thành công!',
       });
       
-      // Redirect based on role
+      // Determine redirect URL based on role
+      let redirectUrl: string;
       if (data.roles.includes('ROLE_ADMIN')) {
-        router.push(ROUTES.ADMIN_DASHBOARD);
+        redirectUrl = ROUTES.ADMIN_DASHBOARD;
       } else if (data.roles.includes('ROLE_LECTURER')) {
-        router.push(ROUTES.INSTRUCTOR_DASHBOARD);
+        redirectUrl = ROUTES.INSTRUCTOR.DASHBOARD;
       } else {
-        router.push(ROUTES.STUDENT_DASHBOARD);
+        redirectUrl = ROUTES.STUDENT.DASHBOARD;
       }
+      
+      // Use window.location.href for the first redirect to ensure middleware detects the cookie
+      // Small delay to ensure token is saved to both localStorage and cookie
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 100);
     },
     onError: (error: any) => {
       addToast({

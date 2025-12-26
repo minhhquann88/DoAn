@@ -26,7 +26,6 @@ public class StudentStatsDTO {
     
     // Điểm số
     private Double averageScore;
-    private Integer totalTestsTaken;
     
     // Chứng chỉ
     private Long totalCertificates;

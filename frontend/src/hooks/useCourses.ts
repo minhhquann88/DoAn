@@ -25,8 +25,15 @@ export const useCourses = (filters?: SearchFilters) => {
       if (filters?.categoryId) params.append('categoryId', filters.categoryId.toString());
       if (filters?.level) params.append('level', filters.level);
       
+      // Price filtering
+      if (filters?.isFree !== undefined) params.append('isFree', filters.isFree.toString());
+      if (filters?.isPaid !== undefined) params.append('isPaid', filters.isPaid.toString());
+      if (filters?.minPrice !== undefined) params.append('minPrice', filters.minPrice.toString());
+      if (filters?.maxPrice !== undefined) params.append('maxPrice', filters.maxPrice.toString());
+      
       // Pagination
-      params.append('page', '0');
+      const page = filters?.page ?? 0;
+      params.append('page', page.toString());
       params.append('size', '12');
       
       // Sorting
@@ -142,5 +149,29 @@ export const useDeleteCourse = () => {
       });
     },
   });
+};
+
+/**
+ * Hook để lấy danh sách khóa học nổi bật (Featured Courses)
+ * Gọi trực tiếp endpoint /courses/featured từ backend
+ */
+export const useFeaturedCourses = () => {
+  const {
+    data: featuredCourses,
+    isLoading,
+    error,
+  } = useQuery<Course[]>({
+    queryKey: ['featured-courses'],
+    queryFn: async () => {
+      const response = await apiClient.get<Course[]>('/courses/featured');
+      return response.data;
+    },
+  });
+  
+  return {
+    featuredCourses: featuredCourses || [],
+    isLoading,
+    error,
+  };
 };
 

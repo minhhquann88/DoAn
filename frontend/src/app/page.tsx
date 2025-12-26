@@ -2,20 +2,20 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, BookOpen, Users, Award, TrendingUp, Search } from 'lucide-react';
+import { ArrowRight, BookOpen, Users, GraduationCap, Star, Search, Layout, Server, Smartphone, Cloud, PenTool, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { CourseGrid } from '@/components/course/CourseGrid';
-import { useCourses } from '@/hooks/useCourses';
+import { StatsSection } from '@/components/home/StatsSection';
+import { useCourses, useFeaturedCourses } from '@/hooks/useCourses';
 import { ROUTES } from '@/lib/constants';
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const { courses, isLoading } = useCourses();
-  
-  const featuredCourses = courses.filter(c => c.isFeatured).slice(0, 8);
+  const { featuredCourses, isLoading: isLoadingFeatured } = useFeaturedCourses();
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,51 +79,7 @@ export default function HomePage() {
       </section>
       
       {/* Stats Section */}
-      <section className="py-12 border-y bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <BookOpen className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold">10,000+</div>
-              <div className="text-sm text-muted-foreground">Khóa học</div>
-            </div>
-            
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10">
-                  <Users className="h-6 w-6 text-secondary" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold">500,000+</div>
-              <div className="text-sm text-muted-foreground">Học viên</div>
-            </div>
-            
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10">
-                  <Award className="h-6 w-6 text-accent" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold">1,000+</div>
-              <div className="text-sm text-muted-foreground">Giảng viên</div>
-            </div>
-            
-            <div className="text-center">
-              <div className="flex items-center justify-center mb-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <TrendingUp className="h-6 w-6 text-primary" />
-                </div>
-              </div>
-              <div className="text-3xl font-bold">95%</div>
-              <div className="text-sm text-muted-foreground">Hài lòng</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <StatsSection coursesCount={courses.length} />
       
       {/* Featured Courses Section */}
       <section className="py-16">
@@ -145,7 +101,7 @@ export default function HomePage() {
             </Link>
           </div>
           
-          <CourseGrid courses={featuredCourses} isLoading={isLoading} />
+          <CourseGrid courses={featuredCourses} isLoading={isLoadingFeatured} />
         </div>
       </section>
       
@@ -157,35 +113,37 @@ export default function HomePage() {
               Danh mục phổ biến
             </h2>
             <p className="text-muted-foreground">
-              Khám phá các lĩnh vực học tập đa dạng
+              Khám phá các lĩnh vực công nghệ và lập trình
             </p>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {[
-              { name: 'Lập trình', icon: '💻', count: '2,500+' },
-              { name: 'Thiết kế', icon: '🎨', count: '1,200+' },
-              { name: 'Kinh doanh', icon: '💼', count: '1,800+' },
-              { name: 'Marketing', icon: '📊', count: '900+' },
-              { name: 'Ngoại ngữ', icon: '🌍', count: '1,500+' },
-              { name: 'Kỹ năng mềm', icon: '🎯', count: '800+' },
-            ].map((category) => (
-              <Link
-                key={category.name}
-                href={`${ROUTES.COURSES}?category=${encodeURIComponent(category.name)}`}
-                className="group"
-              >
-                <div className="flex flex-col items-center justify-center p-6 bg-card rounded-lg border hover:border-primary hover:shadow-md transition-all">
-                  <div className="text-4xl mb-3">{category.icon}</div>
-                  <div className="font-semibold group-hover:text-primary transition-colors">
-                    {category.name}
+              { name: 'Front-end', slug: 'frontend', icon: Layout },
+              { name: 'Back-end', slug: 'backend', icon: Server },
+              { name: 'Mobile App', slug: 'mobile', icon: Smartphone },
+              { name: 'DevOps', slug: 'devops', icon: Cloud },
+              { name: 'UI/UX Design', slug: 'uiux', icon: PenTool },
+              { name: 'Database', slug: 'database', icon: Database },
+            ].map((category) => {
+              const IconComponent = category.icon;
+              return (
+                <Link
+                  key={category.slug}
+                  href={`${ROUTES.COURSES}?category=${encodeURIComponent(category.slug)}`}
+                  className="group"
+                >
+                  <div className="flex flex-col items-center justify-center p-6 bg-card rounded-lg border hover:border-primary hover:shadow-md transition-all min-h-[140px]">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4 group-hover:bg-primary/20 transition-colors">
+                      <IconComponent className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="text-base font-semibold group-hover:text-primary transition-colors text-center">
+                      {category.name}
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {category.count} khóa học
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>

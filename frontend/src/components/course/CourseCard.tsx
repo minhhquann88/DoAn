@@ -13,9 +13,10 @@ import { ROUTES, COURSE_LEVEL_LABELS } from '@/lib/constants';
 
 interface CourseCardProps {
   course: Course;
+  priority?: boolean; // For LCP optimization: prioritize first 4 images
 }
 
-export function CourseCard({ course }: CourseCardProps) {
+export function CourseCard({ course, priority = false }: CourseCardProps) {
   const discountPercentage = course.discountPrice 
     ? Math.round(((course.price - course.discountPrice) / course.price) * 100)
     : 0;
@@ -25,11 +26,13 @@ export function CourseCard({ course }: CourseCardProps) {
       <Card className="group h-full overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
         {/* Thumbnail */}
         <div className="relative aspect-video w-full overflow-hidden bg-muted">
-          {course.thumbnail ? (
+          {course.imageUrl || course.thumbnail ? (
             <Image
-              src={course.thumbnail}
+              src={course.imageUrl || course.thumbnail || ''}
               alt={course.title}
               fill
+              priority={priority}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="object-cover transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
@@ -113,7 +116,7 @@ export function CourseCard({ course }: CourseCardProps) {
               {/* Students */}
               <div className="flex items-center gap-1 text-muted-foreground">
                 <Users className="h-4 w-4" />
-                <span>{course.enrollmentCount.toLocaleString()}</span>
+                <span>{(course.enrollmentCount ?? 0).toLocaleString()}</span>
               </div>
               
               {/* Duration */}

@@ -34,8 +34,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   login: (user, token) => {
     if (typeof window !== 'undefined') {
+      // Save to localStorage for API calls
       localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
       localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+      
+      // Save to cookie for middleware
+      const expires = new Date();
+      expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      document.cookie = `token=${token};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
     }
     set({ user, isAuthenticated: true });
   },
@@ -44,6 +50,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
       localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+      // Remove cookie
+      document.cookie = 'token=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
     }
     set({ user: null, isAuthenticated: false });
   },

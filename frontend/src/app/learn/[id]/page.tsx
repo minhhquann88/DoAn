@@ -45,50 +45,44 @@ interface Section {
   lessons: Lesson[];
 }
 
-// Mock data for curriculum
-const mockCurriculum: Section[] = [
-  {
-    id: 1,
-    title: 'Giới thiệu khóa học',
-    lessons: [
-      { id: 1, title: 'Chào mừng bạn đến với khóa học', type: 'VIDEO', duration: 5, isCompleted: true, videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-      { id: 2, title: 'Tổng quan khóa học', type: 'ARTICLE', duration: 10, isCompleted: true },
-      { id: 3, title: 'Kiểm tra đầu vào', type: 'QUIZ', duration: 15, isCompleted: false },
-    ],
-  },
-  {
-    id: 2,
-    title: 'Nền tảng cơ bản',
-    lessons: [
-      { id: 4, title: 'Khái niệm cơ bản', type: 'VIDEO', duration: 20, isCompleted: false, videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-      { id: 5, title: 'Thực hành đầu tiên', type: 'ARTICLE', duration: 15, isCompleted: false },
-      { id: 6, title: 'Bài tập thực hành', type: 'ASSIGNMENT', duration: 30, isCompleted: false },
-    ],
-  },
-  {
-    id: 3,
-    title: 'Nâng cao',
-    lessons: [
-      { id: 7, title: 'Kỹ thuật nâng cao', type: 'VIDEO', duration: 25, isCompleted: false },
-      { id: 8, title: 'Case study', type: 'ARTICLE', duration: 20, isCompleted: false },
-      { id: 9, title: 'Kiểm tra giữa khóa', type: 'QUIZ', duration: 20, isCompleted: false },
-    ],
-  },
-];
-
 export default function LearningPage() {
   const params = useParams();
   const router = useRouter();
   const { course, isLoading } = useCourse(params.id as string);
   
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
-  const [currentLessonId, setCurrentLessonId] = React.useState(1);
-  const [curriculum] = React.useState(mockCurriculum);
+  const [currentLessonId, setCurrentLessonId] = React.useState<number | null>(null);
+  const [curriculum, setCurriculum] = React.useState<Section[]>([]);
+  const [isLoadingCurriculum, setIsLoadingCurriculum] = React.useState(true);
+  
+  React.useEffect(() => {
+    // TODO: Fetch curriculum from API
+    // const fetchCurriculum = async () => {
+    //   try {
+    //     const response = await fetch(`/api/content/courses/${params.id}`);
+    //     const data = await response.json();
+    //     setCurriculum(data);
+    //     if (data.length > 0 && data[0].lessons.length > 0) {
+    //       setCurrentLessonId(data[0].lessons[0].id);
+    //     }
+    //   } catch (error) {
+    //     console.error('Error fetching curriculum:', error);
+    //   } finally {
+    //     setIsLoadingCurriculum(false);
+    //   }
+    // };
+    // if (params.id) {
+    //   fetchCurriculum();
+    // }
+    setIsLoadingCurriculum(false);
+  }, [params.id]);
   
   // Find current lesson
-  const currentLesson = curriculum
+  const currentLesson = currentLessonId
+    ? curriculum
     .flatMap(section => section.lessons)
-    .find(lesson => lesson.id === currentLessonId);
+        .find(lesson => lesson.id === currentLessonId)
+    : null;
   
   // Calculate progress
   const totalLessons = curriculum.reduce((sum, section) => sum + section.lessons.length, 0);

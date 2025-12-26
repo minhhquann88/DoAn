@@ -15,6 +15,9 @@ public class CourseResponse {
     private Integer totalDurationInHours;
     private String status;
     private LocalDateTime createdAt;
+    private Long enrollmentCount; // Số lượng học viên đã đăng ký
+    private Boolean isFeatured; // Khóa học nổi bật
+    private Boolean isPublished; // Khóa học đã được publish
 
     // Thông tin lồng nhau
     private CategoryInfo category;
@@ -44,6 +47,8 @@ public class CourseResponse {
         dto.setTotalDurationInHours(course.getTotalDurationInHours());
         dto.setStatus(course.getStatus().name());
         dto.setCreatedAt(course.getCreatedAt());
+        dto.setIsFeatured(course.getIsFeatured() != null ? course.getIsFeatured() : false);
+        dto.setIsPublished(course.getIsPublished() != null ? course.getIsPublished() : true);
 
         if (course.getCategory() != null) {
             CategoryInfo catInfo = new CategoryInfo();
@@ -59,6 +64,9 @@ public class CourseResponse {
             insInfo.setAvatarUrl(course.getInstructor().getAvatarUrl());
             dto.setInstructor(insInfo);
         }
+
+        // Note: enrollmentCount sẽ được set trong Service layer để tránh LAZY loading issue
+        // Default value là 0L, sẽ được override trong service
 
         return dto;
     }

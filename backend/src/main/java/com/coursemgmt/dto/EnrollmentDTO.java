@@ -36,8 +36,6 @@ public class EnrollmentDTO {
     // Learning stats
     private Integer completedLessons;
     private Integer totalLessons;
-    private Integer testsTaken;
-    private Double averageTestScore;
     
     // Payment info
     private Boolean isPaid;

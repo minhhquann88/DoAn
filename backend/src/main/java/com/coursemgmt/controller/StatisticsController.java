@@ -11,7 +11,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.coursemgmt.security.services.UserDetailsImpl;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -28,10 +30,12 @@ public class StatisticsController {
     private ExcelService excelService;
 
     /**
-     * 1. Lấy tổng quan dashboard
+     * 1. Lấy tổng quan dashboard (Admin only)
      * GET /api/v1/statistics/dashboard
+     * Security: Only Admin can access system-wide statistics
      */
     @GetMapping("/dashboard")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
         DashboardStatsDTO stats = statisticsService.getDashboardStats();
         return ResponseEntity.ok(stats);
@@ -50,10 +54,13 @@ public class StatisticsController {
     /**
      * 3. Thống kê giảng viên
      * GET /api/v1/statistics/instructor/{instructorId}
+     * Security: Only Admin or the instructor themselves can access
      */
     @GetMapping("/instructor/{instructorId}")
+    @PreAuthorize("hasRole('ADMIN') or (hasRole('LECTURER') and #instructorId == authentication.principal.id)")
     public ResponseEntity<InstructorStatsDTO> getInstructorStats(
-        @PathVariable Long instructorId
+        @PathVariable Long instructorId,
+        @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
         InstructorStatsDTO stats = statisticsService.getInstructorStats(instructorId);
         return ResponseEntity.ok(stats);
@@ -72,10 +79,12 @@ public class StatisticsController {
     }
 
     /**
-     * 5. Báo cáo doanh thu
+     * 5. Báo cáo doanh thu (Admin only)
      * GET /api/v1/statistics/revenue
+     * Security: Only Admin can access system-wide revenue reports
      */
     @GetMapping("/revenue")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RevenueStatsDTO> getRevenueReport(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) 
         LocalDateTime startDate,
@@ -87,10 +96,12 @@ public class StatisticsController {
     }
 
     /**
-     * 6. Báo cáo tỷ lệ hoàn thành
+     * 6. Báo cáo tỷ lệ hoàn thành (Admin only)
      * GET /api/v1/statistics/completion
+     * Security: Only Admin can access system-wide completion reports
      */
     @GetMapping("/completion")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CompletionReportDTO> getCompletionReport() {
         CompletionReportDTO report = statisticsService.getCompletionReport();
         return ResponseEntity.ok(report);

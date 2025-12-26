@@ -31,6 +31,12 @@ public class Course {
     @Column(length = 30)
     private ECourseStatus status; // Enum: DRAFT, PENDING_APPROVAL, PUBLISHED
 
+    @Column(name = "is_featured")
+    private Boolean isFeatured = false; // Khóa học nổi bật (được chọn thủ công)
+
+    @Column(name = "is_published")
+    private Boolean isPublished = true; // Khóa học đã được publish
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

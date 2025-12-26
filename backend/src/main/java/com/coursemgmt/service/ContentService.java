@@ -1,5 +1,6 @@
 package com.coursemgmt.service;
 
+import com.coursemgmt.dto.CertificateRequest;
 import com.coursemgmt.dto.ChapterRequest;
 import com.coursemgmt.dto.ChapterResponse;
 import com.coursemgmt.dto.LessonRequest;
@@ -14,8 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +34,10 @@ public class ContentService {
     private EnrollmentRepository enrollmentRepository;
     @Autowired
     private UserProgressRepository userProgressRepository;
+    @Autowired
+    private CertificateService certificateService;
+
+    private static final Logger logger = Logger.getLogger(ContentService.class.getName());
 
     // --- Quản lý Chapter ---
 
@@ -180,6 +185,49 @@ public class ContentService {
         updateEnrollmentProgress(enrollment);
     }
 
+    // --- Chức năng: Cập nhật tiến độ xem video (Auto-Progress) ---
+    @Transactional
+    public void updateLessonWatchTime(Long lessonId, Integer watchedTime, Integer totalDuration, UserDetailsImpl userDetails) {
+        User user = userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new RuntimeException("User not found!"));
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new RuntimeException("Lesson not found!"));
+        Course course = lesson.getChapter().getCourse();
+
+        // Tìm enrollment của user cho khóa học này
+        Enrollment enrollment = enrollmentRepository.findByUserAndCourse(user, course)
+                .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký khóa học này!"));
+
+        // Tìm hoặc tạo mới User_Progress
+        User_Progress progress = userProgressRepository.findByEnrollmentAndLesson(enrollment, lesson)
+                .orElse(new User_Progress());
+
+        // Set enrollment and lesson if this is a new progress record
+        if (progress.getEnrollment() == null) {
+            progress.setEnrollment(enrollment);
+            progress.setLesson(lesson);
+        }
+
+        // Update watched time and total duration
+        progress.setLastWatchedTime(watchedTime);
+        progress.setTotalDuration(totalDuration);
+
+        // Calculate watch percentage
+        double percent = (double) watchedTime / totalDuration;
+
+        // Crucial Check: IF watched >= 90% AND not already completed -> Auto-complete
+        if (percent >= 0.9 && !Boolean.TRUE.equals(progress.getIsCompleted())) {
+            progress.setIsCompleted(true);
+            progress.setCompletedAt(LocalDateTime.now());
+            
+            // Trigger course-level progress recalculation
+            updateEnrollmentProgress(enrollment);
+        }
+
+        // Save progress (whether completed or not)
+        userProgressRepository.save(progress);
+    }
+
     // Hàm private để tính toán lại tiến độ
     private void updateEnrollmentProgress(Enrollment enrollment) {
         long totalLessonsInCourse = lessonRepository.countByChapter_Course_Id(enrollment.getCourse().getId());
@@ -187,6 +235,9 @@ public class ContentService {
             enrollment.setProgress(100.0);
             enrollment.setStatus(EEnrollmentStatus.COMPLETED);
             enrollmentRepository.save(enrollment);
+            
+            // Auto-issue certificate for courses with no lessons
+            autoIssueCertificate(enrollment);
             return;
         }
 
@@ -197,11 +248,39 @@ public class ContentService {
 
         if (progressPercentage >= 100.0) {
             enrollment.setStatus(EEnrollmentStatus.COMPLETED);
-            // (Bạn có thể thêm logic cấp chứng chỉ ở đây)
+            enrollmentRepository.save(enrollment);
+            
+            // Auto-issue certificate when course is completed
+            autoIssueCertificate(enrollment);
         } else {
             enrollment.setStatus(EEnrollmentStatus.IN_PROGRESS);
+            enrollmentRepository.save(enrollment);
         }
+    }
 
-        enrollmentRepository.save(enrollment);
+    /**
+     * Auto-issue certificate when enrollment reaches 100% completion
+     */
+    private void autoIssueCertificate(Enrollment enrollment) {
+        try {
+            CertificateRequest certRequest = new CertificateRequest();
+            certRequest.setEnrollmentId(enrollment.getId());
+            // Optional: Set final score if available
+            // certRequest.setFinalScore(calculateFinalScore(enrollment));
+            
+            certificateService.issueCertificate(certRequest);
+            logger.info("Auto-issued certificate for Enrollment ID: " + enrollment.getId());
+        } catch (RuntimeException e) {
+            // Handle cases where certificate already exists or other errors
+            // Log but don't fail the enrollment update
+            if (e.getMessage() != null && e.getMessage().contains("already issued")) {
+                logger.info("Certificate already exists for Enrollment ID: " + enrollment.getId() + " - Skipping auto-issue");
+            } else {
+                logger.warning("Failed to auto-issue certificate for Enrollment ID: " + enrollment.getId() + " - Error: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            // Catch any other unexpected exceptions
+            logger.severe("Unexpected error while auto-issuing certificate for Enrollment ID: " + enrollment.getId() + " - Error: " + e.getMessage());
+        }
     }
 }

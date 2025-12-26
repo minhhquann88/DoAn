@@ -43,6 +43,7 @@ class SessionInfo(BaseModel):
     is_active: bool
     context_data: Dict[str, Any]
 
+@router.post("/message", response_model=ChatResponse)
 @router.post("/send", response_model=ChatResponse)
 async def send_message(
     chat_message: ChatMessage,

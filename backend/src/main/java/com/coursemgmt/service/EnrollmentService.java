@@ -6,7 +6,9 @@ import com.coursemgmt.model.EEnrollmentStatus;
 import com.coursemgmt.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,16 +34,44 @@ public class EnrollmentService {
 
     /**
      * Lấy danh sách enrollment theo course
+     * Security: Double-check ownership - only Admin or Course Owner can access
      */
-    public Page<EnrollmentDTO> getEnrollmentsByCourse(Long courseId, Pageable pageable) {
+    public Page<EnrollmentDTO> getEnrollmentsByCourse(Long courseId, Long currentUserId, Pageable pageable) {
+        // Fetch the course to verify ownership
+        Course course = courseRepository.findById(courseId)
+            .orElseThrow(() -> new RuntimeException("Course not found with id: " + courseId));
+        
+        // Check if current user is Admin
+        User currentUser = userRepository.findById(currentUserId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        boolean isAdmin = currentUser.getRoles().stream()
+            .anyMatch(role -> role.getName() == ERole.ROLE_ADMIN);
+        
+        // Security Check: Only Admin or Course Owner can access
+        if (!isAdmin && (course.getInstructor() == null || !course.getInstructor().getId().equals(currentUserId))) {
+            throw new AccessDeniedException("You are not authorized to view enrollments for this course");
+        }
+        
         Page<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId, pageable);
         return enrollments.map(this::convertToDTO);
     }
 
     /**
      * Lấy danh sách enrollment theo student
+     * Security: Double-check identity - only Admin or the student themselves can access
      */
-    public Page<EnrollmentDTO> getEnrollmentsByStudent(Long studentId, Pageable pageable) {
+    public Page<EnrollmentDTO> getEnrollmentsByStudent(Long studentId, Long currentUserId, Pageable pageable) {
+        // Check if current user is Admin
+        User currentUser = userRepository.findById(currentUserId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        boolean isAdmin = currentUser.getRoles().stream()
+            .anyMatch(role -> role.getName() == ERole.ROLE_ADMIN);
+        
+        // Security Check: Only Admin or the student themselves can access
+        if (!isAdmin && !studentId.equals(currentUserId)) {
+            throw new AccessDeniedException("You are not authorized to view this student's enrollments");
+        }
+        
         Page<Enrollment> enrollments = enrollmentRepository.findByUserId(studentId, pageable);
         return enrollments.map(this::convertToDTO);
     }
@@ -139,8 +169,20 @@ public class EnrollmentService {
 
     /**
      * Lấy lịch sử học tập của học viên
+     * Security: Double-check identity - only Admin or the student themselves can access
      */
-    public StudentLearningHistoryDTO getStudentLearningHistory(Long studentId) {
+    public StudentLearningHistoryDTO getStudentLearningHistory(Long studentId, Long currentUserId) {
+        // Check if current user is Admin
+        User currentUser = userRepository.findById(currentUserId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        boolean isAdmin = currentUser.getRoles().stream()
+            .anyMatch(role -> role.getName() == ERole.ROLE_ADMIN);
+        
+        // Security Check: Only Admin or the student themselves can access
+        if (!isAdmin && !studentId.equals(currentUserId)) {
+            throw new AccessDeniedException("You are not authorized to view this student's learning history");
+        }
+        
         User student = userRepository.findById(studentId)
             .orElseThrow(() -> new RuntimeException("Student not found with id: " + studentId));
         
@@ -281,6 +323,71 @@ public class EnrollmentService {
         dto.setLastAccessedAt(null);
         
         return dto;
+    }
+
+    /**
+     * Lấy danh sách học viên của giảng viên hiện tại (My Students)
+     * Returns all students enrolled in ANY course owned by the current instructor
+     */
+    public Page<EnrollmentDTO> getMyStudents(Long instructorId, Long courseId, Pageable pageable) {
+        // Get all courses owned by this instructor
+        List<Course> instructorCourses = courseRepository.findByInstructorId(instructorId);
+        
+        if (instructorCourses.isEmpty()) {
+            return new PageImpl<>(Collections.emptyList(), pageable, 0);
+        }
+        
+        // Filter by specific course if provided
+        if (courseId != null) {
+            // Verify the course belongs to this instructor
+            boolean courseBelongsToInstructor = instructorCourses.stream()
+                .anyMatch(c -> c.getId().equals(courseId));
+            
+            if (!courseBelongsToInstructor) {
+                throw new AccessDeniedException("You are not authorized to view enrollments for this course");
+            }
+            
+            // Return enrollments for this specific course
+            Page<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId, pageable);
+            return enrollments.map(this::convertToDTO);
+        }
+        
+        // Get enrollments from all courses owned by this instructor
+        List<Long> courseIds = instructorCourses.stream()
+            .map(Course::getId)
+            .collect(Collectors.toList());
+        
+        // Fetch all enrollments for these courses
+        List<Enrollment> allEnrollments = new ArrayList<>();
+        for (Long cId : courseIds) {
+            List<Enrollment> enrollments = enrollmentRepository.findByCourseId(cId, Pageable.unpaged())
+                .getContent();
+            allEnrollments.addAll(enrollments);
+        }
+        
+        // Remove duplicates (same student in multiple courses)
+        Map<Long, Enrollment> uniqueEnrollments = new LinkedHashMap<>();
+        for (Enrollment enrollment : allEnrollments) {
+            Long studentId = enrollment.getUser().getId();
+            // Keep the most recent enrollment per student
+            if (!uniqueEnrollments.containsKey(studentId) || 
+                enrollment.getEnrolledAt().isAfter(uniqueEnrollments.get(studentId).getEnrolledAt())) {
+                uniqueEnrollments.put(studentId, enrollment);
+            }
+        }
+        
+        // Paginate manually
+        List<EnrollmentDTO> enrollmentDTOs = uniqueEnrollments.values().stream()
+            .map(this::convertToDTO)
+            .collect(Collectors.toList());
+        
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), enrollmentDTOs.size());
+        List<EnrollmentDTO> pageContent = start < enrollmentDTOs.size() 
+            ? enrollmentDTOs.subList(start, end) 
+            : Collections.emptyList();
+        
+        return new PageImpl<>(pageContent, pageable, enrollmentDTOs.size());
     }
 }
 

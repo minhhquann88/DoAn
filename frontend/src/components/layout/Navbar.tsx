@@ -25,6 +25,42 @@ export function Navbar() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { toggleTheme, theme } = useUIStore();
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [notificationCount, setNotificationCount] = React.useState(0);
+  const [cartCount, setCartCount] = React.useState(0);
+  const [isLoadingNotifications, setIsLoadingNotifications] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      // TODO: Fetch notification count from API
+      // const fetchNotifications = async () => {
+      //   try {
+      //     setIsLoadingNotifications(true);
+      //     const response = await fetch('/api/notifications/unread-count');
+      //     const data = await response.json();
+      //     setNotificationCount(data.count || 0);
+      //   } catch (error) {
+      //     console.error('Error fetching notifications:', error);
+      //   } finally {
+      //     setIsLoadingNotifications(false);
+      //   }
+      // };
+      // fetchNotifications();
+      
+      // TODO: Fetch cart count from API
+      // const fetchCartCount = async () => {
+      //   try {
+      //     const response = await fetch('/api/cart/count');
+      //     const data = await response.json();
+      //     setCartCount(data.count || 0);
+      //   } catch (error) {
+      //     console.error('Error fetching cart count:', error);
+      //   }
+      // };
+      // if (user?.role === 'ROLE_STUDENT') {
+      //   fetchCartCount();
+      // }
+    }
+  }, [isAuthenticated, user?.role]);
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +76,19 @@ export function Navbar() {
   
   const getDashboardRoute = () => {
     if (user?.role === 'ROLE_ADMIN') return ROUTES.ADMIN_DASHBOARD;
-    if (user?.role === 'ROLE_LECTURER') return ROUTES.INSTRUCTOR_DASHBOARD;
-    return ROUTES.STUDENT_DASHBOARD;
+    if (user?.role === 'ROLE_LECTURER') return ROUTES.INSTRUCTOR.DASHBOARD;
+    return ROUTES.STUDENT.DASHBOARD;
+  };
+  
+  const getMyCoursesRoute = () => {
+    if (user?.role === 'ROLE_LECTURER') return ROUTES.INSTRUCTOR.COURSES;
+    return ROUTES.STUDENT.MY_COURSES;
+  };
+  
+  const getProfileRoute = () => {
+    if (user?.role === 'ROLE_ADMIN') return ROUTES.ADMIN_SETTINGS;
+    if (user?.role === 'ROLE_LECTURER') return ROUTES.INSTRUCTOR.PROFILE;
+    return ROUTES.STUDENT.PROFILE;
   };
   
   return (
@@ -84,24 +131,28 @@ export function Navbar() {
               {/* Notifications */}
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
+                {notificationCount > 0 && (
                 <Badge 
                   variant="destructive" 
                   className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
                 >
-                  3
+                    {notificationCount > 99 ? '99+' : notificationCount}
                 </Badge>
+                )}
               </Button>
               
               {/* Shopping Cart - Only for students */}
               {user?.role === 'ROLE_STUDENT' && (
                 <Button variant="ghost" size="icon" className="relative">
                   <ShoppingCart className="h-5 w-5" />
+                  {cartCount > 0 && (
                   <Badge 
                     variant="secondary" 
                     className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
                   >
-                    0
+                      {cartCount > 99 ? '99+' : cartCount}
                   </Badge>
+                  )}
                 </Button>
               )}
               
@@ -127,15 +178,17 @@ export function Navbar() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  {/* Student Menu: Dashboard, Khóa học của tôi, Cài đặt, Đăng xuất */}
+                  {/* Note: "Tiến độ học tập" has been removed as requested */}
                   <DropdownMenuItem onClick={() => router.push(getDashboardRoute())}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Dashboard</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push(ROUTES.STUDENT_MY_COURSES)}>
+                  <DropdownMenuItem onClick={() => router.push(getMyCoursesRoute())}>
                     <BookOpen className="mr-2 h-4 w-4" />
                     <span>Khóa học của tôi</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push(ROUTES.STUDENT_PROFILE)}>
+                  <DropdownMenuItem onClick={() => router.push(getProfileRoute())}>
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Cài đặt</span>
                   </DropdownMenuItem>

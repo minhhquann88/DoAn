@@ -1,9 +1,11 @@
 package com.coursemgmt.controller;
 
 import com.coursemgmt.dto.ChapterResponse;
+import com.coursemgmt.dto.LessonProgressRequest;
 import com.coursemgmt.dto.MessageResponse;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.ContentService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,5 +38,15 @@ public class ContentAccessController {
                                                                  @AuthenticationPrincipal UserDetailsImpl userDetails) {
         contentService.markLessonAsCompleted(lessonId, userDetails);
         return ResponseEntity.ok(new MessageResponse("Lesson marked as completed!"));
+    }
+
+    // API để cập nhật tiến độ xem video (Auto-Progress: Auto-complete khi >90%)
+    @PostMapping("/lessons/{lessonId}/progress")
+    @PreAuthorize("hasRole('STUDENT') and @courseSecurityService.isEnrolled(authentication, #lessonId)")
+    public ResponseEntity<MessageResponse> updateLessonProgress(@PathVariable Long lessonId,
+                                                               @Valid @RequestBody LessonProgressRequest request,
+                                                               @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        contentService.updateLessonWatchTime(lessonId, request.getWatchedTime(), request.getTotalDuration(), userDetails);
+        return ResponseEntity.ok(new MessageResponse("Progress updated successfully!"));
     }
 }

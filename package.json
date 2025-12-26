@@ -19,5 +19,8 @@
     "online-learning"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "react-player": "^3.4.0"
+  }
 }

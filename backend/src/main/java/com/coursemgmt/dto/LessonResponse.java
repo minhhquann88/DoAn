@@ -18,6 +18,9 @@ public class LessonResponse {
     // Dùng cho chức năng "Theo dõi tiến độ"
     private boolean isCompleted;
 
+    // Lesson có thể xem trước (cho guests)
+    private Boolean isPreview;
+
     public static LessonResponse fromEntity(Lesson lesson, boolean isCompleted) {
         LessonResponse dto = new LessonResponse();
         dto.setId(lesson.getId());
@@ -26,6 +29,7 @@ public class LessonResponse {
         dto.setDurationInMinutes(lesson.getDurationInMinutes());
         dto.setPosition(lesson.getPosition());
         dto.setCompleted(isCompleted);
+        dto.setIsPreview(lesson.getIsPreview() != null ? lesson.getIsPreview() : false);
 
         // Chỉ trả về nội dung chi tiết nếu đã hoàn thành (hoặc là Giảng viên)
         // (Đây là logic ví dụ, bạn có thể quyết định trả về hết)

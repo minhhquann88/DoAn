@@ -11,10 +11,12 @@ public class UpdateProfileRequest {
     private String fullName;
 
     @Size(max = 50)
-    @Email
+    @Email(message = "Email should be valid")
     private String email;
 
     private String avatarUrl;
 
+    @Size(max = 500, message = "Bio must not exceed 500 characters")
+    // TODO: Implement XSS sanitization (since adding a full HTML sanitizer library might be too heavy right now)
     private String bio;
 }

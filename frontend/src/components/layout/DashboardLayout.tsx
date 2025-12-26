@@ -31,7 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
-import { ROUTES } from '@/lib/constants';
+import { ROUTES, STORAGE_KEYS } from '@/lib/constants';
 
 interface NavItem {
   title: string;
@@ -40,58 +40,45 @@ interface NavItem {
   badge?: number;
 }
 
-const studentNavItems: NavItem[] = [
+// Student Navigation Items - Strictly for learning tools only
+const STUDENT_NAV: NavItem[] = [
   {
     title: 'Dashboard',
-    href: ROUTES.STUDENT_DASHBOARD,
+    href: ROUTES.STUDENT.DASHBOARD,
     icon: <LayoutDashboard className="h-5 w-5" />,
   },
   {
     title: 'Khóa học của tôi',
-    href: ROUTES.STUDENT_MY_COURSES,
+    href: ROUTES.STUDENT.MY_COURSES,
     icon: <BookOpen className="h-5 w-5" />,
-  },
-  {
-    title: 'Tiến độ học tập',
-    href: ROUTES.STUDENT_PROGRESS,
-    icon: <GraduationCap className="h-5 w-5" />,
-  },
-  {
-    title: 'Chứng chỉ',
-    href: ROUTES.STUDENT_CERTIFICATES,
-    icon: <Award className="h-5 w-5" />,
-  },
-  {
-    title: 'Hồ sơ',
-    href: ROUTES.STUDENT_PROFILE,
-    icon: <User className="h-5 w-5" />,
   },
 ];
 
-const instructorNavItems: NavItem[] = [
+// Instructor Navigation Items - Strictly for management tools
+const INSTRUCTOR_NAV: NavItem[] = [
   {
     title: 'Dashboard',
-    href: ROUTES.INSTRUCTOR_DASHBOARD,
+    href: ROUTES.INSTRUCTOR.DASHBOARD,
     icon: <LayoutDashboard className="h-5 w-5" />,
   },
   {
     title: 'Khóa học',
-    href: ROUTES.INSTRUCTOR_COURSES,
+    href: ROUTES.INSTRUCTOR.COURSES,
     icon: <BookOpen className="h-5 w-5" />,
   },
   {
     title: 'Học viên',
-    href: ROUTES.INSTRUCTOR_STUDENTS,
+    href: ROUTES.INSTRUCTOR.STUDENTS,
     icon: <GraduationCap className="h-5 w-5" />,
   },
   {
     title: 'Doanh thu',
-    href: ROUTES.INSTRUCTOR_EARNINGS,
+    href: ROUTES.INSTRUCTOR.EARNINGS,
     icon: <Award className="h-5 w-5" />,
   },
   {
     title: 'Hồ sơ',
-    href: ROUTES.INSTRUCTOR_PROFILE,
+    href: ROUTES.INSTRUCTOR.PROFILE,
     icon: <User className="h-5 w-5" />,
   },
 ];
@@ -136,15 +123,47 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAuthenticated } = useAuthStore();
   const { sidebarCollapsed, toggleSidebarCollapse } = useUIStore();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
+  
+  // Initialize auth state from localStorage on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+      const storedUser = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+      
+      if (token && storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          useAuthStore.setState({ user: userData, isAuthenticated: true });
+        } catch (error) {
+          console.error('Failed to parse stored user data:', error);
+          localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+          localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        }
+      }
+      setIsInitialized(true);
+    }
+  }, []);
+  
+  // Auth guard: Redirect to login if not authenticated
+  React.useEffect(() => {
+    if (isInitialized && !isAuthenticated) {
+      // Only redirect if we have a token but no user (invalid state)
+      const token = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) : null;
+      if (!token) {
+        router.push(ROUTES.LOGIN);
+      }
+    }
+  }, [isInitialized, isAuthenticated, router]);
   
   // Get navigation items based on user role
-  const getNavItems = () => {
+  const getNavItems = (): NavItem[] => {
     if (user?.role === 'ROLE_ADMIN') return adminNavItems;
-    if (user?.role === 'ROLE_LECTURER') return instructorNavItems;
-    return studentNavItems;
+    if (user?.role === 'ROLE_LECTURER') return INSTRUCTOR_NAV;
+    return STUDENT_NAV;
   };
   
   const navItems = getNavItems();
@@ -153,6 +172,30 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     logout();
     router.push(ROUTES.LOGIN);
   };
+  
+  // Show loading state while initializing
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show loading state if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Đang chuyển hướng...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen flex">
@@ -191,7 +234,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="flex-1 overflow-y-auto p-4">
           <ul className="space-y-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.href;
+              // Improved active state: exact match OR pathname starts with item.href (for nested routes)
+              // But exclude exact matches for parent routes (e.g., /instructor should not be active on /instructor/courses)
+              const isExactMatch = pathname === item.href;
+              const isNestedMatch = pathname.startsWith(item.href + '/');
+              // Special case: Dashboard should only be active on exact match
+              const isActive = item.href.endsWith('/instructor') || item.href.endsWith('/student')
+                ? isExactMatch
+                : (isExactMatch || isNestedMatch);
+              
               return (
                 <li key={item.href}>
                   <Link
@@ -248,7 +299,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Tài khoản của tôi</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push(ROUTES.STUDENT_PROFILE)}>
+              <DropdownMenuItem onClick={() => {
+                if (user?.role === 'ROLE_ADMIN') {
+                  router.push(ROUTES.ADMIN_SETTINGS);
+                } else if (user?.role === 'ROLE_LECTURER') {
+                  router.push(ROUTES.INSTRUCTOR.PROFILE);
+                } else {
+                  router.push(ROUTES.STUDENT.PROFILE);
+                }
+              }}>
                 <User className="mr-2 h-4 w-4" />
                 Hồ sơ
               </DropdownMenuItem>
@@ -301,7 +360,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="flex-1 overflow-y-auto p-4">
           <ul className="space-y-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.href;
+              // Improved active state: exact match OR pathname starts with item.href (for nested routes)
+              const isExactMatch = pathname === item.href;
+              const isNestedMatch = pathname.startsWith(item.href + '/');
+              const isActive = item.href.endsWith('/instructor') || item.href.endsWith('/student')
+                ? isExactMatch
+                : (isExactMatch || isNestedMatch);
+              
               return (
                 <li key={item.href}>
                   <Link

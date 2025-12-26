@@ -53,7 +53,8 @@ export interface Course {
   slug?: string;
   description: string;
   shortDescription?: string;
-  thumbnail?: string;
+  thumbnail?: string; // Deprecated: Use imageUrl instead
+  imageUrl?: string; // Image URL from Backend CourseResponse (matches Backend field name)
   promoVideo?: string;
   price: number;
   discountPrice?: number;
@@ -66,12 +67,13 @@ export interface Course {
   instructorId: number;
   rating?: number;
   reviewCount?: number;
-  enrollmentCount: number;
+  enrollmentCount: number; // Số lượng học viên đã đăng ký (từ Backend CourseResponse)
   duration?: string;
   lastUpdated?: string;
   whatYouLearn?: string[];
   requirements?: string[];
   isFeatured: boolean;
+  isPublished?: boolean; // Khóa học đã được publish
   status: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED';
   createdAt: string;
   updatedAt?: string;
@@ -292,8 +294,11 @@ export interface SearchFilters {
   level?: string;
   minPrice?: number;
   maxPrice?: number;
+  isFree?: boolean; // Filter for free courses (price = 0)
+  isPaid?: boolean; // Filter for paid courses (price > 0)
   rating?: number;
   language?: string;
   sortBy?: 'popular' | 'rating' | 'newest' | 'price_low' | 'price_high';
+  page?: number; // Current page number (0-indexed)
 }
 

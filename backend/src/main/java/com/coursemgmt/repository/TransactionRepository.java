@@ -69,4 +69,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
            "GROUP BY MONTH(t.createdAt), YEAR(t.createdAt) " +
            "ORDER BY month")
     List<Object[]> getMonthlyRevenue(@Param("year") int year);
+    
+    // Tính doanh thu từ transactions thành công của các courses thuộc instructor
+    @Query("SELECT SUM(t.amount) FROM Transaction t " +
+           "WHERE t.status = 'SUCCESS' AND t.course.instructor.id = :instructorId")
+    Double calculateRevenueByInstructor(@Param("instructorId") Long instructorId);
+    
+    // Lấy transactions thành công của các courses thuộc instructor trong khoảng thời gian
+    @Query("SELECT t FROM Transaction t " +
+           "WHERE t.status = 'SUCCESS' AND t.course.instructor.id = :instructorId " +
+           "AND t.createdAt BETWEEN :startDate AND :endDate")
+    List<Transaction> findSuccessfulTransactionsByInstructorAndDateRange(
+            @Param("instructorId") Long instructorId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
 }

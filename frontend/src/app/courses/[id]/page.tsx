@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   Clock, 
   Users, 
@@ -16,6 +17,7 @@ import {
   Download,
   Share2,
   Heart,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,12 +37,76 @@ import { useCourse } from '@/hooks/useCourses';
 import { useAuthStore } from '@/stores/authStore';
 import { ROUTES, COURSE_LEVEL_LABELS } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
+import VideoPlayerModal from '@/components/course/VideoPlayerModal';
+import { getCourseContent, type ChapterResponse, type LessonResponse } from '@/services/contentService';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '@/lib/api';
 
 export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { course, isLoading } = useCourse(params.id as string);
   const { isAuthenticated } = useAuthStore();
+  const [previewVideo, setPreviewVideo] = useState<{ url: string; title: string } | null>(null);
+  
+  // Fetch curriculum data (chapters and lessons) - Use public preview endpoint
+  const { data: curriculum, isLoading: isLoadingCurriculum } = useQuery<ChapterResponse[]>({
+    queryKey: ['course-preview', params.id],
+    queryFn: async () => {
+      try {
+        // First try to fetch full content if authenticated and enrolled
+        if (isAuthenticated) {
+          try {
+            return await getCourseContent(Number(params.id));
+          } catch (error) {
+            // If not enrolled, fall back to preview endpoint
+          }
+        }
+        // Use public preview endpoint (works for guests)
+        const response = await apiClient.get<ChapterResponse[]>(`/courses/${params.id}/preview`);
+        return response.data;
+      } catch (error) {
+        console.error('Failed to fetch curriculum:', error);
+        return [];
+      }
+    },
+    enabled: !!params.id && !!course,
+  });
+  
+  const handlePreviewLesson = (lesson: LessonResponse) => {
+    // Check if lesson is preview - use isPreview from backend (priority)
+    // Fallback to isFree or videoUrl check for backward compatibility
+    const isPreview = lesson.isPreview === true || 
+                      lesson.isFree === true || 
+                      (lesson.videoUrl != null && lesson.videoUrl !== '');
+    
+    if (isPreview) {
+      // Use videoUrl from backend (backend returns videoUrl for preview lessons)
+      const videoUrl = lesson.videoUrl || lesson.contentUrl;
+      if (videoUrl) {
+        setPreviewVideo({
+          url: videoUrl,
+          title: lesson.title,
+        });
+      } else {
+        // No video URL available
+        console.warn('Preview lesson does not have a video URL');
+      }
+    } else {
+      // Not a preview lesson - require authentication
+      // DO NOT redirect if it's a preview lesson (already handled above)
+      if (!isAuthenticated) {
+        router.push(ROUTES.LOGIN);
+      } else {
+        // Authenticated but not enrolled - redirect to enrollment/checkout
+        if (course.price > 0) {
+          router.push(ROUTES.CHECKOUT(course.id.toString()));
+        } else {
+          router.push(ROUTES.LEARN(course.id.toString()));
+        }
+      }
+    }
+  };
   
   if (isLoading) {
     return (
@@ -153,7 +219,7 @@ export default function CourseDetailPage() {
                   {/* Students */}
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-muted-foreground" />
-                    <span>{course.enrollmentCount.toLocaleString()} học viên</span>
+                    <span>{(course.enrollmentCount ?? 0).toLocaleString()} học viên</span>
                   </div>
                   
                   {/* Duration */}
@@ -186,8 +252,26 @@ export default function CourseDetailPage() {
                 </div>
               </div>
               
-              {/* Enrollment Card - Desktop */}
-              <div className="hidden lg:block">
+              {/* Hero Image & Enrollment Card - Desktop */}
+              <div className="hidden lg:block space-y-4">
+                {/* Hero Image (Static - No Video Interaction) */}
+                <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted">
+                  {course.imageUrl || course.thumbnail ? (
+                    <Image
+                      src={course.imageUrl || course.thumbnail || ''}
+                      alt={course.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+                      <BookOpen className="h-24 w-24 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Enrollment Card */}
                 <Card className="sticky top-4">
                   <CardContent className="p-6 space-y-4">
                     {/* Price */}
@@ -342,48 +426,94 @@ export default function CourseDetailPage() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Nội dung khóa học</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        5 chương • 50 bài học • 12 giờ
-                      </p>
+                      {curriculum && curriculum.length > 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          {curriculum.length} chương • {curriculum.reduce((total, ch) => total + (ch.lessons?.length || 0), 0)} bài học
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Đang tải nội dung...
+                        </p>
+                      )}
                     </CardHeader>
                     <CardContent>
-                      <Accordion type="single" collapsible className="w-full">
-                        {[1, 2, 3].map((section) => (
-                          <AccordionItem key={section} value={`section-${section}`}>
-                            <AccordionTrigger className="hover:no-underline">
-                              <div className="flex items-center justify-between w-full pr-4">
-                                <span className="font-semibold">
-                                  Chương {section}: Giới thiệu
-                                </span>
-                                <span className="text-sm text-muted-foreground">
-                                  10 bài học • 2 giờ
-                                </span>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              <ul className="space-y-2">
-                                {[1, 2, 3].map((lesson) => (
-                                  <li 
-                                    key={lesson}
-                                    className="flex items-center justify-between p-3 hover:bg-muted rounded-lg"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <PlayCircle className="h-5 w-5 text-muted-foreground" />
-                                      <span>Bài {lesson}: Tên bài học</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm text-muted-foreground">15:30</span>
-                                      {lesson === 1 && (
-                                        <Badge variant="secondary">Xem trước</Badge>
-                                      )}
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            </AccordionContent>
-                          </AccordionItem>
-                        ))}
-                      </Accordion>
+                      {isLoadingCurriculum ? (
+                        <div className="space-y-4">
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                        </div>
+                      ) : curriculum && curriculum.length > 0 ? (
+                        <Accordion type="single" collapsible className="w-full">
+                          {curriculum.map((chapter) => (
+                            <AccordionItem key={chapter.id} value={`chapter-${chapter.id}`}>
+                              <AccordionTrigger className="hover:no-underline">
+                                <div className="flex items-center justify-between w-full pr-4">
+                                  <span className="font-semibold">
+                                    {chapter.title}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground">
+                                    {chapter.lessons?.length || 0} bài học
+                                  </span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <ul className="space-y-2">
+                                  {chapter.lessons?.map((lesson) => (
+                                    <li 
+                                      key={lesson.id}
+                                      className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors"
+                                    >
+                                      <div className="flex items-center gap-3 flex-1">
+                                        <PlayCircle className="h-5 w-5 text-muted-foreground shrink-0" />
+                                        <span className="flex-1">{lesson.title}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {lesson.durationInMinutes && (
+                                          <span className="text-sm text-muted-foreground">
+                                            {Math.floor(lesson.durationInMinutes / 60)}:{(lesson.durationInMinutes % 60).toString().padStart(2, '0')}
+                                          </span>
+                                        )}
+                                        {/* Show preview button for preview lessons OR lock icon for locked lessons */}
+                                        {lesson.isPreview === true ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handlePreviewLesson(lesson)}
+                                            className="ml-2"
+                                          >
+                                            Xem trước
+                                          </Button>
+                                        ) : !isAuthenticated ? (
+                                          <div className="flex items-center gap-1 ml-2">
+                                            <Lock className="h-4 w-4 text-muted-foreground" />
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => router.push(ROUTES.LOGIN)}
+                                              className="h-auto p-1 text-xs text-muted-foreground hover:text-foreground"
+                                            >
+                                              Đăng nhập để xem
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <Lock className="h-4 w-4 text-muted-foreground ml-2" />
+                                        )}
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                          ))}
+                        </Accordion>
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-muted-foreground">
+                            Chưa có nội dung khóa học
+                          </p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -481,6 +611,16 @@ export default function CourseDetailPage() {
       </div>
       
       <Footer />
+      
+      {/* Video Player Modal */}
+      {previewVideo && (
+        <VideoPlayerModal
+          isOpen={!!previewVideo}
+          onClose={() => setPreviewVideo(null)}
+          videoUrl={previewVideo.url}
+          title={previewVideo.title}
+        />
+      )}
     </div>
   );
 }

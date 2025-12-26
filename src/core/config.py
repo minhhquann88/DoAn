@@ -3,13 +3,28 @@ Configuration settings for Elearning Chatbot
 """
 
 from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator
 from typing import Optional
 import os
 
 class Settings(BaseSettings):
     # Gemini Pro API Configuration
-    GEMINI_API_KEY: str = "AIzaSyBQBirVN7gyPncGHkYu0BtG9-SyHjNYce8"
+    # SECURITY: API key MUST be loaded from environment variables or .env file
+    # DO NOT hardcode API keys in source code
+    GEMINI_API_KEY: str = Field(default="", description="Gemini API Key - Must be set in environment or .env file")
     GEMINI_MODEL: str = "gemini-2.0-flash-exp"  # Hoặc "gemini-pro" nếu không có flash
+    
+    @field_validator('GEMINI_API_KEY')
+    @classmethod
+    def validate_api_key(cls, v: str) -> str:
+        """Validate that API key is provided from environment"""
+        if not v or v.strip() == "":
+            raise ValueError(
+                "GEMINI_API_KEY is required! "
+                "Please set it in environment variables or .env file. "
+                "Example: export GEMINI_API_KEY='your_api_key_here' or add to .env file"
+            )
+        return v
     
     # Database Configuration
     DATABASE_URL: str = "sqlite:///./elearning_chatbot.db"
