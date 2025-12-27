@@ -28,7 +28,8 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const [showPassword, setShowPassword] = React.useState(false);
-  const { login, isLoginLoading } = useAuth();
+  const [loginError, setLoginError] = React.useState('');
+  const { loginAsync: loginUser, isLoginLoading } = useAuth();
   
   // Check if user is already logged in on mount
   React.useEffect(() => {
@@ -72,19 +73,72 @@ export default function LoginPage() {
     register,
     handleSubmit,
     control,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       rememberMe: false,
+      username: '',
+      password: '',
     },
   });
   
-  const onSubmit = (data: LoginFormData) => {
-    login({
-      username: data.username,
-      password: data.password,
-    });
+  const rememberMe = watch('rememberMe');
+  
+  // Auto-fill username and password from localStorage on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const rememberedIdentifier = localStorage.getItem('remembered_identifier');
+      const rememberedPassword = localStorage.getItem('remembered_password');
+      
+      if (rememberedIdentifier && rememberedPassword) {
+        setValue('username', rememberedIdentifier);
+        setValue('password', rememberedPassword);
+        setValue('rememberMe', true);
+      }
+    }
+  }, [setValue]);
+  
+  const onSubmit = async (data: LoginFormData) => {
+    // Clear previous error
+    setLoginError('');
+    
+    try {
+      await loginUser({
+        username: data.username,
+        password: data.password,
+      });
+      
+      // Save or clear remembered identifier and password based on rememberMe checkbox
+      if (typeof window !== 'undefined') {
+        if (data.rememberMe) {
+          localStorage.setItem('remembered_identifier', data.username);
+          localStorage.setItem('remembered_password', data.password);
+        } else {
+          localStorage.removeItem('remembered_identifier');
+          localStorage.removeItem('remembered_password');
+        }
+      }
+      // Success is handled by useAuth hook (redirects automatically)
+    } catch (error: any) {
+      // Handle login errors
+      if (error?.response?.status === 400 || error?.response?.status === 401) {
+        setLoginError('Tên đăng nhập hoặc mật khẩu không chính xác');
+      } else if (error?.response?.data?.message) {
+        setLoginError(error.response.data.message);
+      } else {
+        setLoginError('Đã có lỗi xảy ra. Vui lòng thử lại sau.');
+      }
+    }
+  };
+  
+  // Clear error when user starts typing
+  const handleInputChange = () => {
+    if (loginError) {
+      setLoginError('');
+    }
   };
   
   return (
@@ -108,14 +162,23 @@ export default function LoginPage() {
           
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* Error Alert */}
+              {loginError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                  <p className="text-sm text-red-500 font-medium">{loginError}</p>
+                </div>
+              )}
+              
               {/* Username/Email */}
               <div className="space-y-2">
                 <Label htmlFor="username">Tên đăng nhập hoặc Email</Label>
                 <Input
                   id="username"
                   placeholder="username hoặc email@example.com"
-                  {...register('username')}
-                  className={errors.username ? 'border-destructive' : ''}
+                  {...register('username', {
+                    onChange: handleInputChange,
+                  })}
+                  className={errors.username || loginError ? 'border-destructive' : ''}
                 />
                 {errors.username && (
                   <p className="text-sm text-destructive">{errors.username.message}</p>
@@ -130,8 +193,10 @@ export default function LoginPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Nhập mật khẩu"
-                    {...register('password')}
-                    className={errors.password ? 'border-destructive' : ''}
+                    {...register('password', {
+                      onChange: handleInputChange,
+                    })}
+                    className={errors.password || loginError ? 'border-destructive' : ''}
                   />
                   <button
                     type="button"

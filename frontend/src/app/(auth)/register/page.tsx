@@ -2,10 +2,11 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Eye, EyeOff, BookOpen, User, GraduationCap } from 'lucide-react';
+import { Eye, EyeOff, BookOpen, User, GraduationCap, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,9 +34,12 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const { register: registerUser, isRegisterLoading } = useAuth();
+  const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({});
+  const [successMessage, setSuccessMessage] = React.useState('');
+  const { registerAsync: registerUser, isRegisterLoading } = useAuth();
   
   const {
     register,
@@ -55,6 +59,17 @@ export default function RegisterPage() {
   const selectedRole = watch('role');
   const password = watch('password');
   
+  // Clear validation error when user starts typing
+  const handleFieldChange = (fieldName: string) => {
+    if (validationErrors[fieldName]) {
+      setValidationErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
+  
   // Password strength indicator
   const getPasswordStrength = (pwd: string) => {
     if (!pwd) return { strength: 0, label: '', color: '' };
@@ -73,14 +88,68 @@ export default function RegisterPage() {
   
   const passwordStrength = getPasswordStrength(password);
   
-  const onSubmit = (data: RegisterFormData) => {
-    registerUser({
-      fullName: data.fullName,
-      username: data.username,
-      email: data.email,
-      password: data.password,
-      roles: [data.role],
-    });
+  const onSubmit = async (data: RegisterFormData) => {
+    // Clear previous validation errors and success message
+    setValidationErrors({});
+    setSuccessMessage('');
+    
+    try {
+      await registerUser({
+        fullName: data.fullName,
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        roles: [data.role],
+      });
+      
+      // Success: Set success message and redirect after delay
+      setSuccessMessage('Đăng ký thành công! Đang chuyển hướng đăng nhập...');
+      
+      // Redirect to login page after 1.5 seconds
+      setTimeout(() => {
+        router.push(ROUTES.LOGIN);
+      }, 1500);
+    } catch (error: any) {
+      // Capture backend validation errors and business logic errors
+      const resData = error?.response?.data;
+      
+      // 1. Check for Field-Specific Validation Errors (Map from MethodArgumentNotValidException)
+      if (resData?.validationErrors) {
+        setValidationErrors(resData.validationErrors);
+      } 
+      // 2. Check for Business Logic Errors (String message from RuntimeException)
+      else if (resData?.message) {
+        const msg = resData.message;
+        const msgLower = msg.toLowerCase();
+        
+        // Map business logic errors to specific fields
+        // Check for email-related errors
+        if (msgLower.includes('email') && (msgLower.includes('already') || msgLower.includes('exists') || msgLower.includes('in use') || msgLower.includes('taken'))) {
+          setValidationErrors((prev) => ({ 
+            ...prev, 
+            email: 'Email này đã được sử dụng. Vui lòng chọn email khác.' 
+          }));
+        } 
+        // Check for username-related errors
+        else if (msgLower.includes('username') && (msgLower.includes('already') || msgLower.includes('exists') || msgLower.includes('in use') || msgLower.includes('taken'))) {
+          setValidationErrors((prev) => ({ 
+            ...prev, 
+            username: 'Tên đăng nhập này đã tồn tại. Vui lòng chọn tên đăng nhập khác.' 
+          }));
+        } 
+        // Check for password-related errors
+        else if (msgLower.includes('password')) {
+          setValidationErrors((prev) => ({ 
+            ...prev, 
+            password: msg 
+          }));
+        } 
+        // Generic error - fallback
+        else {
+          console.warn('Unhandled error message:', msg);
+        }
+      }
+    }
   };
   
   return (
@@ -154,11 +223,16 @@ export default function RegisterPage() {
                 <Input
                   id="fullName"
                   placeholder="Nguyễn Văn A"
-                  {...register('fullName')}
-                  className={errors.fullName ? 'border-destructive' : ''}
+                  {...register('fullName', {
+                    onChange: () => handleFieldChange('fullName'),
+                  })}
+                  className={errors.fullName || validationErrors.fullName ? 'border-destructive' : ''}
                 />
                 {errors.fullName && (
                   <p className="text-sm text-destructive">{errors.fullName.message}</p>
+                )}
+                {validationErrors.fullName && !errors.fullName && (
+                  <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.fullName}</p>
                 )}
               </div>
               
@@ -169,11 +243,16 @@ export default function RegisterPage() {
                   <Input
                     id="username"
                     placeholder="username"
-                    {...register('username')}
-                    className={errors.username ? 'border-destructive' : ''}
+                    {...register('username', {
+                      onChange: () => handleFieldChange('username'),
+                    })}
+                    className={errors.username || validationErrors.username ? 'border-destructive' : ''}
                   />
                   {errors.username && (
                     <p className="text-sm text-destructive">{errors.username.message}</p>
+                  )}
+                  {validationErrors.username && !errors.username && (
+                    <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.username}</p>
                   )}
                 </div>
                 
@@ -183,11 +262,16 @@ export default function RegisterPage() {
                     id="email"
                     type="email"
                     placeholder="email@example.com"
-                    {...register('email')}
-                    className={errors.email ? 'border-destructive' : ''}
+                    {...register('email', {
+                      onChange: () => handleFieldChange('email'),
+                    })}
+                    className={errors.email || validationErrors.email ? 'border-destructive' : ''}
                   />
                   {errors.email && (
                     <p className="text-sm text-destructive">{errors.email.message}</p>
+                  )}
+                  {validationErrors.email && !errors.email && (
+                    <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.email}</p>
                   )}
                 </div>
               </div>
@@ -200,8 +284,10 @@ export default function RegisterPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Nhập mật khẩu"
-                    {...register('password')}
-                    className={errors.password ? 'border-destructive' : ''}
+                    {...register('password', {
+                      onChange: () => handleFieldChange('password'),
+                    })}
+                    className={errors.password || validationErrors.password ? 'border-destructive' : ''}
                   />
                   <button
                     type="button"
@@ -236,6 +322,9 @@ export default function RegisterPage() {
                 {errors.password && (
                   <p className="text-sm text-destructive">{errors.password.message}</p>
                 )}
+                {validationErrors.password && !errors.password && (
+                  <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.password}</p>
+                )}
               </div>
               
               {/* Confirm Password */}
@@ -246,8 +335,10 @@ export default function RegisterPage() {
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Nhập lại mật khẩu"
-                    {...register('confirmPassword')}
-                    className={errors.confirmPassword ? 'border-destructive' : ''}
+                    {...register('confirmPassword', {
+                      onChange: () => handleFieldChange('confirmPassword'),
+                    })}
+                    className={errors.confirmPassword || validationErrors.confirmPassword ? 'border-destructive' : ''}
                   />
                   <button
                     type="button"
@@ -259,6 +350,9 @@ export default function RegisterPage() {
                 </div>
                 {errors.confirmPassword && (
                   <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+                )}
+                {validationErrors.confirmPassword && !errors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600 font-medium">{validationErrors.confirmPassword}</p>
                 )}
               </div>
               
@@ -300,9 +394,9 @@ export default function RegisterPage() {
                 type="submit" 
                 className="w-full" 
                 size="lg"
-                disabled={isRegisterLoading}
+                disabled={isRegisterLoading || !!successMessage}
               >
-                {isRegisterLoading ? 'Đang đăng ký...' : 'Đăng ký'}
+                {isRegisterLoading || successMessage ? 'Đang xử lý...' : 'Đăng ký'}
               </Button>
             </form>
           </CardContent>

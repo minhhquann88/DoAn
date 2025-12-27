@@ -33,6 +33,16 @@ public class User {
     @Lob
     private String bio;
 
+    private String expertise;
+
+    private String linkedin;
+
+    private String github;
+
+    private String twitter;
+
+    private String website;
+
     private LocalDateTime createdAt;
 
     private Boolean isEnabled = false; // Mặc định là false để kích hoạt

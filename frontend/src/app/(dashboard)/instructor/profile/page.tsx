@@ -22,6 +22,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
+import { getProfile, updateProfile, uploadAvatar } from '@/services/userService';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const profileSchema = z.object({
   bio: z.string().max(500, 'Bio không được vượt quá 500 ký tự').optional(),
@@ -35,9 +37,12 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function InstructorProfilePage() {
-  const { user } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const { addToast } = useUIStore();
   const [isLoading, setIsLoading] = React.useState(false);
+  const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -56,22 +61,138 @@ export default function InstructorProfilePage() {
     },
   });
 
+  // Load fresh profile data from database on component mount
+  React.useEffect(() => {
+    async function loadFreshData() {
+      try {
+        const freshData = await getProfile();
+        
+        // Populate form fields with fetched data
+        reset({
+          bio: freshData.bio || '',
+          expertise: freshData.expertise || '',
+          linkedin: freshData.linkedin || '',
+          github: freshData.github || '',
+          twitter: freshData.twitter || '',
+          website: freshData.website || '',
+        });
+        
+        // Update avatar preview
+        if (freshData.avatarUrl) {
+          setAvatarPreview(freshData.avatarUrl);
+        } else {
+          setAvatarPreview(null);
+        }
+        
+        // Update user in store
+        updateUser({
+          bio: freshData.bio,
+          avatar: freshData.avatarUrl,
+        });
+      } catch (error) {
+        console.error('Failed to load profile data', error);
+      }
+    }
+    
+    loadFreshData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const onSubmit = async (data: ProfileFormData) => {
     setIsLoading(true);
     try {
-      // TODO: Call API to update profile
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      let avatarUrl: string | undefined;
       
+      // Step 1: Upload avatar if a new file was selected
+      if (avatarFile) {
+        try {
+          const avatarResponse = await uploadAvatar(avatarFile);
+          avatarUrl = avatarResponse.avatarUrl;
+        } catch (error: any) {
+          addToast({
+            type: 'error',
+            description: error?.response?.data?.message || 'Lỗi khi tải ảnh đại diện',
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Step 2: Update profile with all fields
+      // Always include expertise and other fields if they exist in form data (even if empty string)
+      const updateData: any = {};
+      
+      // Include bio if provided
+      if (data.bio !== undefined) {
+        updateData.bio = data.bio.trim() || undefined;
+      }
+      
+      // CRITICAL: Always include expertise if it exists in form data
+      if (data.expertise !== undefined) {
+        updateData.expertise = data.expertise.trim() || undefined;
+      }
+      
+      // Include social links if provided
+      if (data.linkedin !== undefined) {
+        updateData.linkedin = data.linkedin.trim() || undefined;
+      }
+      if (data.github !== undefined) {
+        updateData.github = data.github.trim() || undefined;
+      }
+      if (data.twitter !== undefined) {
+        updateData.twitter = data.twitter.trim() || undefined;
+      }
+      if (data.website !== undefined) {
+        updateData.website = data.website.trim() || undefined;
+      }
+      
+      // Debug: Log the payload to verify expertise is included
+      console.log('Updating profile with data:', updateData);
+      console.log('Form data expertise:', data.expertise);
+      console.log('Payload expertise:', updateData.expertise);
+      
+      // Add avatarUrl if avatar was uploaded
+      if (avatarUrl) {
+        updateData.avatarUrl = avatarUrl;
+      }
+      
+      await updateProfile(updateData);
+      
+      // Step 3: Show success message and reload page
       addToast({
         type: 'success',
         description: 'Cập nhật hồ sơ thành công!',
       });
-    } catch (error) {
+      
+      // Clear avatar file state
+      setAvatarFile(null);
+      
+      // Reload page to reflect changes
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error: any) {
       addToast({
         type: 'error',
-        description: 'Có lỗi xảy ra khi cập nhật hồ sơ.',
+        description: error?.response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ.',
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -95,14 +216,32 @@ export default function InstructorProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-col items-center space-y-4">
-                <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="h-12 w-12 text-primary" />
+                <div className="relative">
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src={avatarPreview || user?.avatar} alt={user?.fullName} />
+                    <AvatarFallback>
+                      <User className="h-12 w-12 text-primary" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
                 </div>
                 <div className="text-center">
                   <h3 className="font-semibold text-lg">{user?.fullName || 'Giảng viên'}</h3>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
                 </div>
-                <Button variant="outline" size="sm" className="w-full">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full"
+                  onClick={handleAvatarClick}
+                  type="button"
+                >
                   <Upload className="h-4 w-4 mr-2" />
                   Cập nhật ảnh đại diện
                 </Button>

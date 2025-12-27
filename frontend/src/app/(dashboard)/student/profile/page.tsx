@@ -11,9 +11,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/stores/authStore';
+import { useUIStore } from '@/stores/uiStore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { getProfile, uploadAvatar, updateProfile, changePassword } from '@/services/userService';
+import { useSearchParams } from 'next/navigation';
+import { Moon, Sun } from 'lucide-react';
 
 const profileSchema = z.object({
   fullName: z.string().min(2, 'Tên phải có ít nhất 2 ký tự'),
@@ -24,8 +28,11 @@ const profileSchema = z.object({
 });
 
 const passwordSchema = z.object({
-  currentPassword: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
-  newPassword: z.string().min(6, 'Mật khẩu mới phải có ít nhất 6 ký tự'),
+  currentPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
+  newPassword: z.string()
+    .min(6, 'Mật khẩu mới phải có ít nhất 6 ký tự')
+    .regex(/[a-zA-Z]/, 'Mật khẩu phải chứa ít nhất một chữ cái')
+    .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất một số'),
   confirmPassword: z.string(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: 'Mật khẩu xác nhận không khớp',
@@ -37,11 +44,76 @@ type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore();
+  const { addToast, theme, toggleTheme } = useUIStore();
+  const searchParams = useSearchParams();
   const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [emailNotif, setEmailNotif] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState('profile');
+  const [changePassError, setChangePassError] = React.useState('');
+  const [changePassSuccess, setChangePassSuccess] = React.useState('');
+  const [profileSuccessMessage, setProfileSuccessMessage] = React.useState('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Handle tab switching from query param
+  React.useEffect(() => {
+    const tab = searchParams.get('activeTab');
+    if (tab === 'options' || tab === 'preferences') {
+      setActiveTab('preferences');
+    } else if (tab === 'security') {
+      setActiveTab('security');
+    } else if (tab === 'profile') {
+      setActiveTab('profile');
+    }
+  }, [searchParams]);
+
+  // Fetch fresh profile data from database on component mount
+  React.useEffect(() => {
+    async function loadFreshData() {
+      try {
+        console.log('ProfilePage: Loading fresh profile data from database...');
+        const freshData = await getProfile();
+        
+        // Update form fields with fresh data from database
+        resetProfile({
+          fullName: freshData.fullName || '',
+          email: freshData.email || '',
+          phone: freshData.phoneNumber || '', // Map phoneNumber to phone
+          bio: freshData.bio || '',
+        });
+        
+        // Update avatar preview with fresh avatarUrl
+        if (freshData.avatarUrl) {
+          setAvatarPreview(freshData.avatarUrl);
+        } else {
+          setAvatarPreview(null);
+        }
+        
+        // Update user in store with fresh data
+        updateUser({
+          fullName: freshData.fullName,
+          email: freshData.email,
+          phone: freshData.phoneNumber, // Map phoneNumber to phone
+          bio: freshData.bio,
+          avatar: freshData.avatarUrl,
+        });
+        
+        console.log('ProfilePage: Fresh profile data loaded successfully', freshData);
+      } catch (error) {
+        console.error('ProfilePage: Failed to load fresh profile data', error);
+        // Fallback to user context data if API call fails
+      }
+    }
+    
+    loadFreshData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   const {
     register: registerProfile,
     handleSubmit: handleSubmitProfile,
+    reset: resetProfile,
     formState: { errors: profileErrors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -65,6 +137,7 @@ export default function ProfilePage() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setAvatarFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);
@@ -73,16 +146,119 @@ export default function ProfilePage() {
     }
   };
   
-  const onProfileSubmit = (data: ProfileFormData) => {
-    updateUser(data);
-    // TODO: API call to update profile
-    console.log('Update profile:', data);
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
   };
   
-  const onPasswordSubmit = (data: PasswordFormData) => {
-    // TODO: API call to change password
-    console.log('Change password');
-    resetPassword();
+  const onProfileSubmit = async (data: ProfileFormData) => {
+    setIsSubmitting(true);
+    setProfileSuccessMessage('');
+    
+    try {
+      let avatarUrl: string | undefined;
+      
+      // Step 1: Upload avatar if a new file was selected
+      if (avatarFile) {
+        try {
+          const avatarResponse = await uploadAvatar(avatarFile);
+          avatarUrl = avatarResponse.avatarUrl;
+        } catch (error: any) {
+          addToast({
+            type: 'error',
+            description: error?.response?.data?.message || 'Lỗi khi tải ảnh đại diện',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
+      // Step 2: Update profile (excluding email for security)
+      // Note: Backend only supports fullName, avatarUrl, and bio
+      const updateData: any = {
+        fullName: data.fullName,
+        bio: data.bio || undefined,
+      };
+      
+      // Add avatarUrl if avatar was uploaded
+      if (avatarUrl) {
+        updateData.avatarUrl = avatarUrl;
+      }
+      
+      await updateProfile(updateData);
+      
+      // Step 3: Show success message and reload page after delay to update avatar/name in header
+      setProfileSuccessMessage('Cập nhật hồ sơ thành công! Đang tải lại...');
+      
+      // Also show toast for consistency
+      addToast({
+        type: 'success',
+        description: 'Cập nhật hồ sơ thành công!',
+      });
+      
+      // Step 4: Clear avatar file state
+      setAvatarFile(null);
+      
+      // Step 5: Force page reload to update avatar/name in header
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      
+    } catch (error: any) {
+      addToast({
+        type: 'error',
+        description: error?.response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ',
+      });
+      setIsSubmitting(false);
+    }
+  };
+  
+  const onPasswordSubmit = async (data: PasswordFormData) => {
+    // Reset error and success messages
+    setChangePassError('');
+    setChangePassSuccess('');
+
+    // Validate password match
+    if (data.newPassword !== data.confirmPassword) {
+      setChangePassError('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    try {
+      await changePassword({
+        oldPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
+
+      // Success: Set success message and clear form
+      setChangePassSuccess('Đổi mật khẩu thành công!');
+      resetPassword();
+      
+      // Also show toast for consistency
+      addToast({
+        type: 'success',
+        description: 'Đổi mật khẩu thành công',
+      });
+    } catch (error: any) {
+      // Handle error - capture error message from backend
+      const errorMessage = error?.response?.data?.message || 'Đã có lỗi xảy ra khi đổi mật khẩu';
+      setChangePassError(errorMessage);
+      
+      // Also show toast for consistency
+      addToast({
+        type: 'error',
+        description: errorMessage,
+      });
+    }
+  };
+
+  // Clear error/success messages when user starts typing
+  const handlePasswordFieldChange = () => {
+    if (changePassError) {
+      setChangePassError('');
+    }
+    if (changePassSuccess) {
+      setChangePassSuccess('');
+    }
   };
   
   return (
@@ -95,7 +271,7 @@ export default function ProfilePage() {
           </p>
         </div>
         
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="profile">Thông tin cá nhân</TabsTrigger>
             <TabsTrigger value="security">Bảo mật</TabsTrigger>
@@ -113,6 +289,13 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmitProfile(onProfileSubmit)} className="space-y-6">
+                  {/* Success Alert */}
+                  {profileSuccessMessage && (
+                    <div className="p-3 mb-4 text-sm rounded-md bg-green-50 border border-green-200 text-green-600">
+                      {profileSuccessMessage}
+                    </div>
+                  )}
+                  
                   {/* Avatar Upload */}
                   <div className="flex items-center gap-6">
                     <Avatar className="h-24 w-24">
@@ -124,12 +307,14 @@ export default function ProfilePage() {
                     <div>
                       <Label
                         htmlFor="avatar"
+                        onClick={handleAvatarClick}
                         className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
                       >
                         <Camera className="h-4 w-4" />
                         Thay đổi ảnh đại diện
                       </Label>
                       <input
+                        ref={fileInputRef}
                         id="avatar"
                         type="file"
                         accept="image/*"
@@ -165,18 +350,17 @@ export default function ProfilePage() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="email">
-                        Email <span className="text-destructive">*</span>
-                      </Label>
+                      <Label htmlFor="email">Email</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="email"
                           type="email"
                           placeholder="email@example.com"
-                          className="pl-10"
+                          className="pl-10 bg-gray-100 text-gray-500 cursor-not-allowed"
                           {...registerProfile('email')}
                           disabled
+                          readOnly
                         />
                       </div>
                       {profileErrors.email && (
@@ -229,9 +413,9 @@ export default function ProfilePage() {
                       <Calendar className="h-4 w-4 inline mr-1" />
                       Tham gia ngày {new Date(user?.createdAt || '').toLocaleDateString('vi-VN')}
                     </p>
-                    <Button type="submit">
+                    <Button type="submit" disabled={isSubmitting}>
                       <Save className="h-4 w-4 mr-2" />
-                      Lưu thay đổi
+                      {isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
                     </Button>
                   </div>
                 </form>
@@ -250,6 +434,20 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmitPassword(onPasswordSubmit)} className="space-y-6">
+                  {/* Error Alert */}
+                  {changePassError && (
+                    <div className="p-3 mb-4 text-sm rounded-md bg-red-50 border border-red-200 text-red-600">
+                      {changePassError}
+                    </div>
+                  )}
+                  
+                  {/* Success Alert */}
+                  {changePassSuccess && (
+                    <div className="p-3 mb-4 text-sm rounded-md bg-green-50 border border-green-200 text-green-600">
+                      {changePassSuccess}
+                    </div>
+                  )}
+                  
                   <div className="space-y-2">
                     <Label htmlFor="currentPassword">
                       Mật khẩu hiện tại <span className="text-destructive">*</span>
@@ -257,7 +455,10 @@ export default function ProfilePage() {
                     <Input
                       id="currentPassword"
                       type="password"
-                      {...registerPassword('currentPassword')}
+                      {...registerPassword('currentPassword', {
+                        onChange: handlePasswordFieldChange,
+                      })}
+                      className={changePassError ? 'border-red-500' : ''}
                     />
                     {passwordErrors.currentPassword && (
                       <p className="text-sm text-destructive">{passwordErrors.currentPassword.message}</p>
@@ -271,7 +472,10 @@ export default function ProfilePage() {
                     <Input
                       id="newPassword"
                       type="password"
-                      {...registerPassword('newPassword')}
+                      {...registerPassword('newPassword', {
+                        onChange: handlePasswordFieldChange,
+                      })}
+                      className={changePassError ? 'border-red-500' : ''}
                     />
                     {passwordErrors.newPassword && (
                       <p className="text-sm text-destructive">{passwordErrors.newPassword.message}</p>
@@ -285,7 +489,10 @@ export default function ProfilePage() {
                     <Input
                       id="confirmPassword"
                       type="password"
-                      {...registerPassword('confirmPassword')}
+                      {...registerPassword('confirmPassword', {
+                        onChange: handlePasswordFieldChange,
+                      })}
+                      className={changePassError ? 'border-red-500' : ''}
                     />
                     {passwordErrors.confirmPassword && (
                       <p className="text-sm text-destructive">{passwordErrors.confirmPassword.message}</p>
@@ -318,7 +525,18 @@ export default function ProfilePage() {
                         Nhận email về khóa học và cập nhật
                       </p>
                     </div>
-                    <Button variant="outline">Cấu hình</Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setEmailNotif(!emailNotif);
+                        addToast({
+                          type: 'success',
+                          description: 'Đã cập nhật cài đặt thông báo email.',
+                        });
+                      }}
+                    >
+                      {emailNotif ? 'Tắt' : 'Bật'}
+                    </Button>
                   </div>
                   
                   <Separator />
@@ -330,7 +548,23 @@ export default function ProfilePage() {
                         Tự động chuyển đổi giao diện
                       </p>
                     </div>
-                    <Button variant="outline">Bật/Tắt</Button>
+                    <Button 
+                      variant="outline"
+                      onClick={toggleTheme}
+                      className="flex items-center gap-2"
+                    >
+                      {theme === 'dark' ? (
+                        <>
+                          <Sun className="h-4 w-4" />
+                          <span>Bật sáng</span>
+                        </>
+                      ) : (
+                        <>
+                          <Moon className="h-4 w-4" />
+                          <span>Bật tối</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
                   
                   <Separator />
@@ -342,7 +576,17 @@ export default function ProfilePage() {
                         Tiếng Việt
                       </p>
                     </div>
-                    <Button variant="outline">Thay đổi</Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        addToast({
+                          type: 'info',
+                          description: 'Tính năng đa ngôn ngữ đang được phát triển.',
+                        });
+                      }}
+                    >
+                      Thay đổi
+                    </Button>
                   </div>
                 </div>
               </CardContent>

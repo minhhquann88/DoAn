@@ -176,28 +176,82 @@ public class AuthService {
     // Chức năng Cập nhật Profile
     @Transactional
     public User updateProfile(Long userId, UpdateProfileRequest request) {
+        // Step 1: Fetch user by ID
+        System.out.println("UpdateProfile: Fetching user with ID: " + userId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found!"));
+                .orElseThrow(() -> {
+                    System.out.println("UpdateProfile: User not found with ID: " + userId);
+                    return new UsernameNotFoundException("User not found!");
+                });
 
-        // Kiểm tra email mới có bị trùng không
-        if(request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            if(userRepository.existsByEmail(request.getEmail())) {
-                throw new RuntimeException("Error: Email is already in use!");
+        // Validate request
+        if (request == null) {
+            System.out.println("UpdateProfile: Request is null");
+            throw new IllegalArgumentException("Request không hợp lệ");
+        }
+
+        // Step 2: Update fields ONLY if they are not null (Partial Update)
+        // Note: Email update is restricted for security - only allow if not changing or changing to new valid email
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            System.out.println("UpdateProfile: Email change requested - checking if email exists");
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new IllegalArgumentException("Email này đã được sử dụng");
             }
             user.setEmail(request.getEmail());
+            System.out.println("UpdateProfile: Email updated");
         }
 
-        if(request.getFullName() != null) {
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+            System.out.println("UpdateProfile: Updating fullName to: " + request.getFullName());
             user.setFullName(request.getFullName());
         }
-        if(request.getAvatarUrl() != null) {
+
+        if (request.getAvatarUrl() != null) {
+            System.out.println("UpdateProfile: Updating avatarUrl");
             user.setAvatarUrl(request.getAvatarUrl());
         }
-        if(request.getBio() != null) {
+
+        if (request.getBio() != null) {
+            System.out.println("UpdateProfile: Updating bio");
             user.setBio(request.getBio());
         }
 
-        return userRepository.save(user);
+        // Update expertise - allow empty string to clear the field
+        if (request.getExpertise() != null) {
+            System.out.println("UpdateProfile: Updating expertise to: " + request.getExpertise());
+            user.setExpertise(request.getExpertise().trim().isEmpty() ? null : request.getExpertise().trim());
+        }
+
+        // Update social links - allow empty string to clear the fields
+        if (request.getLinkedin() != null) {
+            System.out.println("UpdateProfile: Updating linkedin to: " + request.getLinkedin());
+            user.setLinkedin(request.getLinkedin().trim().isEmpty() ? null : request.getLinkedin().trim());
+        }
+
+        if (request.getGithub() != null) {
+            System.out.println("UpdateProfile: Updating github to: " + request.getGithub());
+            user.setGithub(request.getGithub().trim().isEmpty() ? null : request.getGithub().trim());
+        }
+
+        if (request.getTwitter() != null) {
+            System.out.println("UpdateProfile: Updating twitter to: " + request.getTwitter());
+            user.setTwitter(request.getTwitter().trim().isEmpty() ? null : request.getTwitter().trim());
+        }
+
+        if (request.getWebsite() != null) {
+            System.out.println("UpdateProfile: Updating website to: " + request.getWebsite());
+            user.setWebsite(request.getWebsite().trim().isEmpty() ? null : request.getWebsite().trim());
+        }
+
+        // Note: phoneNumber and address are not persisted as User entity doesn't have these fields yet
+        // They can be added to the entity and database schema in the future if needed
+
+        // Step 3: CRITICAL - Save to database to persist changes
+        System.out.println("UpdateProfile: Saving user to database...");
+        User savedUser = userRepository.save(user);
+        System.out.println("UpdateProfile: Profile updated successfully for user ID: " + userId);
+        
+        return savedUser;
     }
 
     // New method to update only avatar URL
@@ -213,5 +267,81 @@ public class AuthService {
     public User getUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
+    }
+
+    // Get user profile as DTO to avoid Jackson infinite recursion
+    public ProfileResponse getUserProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
+        
+        // Map User entity to ProfileResponse DTO
+        return new ProfileResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getFullName(),
+                null, // phoneNumber - not in User entity yet
+                null, // address - not in User entity yet
+                user.getBio(),
+                user.getExpertise(),
+                user.getLinkedin(),
+                user.getGithub(),
+                user.getTwitter(),
+                user.getWebsite(),
+                user.getAvatarUrl(),
+                user.getCreatedAt()
+        );
+    }
+
+    // Chức năng Đổi mật khẩu
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        // Step 1: Check User - Find user by ID
+        System.out.println("ChangePassword: Fetching user with ID: " + userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    System.out.println("ChangePassword: User not found with ID: " + userId);
+                    return new UsernameNotFoundException("User not found!");
+                });
+
+        // Validate request data
+        if (request == null) {
+            System.out.println("ChangePassword: Request is null");
+            throw new IllegalArgumentException("Request không hợp lệ");
+        }
+        if (request.getOldPassword() == null || request.getOldPassword().trim().isEmpty()) {
+            System.out.println("ChangePassword: Old password is null or empty");
+            throw new IllegalArgumentException("Mật khẩu hiện tại không được để trống");
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().trim().isEmpty()) {
+            System.out.println("ChangePassword: New password is null or empty");
+            throw new IllegalArgumentException("Mật khẩu mới không được để trống");
+        }
+
+        // Step 2: Verify Old Password - Use passwordEncoder.matches()
+        System.out.println("ChangePassword: Checking old password...");
+        String storedPassword = user.getPassword();
+        if (storedPassword == null || storedPassword.trim().isEmpty()) {
+            System.out.println("ChangePassword: Stored password is null or empty");
+            throw new RuntimeException("Lỗi: Mật khẩu trong database không hợp lệ");
+        }
+
+        // Crucial: Verify old password matches
+        if (!encoder.matches(request.getOldPassword(), storedPassword)) {
+            System.out.println("ChangePassword: Old password does not match");
+            throw new IllegalArgumentException("Mật khẩu hiện tại không đúng");
+        }
+        System.out.println("ChangePassword: Old password verified successfully");
+
+        // Step 3: Hash and set new password
+        System.out.println("ChangePassword: Encoding new password...");
+        String encodedNewPassword = encoder.encode(request.getNewPassword());
+        user.setPassword(encodedNewPassword);
+        System.out.println("ChangePassword: New password encoded successfully");
+
+        // Step 4: Save to database
+        System.out.println("ChangePassword: Saving user to database...");
+        userRepository.save(user);
+        System.out.println("ChangePassword: Password changed successfully for user ID: " + userId);
     }
 }

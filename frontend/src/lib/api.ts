@@ -64,17 +64,20 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    // Log error details for debugging
+    // Log error details for debugging (skip 400 validation errors to reduce console noise)
     if (error.response) {
-      console.error('API Error Response:', {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        url: error.config?.url,
-        method: error.config?.method,
-        data: error.response.data,
-        message: error.response.data?.message,
-        validationErrors: error.response.data?.errors,
-      });
+      // Only log non-400 errors (500, 401, 403, etc.) - validation errors (400) are handled in UI
+      if (error.response.status !== 400) {
+        console.error('API Error Response:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          url: error.config?.url,
+          method: error.config?.method,
+          data: error.response.data,
+          message: error.response.data?.message,
+          validationErrors: error.response.data?.validationErrors,
+        });
+      }
     } else if (error.request) {
       console.error('API Request Error (No Response):', {
         url: error.config?.url,

@@ -1,6 +1,8 @@
 package com.coursemgmt.controller;
 
+import com.coursemgmt.dto.ChangePasswordRequest;
 import com.coursemgmt.dto.MessageResponse;
+import com.coursemgmt.dto.ProfileResponse;
 import com.coursemgmt.dto.UpdateProfileRequest;
 import com.coursemgmt.model.User;
 import com.coursemgmt.security.services.UserDetailsImpl;
@@ -29,19 +31,87 @@ public class UserController {
     @Autowired
     FileStorageService fileStorageService;
 
+    // Get current user profile - Fetch fresh data from database
+    @GetMapping("/profile")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getProfile() {
+        try {
+            // Get current authenticated user ID
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication.getPrincipal() == null) {
+                System.out.println("GetProfile: Authentication is null");
+                return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
+            }
+
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            Long currentUserId = userDetails.getId();
+
+            if (currentUserId == null) {
+                System.out.println("GetProfile: User ID is null");
+                return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
+            }
+
+            System.out.println("GetProfile: Fetching fresh profile data for user ID: " + currentUserId);
+
+            // CRITICAL: Fetch fresh data from database and map to DTO to avoid Jackson infinite recursion
+            ProfileResponse profileResponse = authService.getUserProfile(currentUserId);
+
+            System.out.println("GetProfile: Successfully fetched profile for user ID: " + currentUserId);
+            return ResponseEntity.ok(profileResponse);
+
+        } catch (Exception e) {
+            System.out.println("GetProfile: Error - " + e.getClass().getName() + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(new MessageResponse("Lỗi hệ thống: " + e.getMessage()));
+        }
+    }
+
     @PutMapping("/profile")
     @PreAuthorize("isAuthenticated()") // Đảm bảo chỉ người đã đăng nhập mới được gọi
     public ResponseEntity<?> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
-        // Lấy thông tin user đang đăng nhập
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        Long currentUserId = userDetails.getId();
-
         try {
-            User updatedUser = authService.updateProfile(currentUserId, request);
-            return ResponseEntity.ok(updatedUser); // Trả về user đã cập nhật
-        } catch (RuntimeException e) {
+            // Get current authenticated user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication.getPrincipal() == null) {
+                System.out.println("UpdateProfile: Authentication is null");
+                return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
+            }
+
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            Long currentUserId = userDetails.getId();
+
+            if (currentUserId == null) {
+                System.out.println("UpdateProfile: User ID is null");
+                return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
+            }
+
+            System.out.println("UpdateProfile: Processing request for user ID: " + currentUserId);
+
+            // Validate request
+            if (request == null) {
+                System.out.println("UpdateProfile: Request body is null");
+                return ResponseEntity.badRequest().body(new MessageResponse("Request không hợp lệ"));
+            }
+
+            // Call service to update and persist to database
+            authService.updateProfile(currentUserId, request);
+            return ResponseEntity.ok(new MessageResponse("Cập nhật hồ sơ thành công"));
+
+        } catch (IllegalArgumentException e) {
+            // Validation errors
+            System.out.println("UpdateProfile: IllegalArgumentException - " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+        } catch (RuntimeException e) {
+            // Business logic errors
+            System.out.println("UpdateProfile: RuntimeException - " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+        } catch (Exception e) {
+            // Unexpected errors - Log the real error to console
+            System.out.println("UpdateProfile: Unexpected error - " + e.getClass().getName() + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(new MessageResponse("Lỗi hệ thống: " + e.getMessage()));
         }
     }
 
@@ -63,6 +133,56 @@ public class UserController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error uploading avatar: " + e.getMessage()));
+        }
+    }
+
+    // Endpoint for changing password
+    @PutMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        try {
+            // Get current authenticated user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication.getPrincipal() == null) {
+                System.out.println("ChangePassword: Authentication is null");
+                return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
+            }
+
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            Long currentUserId = userDetails.getId();
+
+            if (currentUserId == null) {
+                System.out.println("ChangePassword: User ID is null");
+                return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
+            }
+
+            System.out.println("ChangePassword: Processing request for user ID: " + currentUserId);
+
+            // Validate request
+            if (request == null) {
+                System.out.println("ChangePassword: Request body is null");
+                return ResponseEntity.badRequest().body(new MessageResponse("Request không hợp lệ"));
+            }
+
+            // Call service
+            authService.changePassword(currentUserId, request);
+            return ResponseEntity.ok(new MessageResponse("Đổi mật khẩu thành công"));
+
+        } catch (IllegalArgumentException e) {
+            // Return 400 Bad Request for wrong password/validation errors, so frontend can show the red alert
+            System.out.println("ChangePassword: IllegalArgumentException - " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+        } catch (RuntimeException e) {
+            // Other runtime exceptions
+            System.out.println("ChangePassword: RuntimeException - " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+        } catch (Exception e) {
+            // Unexpected errors (NullPointerException, etc.) - Log the real error to console
+            System.out.println("ChangePassword: Unexpected error - " + e.getClass().getName() + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(new MessageResponse("Lỗi hệ thống: " + e.getMessage()));
         }
     }
 }

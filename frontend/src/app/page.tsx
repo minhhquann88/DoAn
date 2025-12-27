@@ -11,11 +11,22 @@ import { CourseGrid } from '@/components/course/CourseGrid';
 import { StatsSection } from '@/components/home/StatsSection';
 import { useCourses, useFeaturedCourses } from '@/hooks/useCourses';
 import { ROUTES } from '@/lib/constants';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const { courses, isLoading } = useCourses();
   const { featuredCourses, isLoading: isLoadingFeatured } = useFeaturedCourses();
+  const { user } = useAuthStore();
+  
+  // Determine dashboard URL based on user role
+  const dashboardLink = React.useMemo(() => {
+    if (!user) return null;
+    if (user.role === 'ROLE_LECTURER' || user.role === 'ROLE_ADMIN') {
+      return ROUTES.INSTRUCTOR.DASHBOARD;
+    }
+    return ROUTES.STUDENT.DASHBOARD;
+  }, [user]);
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,11 +79,20 @@ export default function HomePage() {
                   <ArrowRight className="h-5 w-5" />
                 </Button>
               </Link>
-              <Link href={ROUTES.REGISTER}>
-                <Button size="lg" variant="outline">
-                  Đăng ký miễn phí
-                </Button>
-              </Link>
+              {!user ? (
+                <Link href={ROUTES.REGISTER}>
+                  <Button size="lg" variant="outline">
+                    Đăng ký miễn phí
+                  </Button>
+                </Link>
+              ) : (
+                <Link href={dashboardLink || ROUTES.STUDENT.DASHBOARD}>
+                  <Button size="lg" variant="outline">
+                    Vào Dashboard
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -152,23 +172,37 @@ export default function HomePage() {
       <section className="py-20 bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold font-poppins mb-4">
-            Bắt đầu học tập ngay hôm nay
+            {!user ? 'Bắt đầu học tập ngay hôm nay' : 'Tiếp tục hành trình học tập của bạn'}
           </h2>
           <p className="text-lg mb-8 opacity-90 max-w-2xl mx-auto">
-            Tham gia cộng đồng học viên và nâng cao kỹ năng của bạn với hàng ngàn khóa học chất lượng
+            {!user 
+              ? 'Tham gia cộng đồng học viên và nâng cao kỹ năng của bạn với hàng ngàn khóa học chất lượng'
+              : 'Khám phá các khóa học mới và tiếp tục phát triển kỹ năng của bạn'
+            }
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link href={ROUTES.REGISTER}>
-              <Button size="lg" variant="secondary" className="gap-2">
-                Đăng ký miễn phí
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href={ROUTES.COURSES}>
-              <Button size="lg" variant="outline" className="bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary">
-                Khám phá khóa học
-              </Button>
-            </Link>
+            {!user ? (
+              <>
+                <Link href={ROUTES.REGISTER}>
+                  <Button size="lg" variant="secondary" className="gap-2">
+                    Đăng ký miễn phí
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link href={ROUTES.COURSES}>
+                  <Button size="lg" variant="outline" className="bg-transparent border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white transition-colors duration-200">
+                    Khám phá khóa học
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <Link href={ROUTES.COURSES}>
+                <Button size="lg" variant="secondary" className="gap-2">
+                  Khám phá các khóa học mới
+                  <ArrowRight className="h-5 w-5" />
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>

@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Bell, ShoppingCart, User, LogOut, Settings, BookOpen, Menu } from 'lucide-react';
+import { Search, Bell, ShoppingCart, User, LogOut, BookOpen, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -178,8 +178,8 @@ export function Navbar() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {/* Student Menu: Dashboard, Khóa học của tôi, Cài đặt, Đăng xuất */}
-                  {/* Note: "Tiến độ học tập" has been removed as requested */}
+                  {/* Student Menu: Dashboard, Khóa học của tôi, Đăng xuất */}
+                  {/* Note: "Cài đặt" and "Tiến độ học tập" have been removed as requested */}
                   <DropdownMenuItem onClick={() => router.push(getDashboardRoute())}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Dashboard</span>
@@ -187,10 +187,6 @@ export function Navbar() {
                   <DropdownMenuItem onClick={() => router.push(getMyCoursesRoute())}>
                     <BookOpen className="mr-2 h-4 w-4" />
                     <span>Khóa học của tôi</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push(getProfileRoute())}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Cài đặt</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>

@@ -33,14 +33,18 @@ export const useAuth = () => {
         const response = await apiClient.post('/auth/login', requestBody);
         return response.data;
       } catch (error: any) {
-        // Log detailed error information
-        console.error('Login Error:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          message: error.response?.data?.message || error.message,
-          validationErrors: error.response?.data?.errors,
-        });
+        // Only log actual system crashes (500) or network errors.
+        // Do NOT log 400 (Bad Credentials) or 401 as these are expected user errors.
+        const status = error.response?.status;
+        if (status && status !== 400 && status !== 401) {
+          console.error('Login System Error:', {
+            status,
+            statusText: error.response?.statusText,
+            data: error.response?.data,
+            message: error.response?.data?.message || error.message,
+          });
+        }
+        // We must throw it so the Login Page can catch and show the UI alert
         throw error;
       }
     },
@@ -100,6 +104,12 @@ export const useAuth = () => {
       router.push(ROUTES.LOGIN);
     },
     onError: (error: any) => {
+      // Don't show toast for 400 validation errors - they're displayed in the form fields
+      if (error?.response?.status === 400 && error?.response?.data?.validationErrors) {
+        // Validation errors are handled in the component, no need for toast
+        return;
+      }
+      // Show toast for other errors (500, network errors, etc.)
       addToast({
         type: 'error',
         description: handleApiError(error),
@@ -184,7 +194,9 @@ export const useAuth = () => {
     user,
     isAuthenticated,
     login: loginMutation.mutate,
+    loginAsync: loginMutation.mutateAsync,
     register: registerMutation.mutate,
+    registerAsync: registerMutation.mutateAsync,
     forgotPassword: forgotPasswordMutation.mutate,
     resetPassword: resetPasswordMutation.mutate,
     logout,
