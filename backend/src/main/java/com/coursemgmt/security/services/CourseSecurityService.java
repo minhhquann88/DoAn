@@ -52,14 +52,46 @@ public class CourseSecurityService {
 
     // Kiểm tra đã ghi danh (cho bài học)
     public boolean isEnrolled(Authentication authentication, Long lessonId) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        User user = userRepository.findById(userDetails.getId()).orElse(null);
-        Lesson lesson = lessonRepository.findById(lessonId).orElse(null);
+        try {
+            if (authentication == null || authentication.getPrincipal() == null) {
+                logger.warn("isEnrolled: Authentication or principal is null");
+                return false;
+            }
+            
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            User user = userRepository.findById(userDetails.getId()).orElse(null);
+            Lesson lesson = lessonRepository.findById(lessonId).orElse(null);
 
-        if (user == null || lesson == null) return false;
+            if (user == null) {
+                logger.warn("isEnrolled: User not found for ID: {}", userDetails.getId());
+                return false;
+            }
+            
+            if (lesson == null) {
+                logger.warn("isEnrolled: Lesson not found for ID: {}", lessonId);
+                return false;
+            }
 
-        Course course = lesson.getChapter().getCourse();
-        return enrollmentRepository.findByUserAndCourse(user, course).isPresent();
+            // Load chapter and course to avoid LazyInitializationException
+            Chapter chapter = lesson.getChapter();
+            if (chapter == null) {
+                logger.warn("isEnrolled: Chapter not found for lesson ID: {}", lessonId);
+                return false;
+            }
+            
+            Course course = chapter.getCourse();
+            if (course == null) {
+                logger.warn("isEnrolled: Course not found for chapter ID: {}", chapter.getId());
+                return false;
+            }
+
+            boolean enrolled = enrollmentRepository.findByUserAndCourse(user, course).isPresent();
+            logger.debug("isEnrolled: User {} enrolled in course {}: {}", user.getId(), course.getId(), enrolled);
+            return enrolled;
+        } catch (Exception e) {
+            logger.error("Error in isEnrolled for lessonId {}: {}", lessonId, e.getMessage(), e);
+            return false;
+        }
     }
 
     // Kiểm tra học viên có phải là chính họ không (cho enrollment)

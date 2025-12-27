@@ -2,6 +2,7 @@ package com.coursemgmt.dto;
 
 import com.coursemgmt.model.EContentType;
 import com.coursemgmt.model.Lesson;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
@@ -16,6 +17,7 @@ public class LessonResponse {
     private Integer position;
 
     // Dùng cho chức năng "Theo dõi tiến độ"
+    @JsonProperty("isCompleted")
     private boolean isCompleted;
 
     // Lesson có thể xem trước (cho guests)
@@ -31,13 +33,11 @@ public class LessonResponse {
         dto.setCompleted(isCompleted);
         dto.setIsPreview(lesson.getIsPreview() != null ? lesson.getIsPreview() : false);
 
-        // Chỉ trả về nội dung chi tiết nếu đã hoàn thành (hoặc là Giảng viên)
-        // (Đây là logic ví dụ, bạn có thể quyết định trả về hết)
-        if (isCompleted) {
-            dto.setVideoUrl(lesson.getVideoUrl());
-            dto.setDocumentUrl(lesson.getDocumentUrl());
-            dto.setContent(lesson.getContent());
-        }
+        // Trả về nội dung chi tiết cho học viên đã đăng ký (không cần đợi hoàn thành)
+        // Học viên cần xem video để học, không phải chỉ khi đã hoàn thành
+        dto.setVideoUrl(lesson.getVideoUrl());
+        dto.setDocumentUrl(lesson.getDocumentUrl());
+        dto.setContent(lesson.getContent());
 
         return dto;
     }

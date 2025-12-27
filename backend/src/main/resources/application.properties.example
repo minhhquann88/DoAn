@@ -1,12 +1,11 @@
 # ============================================
 # MySQL Database Configuration
-# Để test các Module 6, 7, 8, 9
 # ============================================
 
 # MySQL Database Configuration
 spring.datasource.url=jdbc:mysql://localhost:3306/coursemgmt_test?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
 spring.datasource.username=root
-spring.datasource.password=27012003
+spring.datasource.password=your_password_here
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 # JPA/Hibernate Configuration
@@ -43,14 +42,19 @@ logging.level.org.springframework.web=INFO
 logging.file.name=logs/application.log
 
 # JWT Configuration
-coursemgmt.app.jwtSecret=======================BezKoder=Spring=Boot=Jwt=======================
+coursemgmt.app.jwtSecret=YOUR_JWT_SECRET_HERE
 coursemgmt.app.jwtExpirationMs=86400000
 
 # Mail Configuration
 spring.mail.host=smtp.gmail.com
 spring.mail.port=587
-spring.mail.username=dauminhquan882003@gmail.com
-spring.mail.password=cebyyyouveznqnfs
+spring.mail.username=YOUR_EMAIL_HERE
+spring.mail.password=YOUR_APP_PASSWORD_HERE
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
+
+# Google Gemini API Configuration
+gemini.api.key=YOUR_GEMINI_API_KEY_HERE
+gemini.api.url=https://generativelanguage.googleapis.com/v1beta
+gemini.api.model=gemini-2.5-flash
 

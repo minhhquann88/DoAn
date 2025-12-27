@@ -11,7 +11,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.coursemgmt.security.services.UserDetailsImpl;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -51,10 +54,11 @@ public class TransactionController {
     }
 
     /**
-     * 3. Lấy tất cả giao dịch (có phân trang)
+     * 3. Lấy tất cả giao dịch (có phân trang) - Admin only
      * GET /api/v1/transactions
      */
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<TransactionDTO>> getAllTransactions(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "10") int size,
@@ -81,15 +85,41 @@ public class TransactionController {
     }
 
     /**
-     * 5. Lấy giao dịch của user
-     * GET /api/v1/transactions/user/{userId}
+     * 5. Lấy giao dịch của user hiện tại (UC-PAY-02)
+     * GET /api/v1/transactions/my-transactions
      */
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<Page<TransactionDTO>> getUserTransactions(
-        @PathVariable Long userId,
+    @GetMapping("/my-transactions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<TransactionDTO>> getMyTransactions(
+        @AuthenticationPrincipal UserDetailsImpl userDetails,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "10") int size
     ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<TransactionDTO> transactions = transactionService.getUserTransactions(userDetails.getId(), pageable);
+        return ResponseEntity.ok(transactions);
+    }
+
+    /**
+     * 5.1. Lấy giao dịch của user (Admin có thể xem bất kỳ user nào)
+     * GET /api/v1/transactions/user/{userId}
+     */
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<TransactionDTO>> getUserTransactions(
+        @PathVariable Long userId,
+        @AuthenticationPrincipal UserDetailsImpl userDetails,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
+        // Check authorization: User can only view their own transactions, unless they are Admin
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+        
+        if (!isAdmin && !userDetails.getId().equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<TransactionDTO> transactions = transactionService.getUserTransactions(userId, pageable);
         return ResponseEntity.ok(transactions);

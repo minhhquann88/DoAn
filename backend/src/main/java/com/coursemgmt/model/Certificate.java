@@ -1,12 +1,17 @@
 package com.coursemgmt.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "certificates")
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString(exclude = {"enrollment"})
+@EqualsAndHashCode(exclude = {"enrollment"})
 public class Certificate {
 
     @Id

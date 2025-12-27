@@ -1,13 +1,18 @@
 package com.coursemgmt.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "enrollments")
-@Data
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString(exclude = {"certificate", "progresses", "user", "course"})
+@EqualsAndHashCode(exclude = {"certificate", "progresses", "user", "course"})
 public class Enrollment {
 
     @Id

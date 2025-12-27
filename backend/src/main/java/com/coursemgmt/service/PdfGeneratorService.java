@@ -102,11 +102,12 @@ public class PdfGeneratorService {
         String issuedDate = certificate.getIssuedAt().format(formatter);
         String certificateCode = certificate.getCertificateCode();
         
-        return """
+        // Use String.format() instead of .formatted() to avoid conflict with # in CSS
+        return String.format("""
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <style>
         @page {
             size: A4 landscape;
@@ -116,7 +117,7 @@ public class PdfGeneratorService {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
         }
         .certificate {
             background: white;
@@ -173,7 +174,7 @@ public class PdfGeneratorService {
         
         <div class="recipient">%s</div>
         
-        <p>đã hoàn thành xuất sắc khóa học<br>has successfully completed the course</p>
+        <p>đã hoàn thành xuất sắc khóa học<br />has successfully completed the course</p>
         
         <div class="course">%s</div>
         
@@ -191,7 +192,7 @@ public class PdfGeneratorService {
     </div>
 </body>
 </html>
-                """.formatted(userName, courseTitle, instructorName, issuedDate, certificateCode);
+                """, userName, courseTitle, instructorName, issuedDate, certificateCode);
     }
 }
 

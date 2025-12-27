@@ -23,7 +23,7 @@ import java.util.Set;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
-@RequestMapping("/api/courses")
+@RequestMapping("/api/v1/courses")
 public class CourseController {
 
     @Autowired
@@ -167,5 +167,26 @@ public class CourseController {
                                                           @RequestParam(defaultValue = "true") Boolean isFeatured) {
         Course course = courseService.toggleFeatured(id, isFeatured);
         return ResponseEntity.ok(CourseResponse.fromEntity(course));
+    }
+
+    // 11. Lấy danh sách khóa học của học viên (My Courses)
+    @GetMapping("/my-courses")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<CourseResponse>> getMyCourses(
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        System.out.println("========================================");
+        System.out.println("GetMyCourses: Request received for user ID: " + userDetails.getId());
+        
+        List<CourseResponse> courses = courseService.getMyCourses(userDetails.getId());
+        
+        System.out.println("GetMyCourses: Found " + courses.size() + " courses for user " + userDetails.getId());
+        if (courses.size() > 0) {
+            System.out.println("GetMyCourses: Course IDs: " + 
+                courses.stream().map(CourseResponse::getId).toList());
+        }
+        System.out.println("========================================");
+        
+        return ResponseEntity.ok(courses);
     }
 }

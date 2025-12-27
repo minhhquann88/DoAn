@@ -21,12 +21,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,6 +60,74 @@ public class CourseService {
     private User getCurrentUser(UserDetailsImpl userDetails) {
         return userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new RuntimeException("User not found!"));
+    }
+
+    /**
+     * Helper method: Get current authenticated user ID from SecurityContext
+     * Returns null if user is not authenticated
+     */
+    private Long getCurrentUserId() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
+                return null;
+            }
+            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            String username = userDetails.getUsername();
+            User user = userRepository.findByUsername(username).orElse(null);
+            return user != null ? user.getId() : null;
+        } catch (Exception e) {
+            System.out.println("CourseService.getCurrentUserId: User not authenticated or error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Helper method: Get enrolled course IDs for a user
+     * Returns empty set if user is not authenticated or not found
+     */
+    private Set<Long> getEnrolledCourseIds(Long userId) {
+        if (userId == null) {
+            return Collections.emptySet();
+        }
+        try {
+            Set<Long> enrolledIds = enrollmentRepository.findEnrolledCourseIdsByUserId(userId);
+            System.out.println("CourseService.getEnrolledCourseIds: User " + userId + " has " + 
+                             (enrolledIds != null ? enrolledIds.size() : 0) + " enrolled courses");
+            return enrolledIds != null ? enrolledIds : Collections.emptySet();
+        } catch (Exception e) {
+            System.err.println("CourseService.getEnrolledCourseIds: Error fetching enrolled courses: " + e.getMessage());
+            return Collections.emptySet();
+        }
+    }
+
+    /**
+     * Helper method: Get enrollment map (courseId -> Enrollment) for a user
+     * Returns empty map if user is not authenticated or not found
+     * Used to get enrollment progress and status for enrolled courses
+     */
+    private Map<Long, Enrollment> getEnrollmentMap(Long userId) {
+        if (userId == null) {
+            return Collections.emptyMap();
+        }
+        try {
+            // Use findByUserIdWithCourse to eagerly fetch course to avoid LazyInitializationException
+            List<Enrollment> enrollments = enrollmentRepository.findByUserIdWithCourse(userId);
+            if (enrollments == null || enrollments.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            return enrollments.stream()
+                    .filter(e -> e.getCourse() != null) // Filter out enrollments with null course
+                    .collect(Collectors.toMap(
+                            e -> e.getCourse().getId(),
+                            e -> e,
+                            (e1, e2) -> e1 // If duplicate, keep first one
+                    ));
+        } catch (Exception e) {
+            System.err.println("CourseService.getEnrollmentMap: Error fetching enrollments: " + e.getMessage());
+            e.printStackTrace();
+            return Collections.emptyMap();
+        }
     }
 
     // Chức năng 1: Tạo khóa học
@@ -154,9 +228,22 @@ public class CourseService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
         CourseResponse dto = CourseResponse.fromEntity(course);
+        
         // Tính enrollmentCount từ repository (tránh LAZY loading issue)
         Long enrollmentCount = enrollmentRepository.countByCourseId(courseId);
         dto.setEnrollmentCount(enrollmentCount != null ? enrollmentCount : 0L);
+        
+        // Check if current user is enrolled
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId != null) {
+            boolean isEnrolled = enrollmentRepository.existsByUserIdAndCourseId(currentUserId, courseId);
+            dto.setIsEnrolled(isEnrolled);
+            System.out.println("CourseService.getCourseById: User " + currentUserId + 
+                             " enrolled in course " + courseId + ": " + isEnrolled);
+        } else {
+            dto.setIsEnrolled(false);
+        }
+        
         return dto;
     }
 
@@ -172,13 +259,39 @@ public class CourseService {
             featuredCourses = courseRepository.findLatestPublishedCourses(pageable);
         }
         
-        // Convert sang DTO và tính enrollmentCount
+        // Get enrolled course IDs and enrollment map for current user (if authenticated)
+        Long currentUserId = getCurrentUserId();
+        Set<Long> enrolledIds = getEnrolledCourseIds(currentUserId);
+        Map<Long, Enrollment> enrollmentMap = getEnrollmentMap(currentUserId);
+        
+        // Convert sang DTO và tính enrollmentCount + isEnrolled + enrollmentProgress
         return featuredCourses.stream()
                 .map(course -> {
                     CourseResponse dto = CourseResponse.fromEntity(course);
                     // Tính enrollmentCount từ repository (tránh LAZY loading issue)
                     Long enrollmentCount = enrollmentRepository.countByCourseId(course.getId());
                     dto.setEnrollmentCount(enrollmentCount != null ? enrollmentCount : 0L);
+                    // Set isEnrolled status
+                    boolean isEnrolled = enrolledIds.contains(course.getId());
+                    dto.setIsEnrolled(isEnrolled);
+                    
+                    // If enrolled, set enrollment progress and status
+                    if (isEnrolled) {
+                        Enrollment enrollment = enrollmentMap.get(course.getId());
+                        if (enrollment != null) {
+                            if (enrollment.getProgress() != null) {
+                                dto.setEnrollmentProgress(enrollment.getProgress());
+                            } else {
+                                dto.setEnrollmentProgress(0.0);
+                            }
+                            if (enrollment.getStatus() != null) {
+                                dto.setEnrollmentStatus(enrollment.getStatus().name());
+                            } else {
+                                dto.setEnrollmentStatus("IN_PROGRESS");
+                            }
+                        }
+                    }
+                    
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -231,13 +344,39 @@ public class CourseService {
         // 3. Truy vấn
         Page<Course> coursePage = courseRepository.findAll(spec, pageable);
 
-        // 4. Convert sang DTO và tính enrollmentCount
+        // 4. Get enrolled course IDs and enrollment map for current user (if authenticated)
+        Long currentUserId = getCurrentUserId();
+        Set<Long> enrolledIds = getEnrolledCourseIds(currentUserId);
+        Map<Long, Enrollment> enrollmentMap = getEnrollmentMap(currentUserId);
+
+        // 5. Convert sang DTO và tính enrollmentCount + isEnrolled + enrollmentProgress
         List<CourseResponse> dtos = coursePage.getContent().stream()
                 .map(course -> {
                     CourseResponse dto = CourseResponse.fromEntity(course);
                     // Tính enrollmentCount từ repository (tránh LAZY loading issue)
                     Long enrollmentCount = enrollmentRepository.countByCourseId(course.getId());
                     dto.setEnrollmentCount(enrollmentCount != null ? enrollmentCount : 0L);
+                    // Set isEnrolled status
+                    boolean isEnrolled = enrolledIds.contains(course.getId());
+                    dto.setIsEnrolled(isEnrolled);
+                    
+                    // If enrolled, set enrollment progress and status
+                    if (isEnrolled) {
+                        Enrollment enrollment = enrollmentMap.get(course.getId());
+                        if (enrollment != null) {
+                            if (enrollment.getProgress() != null) {
+                                dto.setEnrollmentProgress(enrollment.getProgress());
+                            } else {
+                                dto.setEnrollmentProgress(0.0);
+                            }
+                            if (enrollment.getStatus() != null) {
+                                dto.setEnrollmentStatus(enrollment.getStatus().name());
+                            } else {
+                                dto.setEnrollmentStatus("IN_PROGRESS");
+                            }
+                        }
+                    }
+                    
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -338,9 +477,48 @@ public class CourseService {
             return List.of(); // Return empty list if no chapters
         }
 
-        // Map to DTO - For preview, return all lessons with videoUrl for first lesson of each chapter
+        // Find the first lesson of the entire course (first lesson of first chapter)
+        Long firstLessonIdOfCourse = null;
+        if (!chapters.isEmpty()) {
+            // Sort chapters by position
+            List<Chapter> sortedChapters = chapters.stream()
+                    .filter(chapter -> chapter != null)
+                    .sorted((c1, c2) -> {
+                        Integer pos1 = c1.getPosition() != null ? c1.getPosition() : Integer.MAX_VALUE;
+                        Integer pos2 = c2.getPosition() != null ? c2.getPosition() : Integer.MAX_VALUE;
+                        return Integer.compare(pos1, pos2);
+                    })
+                    .collect(Collectors.toList());
+            
+            // Get first chapter
+            Chapter firstChapter = sortedChapters.get(0);
+            if (firstChapter != null && firstChapter.getLessons() != null && !firstChapter.getLessons().isEmpty()) {
+                // Sort lessons by position
+                List<Lesson> sortedLessons = firstChapter.getLessons().stream()
+                        .filter(lesson -> lesson != null)
+                        .sorted((l1, l2) -> {
+                            Integer pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
+                            Integer pos2 = l2.getPosition() != null ? l2.getPosition() : Integer.MAX_VALUE;
+                            return Integer.compare(pos1, pos2);
+                        })
+                        .collect(Collectors.toList());
+                
+                if (!sortedLessons.isEmpty()) {
+                    firstLessonIdOfCourse = sortedLessons.get(0).getId();
+                }
+            }
+        }
+        
+        final Long finalFirstLessonId = firstLessonIdOfCourse; // For use in lambda
+        
+        // Map to DTO - Only the first lesson of the entire course is preview
         return chapters.stream()
                 .filter(chapter -> chapter != null) // Filter out null chapters
+                .sorted((c1, c2) -> {
+                    Integer pos1 = c1.getPosition() != null ? c1.getPosition() : Integer.MAX_VALUE;
+                    Integer pos2 = c2.getPosition() != null ? c2.getPosition() : Integer.MAX_VALUE;
+                    return Integer.compare(pos1, pos2);
+                })
                 .map(chapter -> {
                     // Get lessons safely - handle null/empty list
                     List<Lesson> lessons = chapter.getLessons();
@@ -363,14 +541,11 @@ public class CourseService {
                         return ChapterResponse.fromEntity(chapter, List.of());
                     }
                     
-                    // Get first lesson ID for preview identification
-                    Long firstLessonId = sortedLessons.get(0).getId();
-                    
                     // Map lessons to DTOs
                     List<LessonResponse> lessonResponses = sortedLessons.stream()
                             .map(lesson -> {
-                                // Check if this is the first lesson of the chapter (for preview)
-                                boolean isFirstLesson = firstLessonId != null && firstLessonId.equals(lesson.getId());
+                                // Check if this is the first lesson of the entire course (for preview)
+                                boolean isFirstLessonOfCourse = finalFirstLessonId != null && finalFirstLessonId.equals(lesson.getId());
                                 
                                 // Create response - for preview, always set isCompleted = false (no user progress)
                                 LessonResponse response = new LessonResponse();
@@ -381,19 +556,14 @@ public class CourseService {
                                 response.setPosition(lesson.getPosition());
                                 response.setCompleted(false); // No progress tracking for guests
                                 
-                                // Set isPreview: Use database value if available, otherwise mark first lesson as preview
-                                Boolean isPreviewFromDb = lesson.getIsPreview();
-                                if (isPreviewFromDb != null) {
-                                    response.setIsPreview(isPreviewFromDb);
+                                // Set isPreview: Only the first lesson of the entire course is preview
+                                // Ignore database value for preview endpoint - only first lesson can be preview
+                                if (isFirstLessonOfCourse && lesson.getVideoUrl() != null && lesson.getContentType() == EContentType.VIDEO) {
+                                    response.setIsPreview(true);
+                                    response.setVideoUrl(lesson.getVideoUrl()); // Only include videoUrl for first lesson
                                 } else {
-                                    // Fallback: Mark first lesson of each chapter as preview if it has video
-                                    response.setIsPreview(isFirstLesson && lesson.getVideoUrl() != null && lesson.getContentType() == EContentType.VIDEO);
-                                }
-                                
-                                // For preview: Always include videoUrl for first lesson of each chapter OR if isPreview is true
-                                boolean isPreview = response.getIsPreview() != null && response.getIsPreview();
-                                if ((isFirstLesson || isPreview) && lesson.getVideoUrl() != null && lesson.getContentType() == EContentType.VIDEO) {
-                                    response.setVideoUrl(lesson.getVideoUrl());
+                                    response.setIsPreview(false);
+                                    // Don't set videoUrl for non-preview lessons
                                 }
                                 
                                 // Note: We don't set documentUrl or content for preview (guests can't access full content)
@@ -405,5 +575,70 @@ public class CourseService {
                     return ChapterResponse.fromEntity(chapter, lessonResponses);
                 })
                 .collect(Collectors.toList());
+    }
+
+    // Chức năng 11: Lấy danh sách khóa học của học viên (My Courses)
+    @Transactional(readOnly = true) // IMPORTANT: Add @Transactional to avoid LazyInitializationException
+    public List<CourseResponse> getMyCourses(Long userId) {
+        System.out.println("CourseService.getMyCourses: Fetching courses for user ID: " + userId);
+        
+        try {
+            // Use JOIN FETCH query to avoid LazyInitializationException
+            List<Enrollment> enrollments = enrollmentRepository.findByUserIdWithCourse(userId);
+            
+            System.out.println("CourseService.getMyCourses: Found " + enrollments.size() + " enrollments");
+            
+            // Extract courses from enrollments
+            List<CourseResponse> courses = enrollments.stream()
+                    .map(enrollment -> {
+                        try {
+                            Course course = enrollment.getCourse();
+                            if (course == null) {
+                                System.err.println("WARNING: Enrollment " + enrollment.getId() + " has null course");
+                                return null;
+                            }
+                            
+                            CourseResponse dto = CourseResponse.fromEntity(course);
+                            
+                            // Set enrollment info
+                            Long enrollmentCount = enrollmentRepository.countByCourseId(course.getId());
+                            dto.setEnrollmentCount(enrollmentCount != null ? enrollmentCount : 0L);
+                            
+                            // All courses in "My Courses" are enrolled by definition
+                            dto.setIsEnrolled(true);
+                            
+                            // Set enrollment progress and status
+                            if (enrollment.getProgress() != null) {
+                                dto.setEnrollmentProgress(enrollment.getProgress());
+                            } else {
+                                dto.setEnrollmentProgress(0.0);
+                            }
+                            
+                            if (enrollment.getStatus() != null) {
+                                dto.setEnrollmentStatus(enrollment.getStatus().name());
+                            } else {
+                                dto.setEnrollmentStatus("IN_PROGRESS");
+                            }
+                            
+                            System.out.println("Course " + course.getId() + " - Progress: " + dto.getEnrollmentProgress() + "%, Status: " + dto.getEnrollmentStatus());
+                            
+                            return dto;
+                        } catch (Exception e) {
+                            System.err.println("ERROR mapping enrollment " + enrollment.getId() + " to CourseResponse: " + e.getMessage());
+                            e.printStackTrace();
+                            return null;
+                        }
+                    })
+                    .filter(dto -> dto != null) // Filter out null DTOs
+                    .collect(Collectors.toList());
+            
+            System.out.println("CourseService.getMyCourses: Returning " + courses.size() + " courses");
+            
+            return courses;
+        } catch (Exception e) {
+            System.err.println("ERROR in getMyCourses: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to fetch my courses: " + e.getMessage(), e);
+        }
     }
 }

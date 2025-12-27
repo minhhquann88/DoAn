@@ -68,7 +68,19 @@ public class CertificateController {
     }
 
     /**
-     * 4. Lấy certificate theo code (để verify)
+     * 4. Download certificate PDF by code (phải đặt trước /code/{code} để tránh conflict)
+     * GET /api/v1/certificates/code/{code}/download
+     */
+    @GetMapping("/code/{code}/download")
+    public ResponseEntity<?> downloadCertificateByCode(@PathVariable String code) {
+        System.out.println("========================================");
+        System.out.println("Download Certificate by Code: " + code);
+        System.out.println("========================================");
+        return certificateService.downloadCertificateByCode(code);
+    }
+
+    /**
+     * 5. Lấy certificate theo code (để verify)
      * GET /api/v1/certificates/code/{code}
      */
     @GetMapping("/code/{code}")
@@ -78,7 +90,7 @@ public class CertificateController {
     }
 
     /**
-     * 5. Verify certificate
+     * 6. Verify certificate
      * GET /api/v1/certificates/verify/{code}
      */
     @GetMapping("/verify/{code}")
@@ -92,7 +104,7 @@ public class CertificateController {
     }
 
     /**
-     * 6. Lấy tất cả certificate của user
+     * 7. Lấy tất cả certificate của user
      * GET /api/v1/certificates/user/{userId}
      */
     @GetMapping("/user/{userId}")
@@ -107,7 +119,7 @@ public class CertificateController {
     }
 
     /**
-     * 7. Lấy certificate của 1 course
+     * 8. Lấy certificate của 1 course
      * GET /api/v1/certificates/course/{courseId}
      */
     @GetMapping("/course/{courseId}")
@@ -122,7 +134,7 @@ public class CertificateController {
     }
 
     /**
-     * 8. Thống kê số certificate theo thời gian
+     * 9. Thống kê số certificate theo thời gian
      * GET /api/v1/certificates/stats
      */
     @GetMapping("/stats")
@@ -139,7 +151,19 @@ public class CertificateController {
     }
 
     /**
-     * 9. Thu hồi certificate (Admin only)
+     * 10. Download certificate PDF by ID
+     * GET /api/v1/certificates/{id}/download
+     */
+    @GetMapping("/{id}/download")
+    public ResponseEntity<?> downloadCertificateById(@PathVariable Long id) {
+        System.out.println("========================================");
+        System.out.println("Download Certificate by ID: " + id);
+        System.out.println("========================================");
+        return certificateService.downloadCertificateById(id);
+    }
+
+    /**
+     * 11. Thu hồi certificate (Admin only)
      * DELETE /api/v1/certificates/{id}
      */
     @DeleteMapping("/{id}")

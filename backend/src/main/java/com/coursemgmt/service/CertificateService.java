@@ -8,11 +8,21 @@ import com.coursemgmt.model.Enrollment;
 import com.coursemgmt.repository.CertificateRepository;
 import com.coursemgmt.repository.EnrollmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -157,6 +167,175 @@ public class CertificateService {
     }
 
     /**
+     * Download certificate PDF by ID
+     */
+    public ResponseEntity<?> downloadCertificateById(Long id) {
+        Certificate certificate = certificateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Certificate not found with id: " + id
+                ));
+        
+        return downloadCertificateFile(certificate);
+    }
+
+    /**
+     * Download certificate PDF by code
+     */
+    public ResponseEntity<?> downloadCertificateByCode(String code) {
+        System.out.println("CertificateService.downloadCertificateByCode: Looking for code: " + code);
+        
+        Certificate certificate = certificateRepository.findByCertificateCode(code)
+                .orElseThrow(() -> {
+                    System.err.println("Certificate not found with code: " + code);
+                    return new ResourceNotFoundException(
+                        "Certificate not found with code: " + code
+                    );
+                });
+        
+        System.out.println("CertificateService.downloadCertificateByCode: Found certificate ID: " + certificate.getId());
+        System.out.println("CertificateService.downloadCertificateByCode: PDF URL: " + certificate.getPdfUrl());
+        
+        return downloadCertificateFile(certificate);
+    }
+
+    /**
+     * Helper method to download certificate PDF file
+     */
+    private ResponseEntity<?> downloadCertificateFile(Certificate certificate) {
+        try {
+            System.out.println("========================================");
+            System.out.println("downloadCertificateFile: Starting download");
+            System.out.println("Certificate ID: " + certificate.getId());
+            System.out.println("Certificate Code: " + certificate.getCertificateCode());
+            System.out.println("PDF URL from DB: " + certificate.getPdfUrl());
+            
+            // If PDF URL is null or empty, generate PDF on-the-fly
+            if (certificate.getPdfUrl() == null || certificate.getPdfUrl().isEmpty()) {
+                System.out.println("PDF URL is null or empty. Generating PDF on-the-fly...");
+                try {
+                    // Reload certificate with enrollment (eager fetch) to generate PDF
+                    Certificate fullCertificate = certificateRepository.findByIdWithEnrollment(certificate.getId())
+                            .orElse(certificateRepository.findByCertificateCodeWithEnrollment(certificate.getCertificateCode())
+                                    .orElseThrow(() -> new ResourceNotFoundException(
+                                        "Certificate not found with id: " + certificate.getId()
+                                    )));
+                    
+                    // Verify enrollment is loaded
+                    if (fullCertificate.getEnrollment() == null) {
+                        System.err.println("ERROR: Enrollment is null. Cannot generate PDF.");
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body("Certificate data is incomplete. Please contact administrator.");
+                    }
+                    
+                    System.out.println("Generating PDF for certificate: " + fullCertificate.getCertificateCode());
+                    System.out.println("Enrollment ID: " + fullCertificate.getEnrollment().getId());
+                    
+                    // Generate PDF and save
+                    String pdfUrl = pdfGeneratorService.generateCertificatePdfAndSave(fullCertificate);
+                    fullCertificate.setPdfUrl(pdfUrl);
+                    certificateRepository.save(fullCertificate);
+                    
+                    System.out.println("PDF generated successfully. URL: " + pdfUrl);
+                    certificate.setPdfUrl(pdfUrl); // Update local reference
+                } catch (Exception e) {
+                    System.err.println("ERROR: Failed to generate PDF on-the-fly: " + e.getMessage());
+                    e.printStackTrace();
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body("Failed to generate certificate PDF: " + e.getMessage() + ". Please contact administrator.");
+                }
+            }
+            
+            // Extract file path from URL
+            // Assuming pdfUrl is a file path like: /uploads/certificates/cert-123.pdf
+            // or full URL: http://localhost:8080/uploads/certificates/cert-123.pdf
+            // or relative path from PdfGeneratorService: http://localhost:8080/certificates/certificate_CERT-XXX.pdf
+            String pdfPath = certificate.getPdfUrl();
+            System.out.println("Original PDF Path: " + pdfPath);
+            
+            // If it's a full URL, extract the path
+            if (pdfPath.startsWith("http://") || pdfPath.startsWith("https://")) {
+                // Extract path from URL
+                // Try to find /certificates/ or /uploads/
+                int pathStart = pdfPath.indexOf("/certificates/");
+                if (pathStart < 0) {
+                    pathStart = pdfPath.indexOf("/uploads/");
+                }
+                if (pathStart > 0) {
+                    pdfPath = pdfPath.substring(pathStart);
+                    System.out.println("Extracted path from URL: " + pdfPath);
+                } else {
+                    // If no /certificates/ or /uploads/ found, try to get path after domain
+                    int domainEnd = pdfPath.indexOf("/", 8); // Skip http:// or https://
+                    if (domainEnd > 0) {
+                        pdfPath = pdfPath.substring(domainEnd);
+                        System.out.println("Extracted path after domain: " + pdfPath);
+                    }
+                }
+            }
+            
+            // Convert to file system path
+            // PdfGeneratorService saves to ./certificates/ directory
+            if (pdfPath.startsWith("/certificates/")) {
+                pdfPath = "." + pdfPath; // ./certificates/certificate_CERT-XXX.pdf
+            } else if (pdfPath.startsWith("/uploads/certificates/")) {
+                pdfPath = "." + pdfPath; // ./uploads/certificates/cert-123.pdf
+            } else if (!pdfPath.startsWith("/") && !pdfPath.startsWith("./")) {
+                // Relative path, check if it's just filename
+                if (pdfPath.contains("certificate_")) {
+                    pdfPath = "./certificates/" + pdfPath;
+                } else {
+                    pdfPath = "./uploads/certificates/" + pdfPath;
+                }
+            }
+            
+            System.out.println("Final file path: " + pdfPath);
+            
+            Path filePath = Paths.get(pdfPath).toAbsolutePath().normalize();
+            File file = filePath.toFile();
+            
+            System.out.println("Absolute file path: " + file.getAbsolutePath());
+            System.out.println("File exists: " + file.exists());
+            System.out.println("Is file: " + file.isFile());
+            
+            if (!file.exists() || !file.isFile()) {
+                System.err.println("ERROR: File does not exist or is not a file");
+                System.err.println("Tried path: " + file.getAbsolutePath());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Certificate PDF file not found on server. Path: " + file.getAbsolutePath());
+            }
+            
+            Resource resource = new FileSystemResource(file);
+            
+            // Determine content type
+            String contentType = Files.probeContentType(filePath);
+            if (contentType == null) {
+                contentType = "application/pdf";
+            }
+            
+            System.out.println("Content type: " + contentType);
+            System.out.println("File size: " + file.length() + " bytes");
+            System.out.println("Successfully preparing file for download");
+            System.out.println("========================================");
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename=\"" + file.getName() + "\"")
+                    .body(resource);
+                    
+        } catch (Exception e) {
+            System.err.println("========================================");
+            System.err.println("ERROR downloading certificate PDF:");
+            System.err.println("Message: " + e.getMessage());
+            System.err.println("Stack trace:");
+            e.printStackTrace();
+            System.err.println("========================================");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error downloading certificate: " + e.getMessage());
+        }
+    }
+
+    /**
      * Generate unique certificate code
      */
     private String generateCertificateCode() {
@@ -172,15 +351,20 @@ public class CertificateService {
         dto.setCertificateCode(certificate.getCertificateCode());
         dto.setIssuedAt(certificate.getIssuedAt());
         dto.setPdfUrl(certificate.getPdfUrl());
+        
+        // Set status (default to ACTIVE if not revoked)
+        dto.setStatus("ACTIVE");
+        
         // completedAt and finalScore not available in Certificate model
         // Can be set from enrollment if needed
         if (certificate.getEnrollment() != null) {
-            dto.setCompletedAt(certificate.getEnrollment().getEnrolledAt());
-        }
-        
-        // Enrollment info
-        if (certificate.getEnrollment() != null) {
             Enrollment enrollment = certificate.getEnrollment();
+            dto.setCompletedAt(enrollment.getEnrolledAt());
+            
+            // Set finalScore from enrollment progress if available
+            if (enrollment.getProgress() != null) {
+                dto.setFinalScore((int) Math.round(enrollment.getProgress()));
+            }
             
             // User info
             if (enrollment.getUser() != null) {

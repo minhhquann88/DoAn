@@ -117,47 +117,148 @@ public class ContentService {
 
     // Lấy toàn bộ nội dung (chapters + lessons) của 1 khóa học
     public List<ChapterResponse> getCourseContent(Long courseId, UserDetailsImpl userDetails) {
+        System.out.println("========================================");
+        System.out.println("ContentService.getCourseContent called");
+        System.out.println("Course ID: " + courseId);
+        System.out.println("User ID: " + (userDetails != null ? userDetails.getId() : "NULL"));
+        System.out.println("========================================");
+        
+        if (userDetails == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        
         User user = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userDetails.getId()));
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
 
+        System.out.println("User found: " + user.getUsername() + " (ID: " + user.getId() + ")");
+        System.out.println("Course found: " + course.getTitle() + " (ID: " + course.getId() + ")");
+
         // Kiểm tra xem user có phải là chủ khóa học không
         boolean isInstructor = course.getInstructor() != null && 
                                course.getInstructor().getId().equals(user.getId());
+        System.out.println("Is Instructor: " + isInstructor);
 
-        // Lấy thông tin Enrollment
+        // Lấy thông tin Enrollment - Try multiple methods
+        System.out.println("Attempting to find enrollment...");
+        System.out.println("Method 1: findByUserAndCourse");
         Enrollment enrollment = enrollmentRepository.findByUserAndCourse(user, course).orElse(null);
+        
+        // Fallback: Try by userId and courseId
+        if (enrollment == null) {
+            System.out.println("Method 1 failed. Trying Method 2: findByUserIdAndCourseId");
+            enrollment = enrollmentRepository.findByUserIdAndCourseId(user.getId(), courseId).orElse(null);
+        }
+        
+        // Additional check: List all enrollments for this user to debug
+        if (enrollment == null) {
+            System.out.println("Method 2 also failed. Checking all enrollments for user...");
+            List<Enrollment> allUserEnrollments = enrollmentRepository.findByUserIdWithCourse(user.getId());
+            System.out.println("Total enrollments for user " + user.getId() + ": " + allUserEnrollments.size());
+            for (Enrollment e : allUserEnrollments) {
+                System.out.println("  - Enrollment ID: " + e.getId() + ", Course ID: " + e.getCourse().getId() + ", Course Title: " + e.getCourse().getTitle());
+            }
+        }
+        
+        System.out.println("Enrollment found: " + (enrollment != null ? "YES (ID: " + enrollment.getId() + ")" : "NO"));
+        
+        if (enrollment != null) {
+            System.out.println("Enrollment Status: " + enrollment.getStatus());
+            System.out.println("Enrollment Progress: " + enrollment.getProgress() + "%");
+        }
 
         // Nếu không phải Giảng viên VÀ chưa đăng ký, ném lỗi
         if (!isInstructor && enrollment == null) {
-            throw new RuntimeException("Bạn chưa đăng ký khóa học này!");
+            System.err.println("ERROR: User " + user.getId() + " is not enrolled in course " + courseId);
+            throw new RuntimeException("Bạn chưa đăng ký khóa học này! Vui lòng đăng ký để xem nội dung.");
         }
-
+        
+        System.out.println("Access granted - proceeding to fetch content");
+        System.out.println("========================================");
+        
         // Lấy danh sách ID các bài học đã hoàn thành
         Set<Long> completedLessonIds = Set.of();
         if (enrollment != null) {
-            completedLessonIds = userProgressRepository.findByEnrollment(enrollment).stream()
-                    .filter(User_Progress::getIsCompleted)
-                    .map(progress -> progress.getLesson().getId())
-                    .collect(Collectors.toSet());
+            System.out.println("Fetching user progress for enrollment ID: " + enrollment.getId());
+            try {
+                // Sử dụng JOIN FETCH để load lesson cùng lúc, tránh LazyInitializationException
+                Set<User_Progress> progressSet = userProgressRepository.findByEnrollmentWithLesson(enrollment);
+                System.out.println("Found " + progressSet.size() + " progress records");
+                
+                completedLessonIds = progressSet.stream()
+                        .filter(progress -> {
+                            if (progress == null) return false;
+                            Boolean isCompleted = progress.getIsCompleted();
+                            return isCompleted != null && isCompleted;
+                        })
+                        .filter(progress -> {
+                            try {
+                                return progress.getLesson() != null && progress.getLesson().getId() != null;
+                            } catch (Exception e) {
+                                System.err.println("ERROR accessing lesson from progress: " + e.getMessage());
+                                e.printStackTrace();
+                                return false;
+                            }
+                        })
+                        .map(progress -> {
+                            try {
+                                return progress.getLesson().getId();
+                            } catch (Exception e) {
+                                System.err.println("ERROR getting lesson ID: " + e.getMessage());
+                                e.printStackTrace();
+                                return null;
+                            }
+                        })
+                        .filter(id -> id != null)
+                        .collect(Collectors.toSet());
+                System.out.println("Completed lesson IDs: " + completedLessonIds.size());
+            } catch (Exception e) {
+                System.err.println("ERROR fetching user progress: " + e.getMessage());
+                e.printStackTrace();
+                // Continue with empty set if progress fetch fails
+                completedLessonIds = Set.of();
+            }
         }
+        
+        System.out.println("Final completed lesson IDs count: " + completedLessonIds.size());
 
         final Set<Long> finalCompletedLessonIds = completedLessonIds; // Cần final để dùng trong lambda
 
-        // Lấy danh sách Chapters
-        List<Chapter> chapters = chapterRepository.findByCourseIdOrderByPositionAsc(courseId);
+        // Lấy danh sách Chapters với lessons (sử dụng JOIN FETCH để tránh LazyInitializationException)
+        System.out.println("Fetching chapters for course ID: " + courseId);
+        List<Chapter> chapters;
+        try {
+            chapters = chapterRepository.findByCourseIdWithLessons(courseId);
+            System.out.println("Found " + chapters.size() + " chapters");
+            
+            if (chapters.isEmpty()) {
+                System.out.println("WARNING: No chapters found for course " + courseId);
+                return List.of(); // Return empty list instead of throwing error
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR fetching chapters: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Không thể tải nội dung khóa học: " + e.getMessage(), e);
+        }
 
         // Map sang DTO
-        return chapters.stream().map(chapter -> {
-            List<LessonResponse> lessonResponses = chapter.getLessons().stream()
-                    .map(lesson -> {
-                        boolean isCompleted = isInstructor || finalCompletedLessonIds.contains(lesson.getId());
-                        return LessonResponse.fromEntity(lesson, isCompleted);
-                    })
-                    .collect(Collectors.toList());
-            return ChapterResponse.fromEntity(chapter, lessonResponses);
-        }).collect(Collectors.toList());
+        System.out.println("Mapping chapters to DTOs...");
+        try {
+            return chapters.stream().map(chapter -> {
+                List<LessonResponse> lessonResponses = chapter.getLessons().stream()
+                        .map(lesson -> {
+                            boolean isCompleted = isInstructor || finalCompletedLessonIds.contains(lesson.getId());
+                            return LessonResponse.fromEntity(lesson, isCompleted);
+                        })
+                        .collect(Collectors.toList());
+                return ChapterResponse.fromEntity(chapter, lessonResponses);
+            }).collect(Collectors.toList());
+        } catch (Exception e) {
+            System.err.println("ERROR mapping chapters to DTOs: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Không thể xử lý nội dung khóa học: " + e.getMessage(), e);
+        }
     }
 
     // --- Chức năng: Theo dõi tiến độ ---
@@ -243,7 +344,15 @@ public class ContentService {
 
         long completedLessons = userProgressRepository.countByEnrollmentAndIsCompleted(enrollment, true);
 
-        double progressPercentage = ((double) completedLessons / totalLessonsInCourse) * 100.0;
+        double progressPercentage = totalLessonsInCourse > 0 
+            ? ((double) completedLessons / totalLessonsInCourse) * 100.0 
+            : 100.0;
+        
+        // Round to 2 decimal places
+        progressPercentage = Math.round(progressPercentage * 100.0) / 100.0;
+        
+        System.out.println("Updating enrollment progress: " + completedLessons + " / " + totalLessonsInCourse + " = " + progressPercentage + "%");
+        
         enrollment.setProgress(progressPercentage);
 
         if (progressPercentage >= 100.0) {

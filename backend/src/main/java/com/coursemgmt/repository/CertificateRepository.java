@@ -47,5 +47,23 @@ public interface CertificateRepository extends JpaRepository<Certificate, Long> 
            "GROUP BY c.enrollment.course.id, c.enrollment.course.title " +
            "ORDER BY total DESC")
     List<Object[]> findTopCertifiedCourses(Pageable pageable);
+    
+    // Fetch certificate with enrollment and related entities (for PDF generation)
+    @Query("SELECT c FROM Certificate c " +
+           "LEFT JOIN FETCH c.enrollment e " +
+           "LEFT JOIN FETCH e.user " +
+           "LEFT JOIN FETCH e.course co " +
+           "LEFT JOIN FETCH co.instructor " +
+           "WHERE c.id = :id")
+    Optional<Certificate> findByIdWithEnrollment(@Param("id") Long id);
+    
+    // Fetch certificate by code with enrollment and related entities
+    @Query("SELECT c FROM Certificate c " +
+           "LEFT JOIN FETCH c.enrollment e " +
+           "LEFT JOIN FETCH e.user " +
+           "LEFT JOIN FETCH e.course co " +
+           "LEFT JOIN FETCH co.instructor " +
+           "WHERE c.certificateCode = :code")
+    Optional<Certificate> findByCertificateCodeWithEnrollment(@Param("code") String code);
 }
 

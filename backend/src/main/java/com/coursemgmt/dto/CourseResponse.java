@@ -18,6 +18,11 @@ public class CourseResponse {
     private Long enrollmentCount; // Số lượng học viên đã đăng ký
     private Boolean isFeatured; // Khóa học nổi bật
     private Boolean isPublished; // Khóa học đã được publish
+    private Boolean isEnrolled; // Người dùng hiện tại đã đăng ký khóa học này chưa
+    
+    // Enrollment progress (chỉ có khi lấy my-courses)
+    private Double enrollmentProgress; // Tiến độ học tập 0-100%
+    private String enrollmentStatus; // Trạng thái enrollment: IN_PROGRESS, COMPLETED
 
     // Thông tin lồng nhau
     private CategoryInfo category;
