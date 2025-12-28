@@ -3,16 +3,19 @@ package com.coursemgmt.service;
 import com.coursemgmt.dto.CourseRequest;
 import com.coursemgmt.dto.CourseResponse;
 import com.coursemgmt.dto.CourseStatisticsResponse;
+import com.coursemgmt.dto.CourseAnalyticsResponse;
 import com.coursemgmt.dto.ChapterResponse;
 import com.coursemgmt.dto.LessonResponse;
 import com.coursemgmt.exception.ResourceNotFoundException;
 import com.coursemgmt.model.*;
+import com.coursemgmt.model.EEnrollmentStatus;
 import com.coursemgmt.repository.CategoryRepository;
 import com.coursemgmt.repository.CourseRepository;
 import com.coursemgmt.repository.EnrollmentRepository;
 import com.coursemgmt.repository.UserRepository;
 import com.coursemgmt.repository.ChapterRepository;
 import com.coursemgmt.repository.LessonRepository;
+import com.coursemgmt.repository.TransactionRepository;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -28,12 +31,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 public class CourseService {
@@ -47,6 +53,9 @@ public class CourseService {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @Autowired
     private EnrollmentRepository enrollmentRepository;
 
@@ -55,6 +64,9 @@ public class CourseService {
 
     @Autowired
     private LessonRepository lessonRepository;
+    
+    @Autowired
+    private TransactionRepository transactionRepository;
 
     // Hàm chung để lấy User từ security context
     private User getCurrentUser(UserDetailsImpl userDetails) {
@@ -212,6 +224,29 @@ public class CourseService {
         courseRepository.delete(course);
     }
 
+    // Chức năng 3.1: Chuyển quyền sở hữu khóa học (Admin only)
+    @Transactional
+    public Course transferCourseOwnership(Long courseId, Long newInstructorId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found!"));
+        
+        User newInstructor = userRepository.findById(newInstructorId)
+                .orElseThrow(() -> new RuntimeException("Instructor not found!"));
+        
+        // Kiểm tra user có phải là giảng viên không
+        boolean isLecturer = newInstructor.getRoles().stream()
+                .anyMatch(role -> role.getName() == ERole.ROLE_LECTURER);
+        
+        if (!isLecturer) {
+            throw new RuntimeException("User is not a lecturer!");
+        }
+        
+        course.setInstructor(newInstructor);
+        course.setUpdatedAt(LocalDateTime.now());
+        
+        return courseRepository.save(course);
+    }
+
     // Chức năng 4: Admin duyệt khóa học
     @Transactional
     public Course approveCourse(Long courseId) {
@@ -295,6 +330,67 @@ public class CourseService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+    }
+
+    // Chức năng 6.1: Lấy tất cả khóa học cho Admin (không filter theo published)
+    @Transactional(readOnly = true)
+    public Page<Course> getAllCoursesForAdmin(Pageable pageable, String search, String status) {
+        // Use custom query with JOIN FETCH to eager load instructor and category
+        // This avoids LAZY loading issues when converting to DTO
+        String baseQuery = "SELECT DISTINCT c FROM Course c LEFT JOIN FETCH c.instructor LEFT JOIN FETCH c.category WHERE 1=1";
+        String countQuery = "SELECT COUNT(DISTINCT c) FROM Course c WHERE 1=1";
+        
+        List<String> conditions = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
+        int paramIndex = 1;
+        
+        // Search by title
+        if (search != null && !search.trim().isEmpty()) {
+            conditions.add("LOWER(c.title) LIKE LOWER(?" + paramIndex + ")");
+            params.add("%" + search.trim() + "%");
+            paramIndex++;
+        }
+        
+        // Filter by status
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                ECourseStatus courseStatus = ECourseStatus.valueOf(status.toUpperCase());
+                conditions.add("c.status = ?" + paramIndex);
+                params.add(courseStatus);
+                paramIndex++;
+            } catch (IllegalArgumentException e) {
+                // Invalid status, ignore
+            }
+        }
+        
+        // Build final queries
+        if (!conditions.isEmpty()) {
+            String whereClause = " AND " + String.join(" AND ", conditions);
+            baseQuery += whereClause;
+            countQuery += whereClause;
+        }
+        
+        baseQuery += " ORDER BY c.createdAt DESC";
+        
+        // Execute count query
+        jakarta.persistence.Query countQ = entityManager.createQuery(countQuery);
+        for (int i = 0; i < params.size(); i++) {
+            countQ.setParameter(i + 1, params.get(i));
+        }
+        Long total = (Long) countQ.getSingleResult();
+        
+        // Execute main query with pagination
+        jakarta.persistence.Query query = entityManager.createQuery(baseQuery, Course.class);
+        for (int i = 0; i < params.size(); i++) {
+            query.setParameter(i + 1, params.get(i));
+        }
+        query.setFirstResult((int) pageable.getOffset());
+        query.setMaxResults(pageable.getPageSize());
+        
+        @SuppressWarnings("unchecked")
+        List<Course> courses = query.getResultList();
+        
+        return new PageImpl<>(courses, pageable, total);
     }
 
     // Chức năng 6: Tìm kiếm, lọc, sắp xếp (Public)
@@ -393,6 +489,72 @@ public class CourseService {
 
         return new CourseStatisticsResponse(courseId, course.getTitle(), totalEnrollments);
     }
+    
+    // Chức năng 8: Analytics chi tiết
+    public CourseAnalyticsResponse getCourseAnalytics(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found!"));
+        
+        // Basic stats
+        Long totalEnrollments = enrollmentRepository.countByCourseId(courseId);
+        
+        // Calculate total revenue from successful transactions
+        Double totalRevenue = transactionRepository.calculateRevenueByCourseId(courseId);
+        if (totalRevenue == null) {
+            totalRevenue = 0.0;
+        }
+        
+        // Calculate completion rate
+        Long completedEnrollments = enrollmentRepository.countByCourseIdAndStatus(
+            courseId, 
+            EEnrollmentStatus.COMPLETED
+        );
+        Double completionRate = 0.0;
+        if (totalEnrollments > 0 && completedEnrollments != null) {
+            completionRate = (completedEnrollments * 100.0) / totalEnrollments;
+        }
+        
+        // Average rating (not implemented yet, set to null)
+        Double averageRating = null;
+        
+        // Get current year for monthly data
+        int currentYear = LocalDateTime.now().getYear();
+        
+        // Monthly enrollments
+        List<Object[]> monthlyEnrollmentData = enrollmentRepository.getMonthlyEnrollmentsByCourse(courseId, currentYear);
+        List<CourseAnalyticsResponse.MonthlyEnrollmentData> monthlyEnrollments = new ArrayList<>();
+        for (Object[] data : monthlyEnrollmentData) {
+            Integer month = (Integer) data[0];
+            Long count = ((Number) data[2]).longValue();
+            monthlyEnrollments.add(new CourseAnalyticsResponse.MonthlyEnrollmentData(
+                "Tháng " + month,
+                count
+            ));
+        }
+        
+        // Monthly revenue
+        List<Object[]> monthlyRevenueData = transactionRepository.getMonthlyRevenueByCourse(courseId, currentYear);
+        List<CourseAnalyticsResponse.MonthlyRevenueData> monthlyRevenue = new ArrayList<>();
+        for (Object[] data : monthlyRevenueData) {
+            Integer month = (Integer) data[0];
+            Double revenue = ((Number) data[2]).doubleValue();
+            monthlyRevenue.add(new CourseAnalyticsResponse.MonthlyRevenueData(
+                "Tháng " + month,
+                revenue
+            ));
+        }
+        
+        return new CourseAnalyticsResponse(
+            courseId,
+            course.getTitle(),
+            totalEnrollments,
+            totalRevenue,
+            completionRate,
+            averageRating,
+            monthlyEnrollments,
+            monthlyRevenue
+        );
+    }
 
     // Chức năng 7.1: Đánh dấu khóa học là nổi bật (Featured) - Chỉ Admin
     @Transactional
@@ -430,6 +592,76 @@ public class CourseService {
     // Chức năng 9: Giảng viên tự publish khóa học (Marketplace Model - Self-Publish)
     @Transactional
     public Course publishCourse(Long courseId, UserDetailsImpl userDetails) {
+        System.out.println("========================================");
+        System.out.println("Publish Course Request");
+        System.out.println("Course ID: " + courseId);
+        System.out.println("User ID: " + userDetails.getId());
+        System.out.println("========================================");
+        
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> {
+                    System.err.println("Course not found: " + courseId);
+                    return new RuntimeException("Course not found!");
+                });
+
+        System.out.println("Course found: " + course.getTitle());
+        System.out.println("Current status: " + course.getStatus());
+        System.out.println("Instructor ID: " + (course.getInstructor() != null ? course.getInstructor().getId() : "null"));
+
+        // Authorization: Ensure the current user is the owner of the course (or Admin)
+        boolean isAdmin = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role -> role.equals(ERole.ROLE_ADMIN.name()));
+
+        System.out.println("Is Admin: " + isAdmin);
+        System.out.println("User is instructor: " + (course.getInstructor() != null && course.getInstructor().getId().equals(userDetails.getId())));
+
+        if (!isAdmin && (course.getInstructor() == null || !course.getInstructor().getId().equals(userDetails.getId()))) {
+            System.err.println("Authorization failed: User " + userDetails.getId() + " is not authorized to publish course " + courseId);
+            throw new RuntimeException("You are not authorized to publish this course.");
+        }
+
+        // Validation: Ensure the course is currently in DRAFT status
+        if (course.getStatus() != ECourseStatus.DRAFT) {
+            System.err.println("Invalid status: Course is " + course.getStatus() + ", expected DRAFT");
+            throw new RuntimeException("Only DRAFT courses can be published. Current status: " + course.getStatus());
+        }
+
+        // Validation: Course must have at least 1 chapter before publishing
+        List<Chapter> chapters = chapterRepository.findByCourseIdOrderByPositionAsc(courseId);
+        System.out.println("Chapters count: " + (chapters != null ? chapters.size() : 0));
+        if (chapters == null || chapters.isEmpty()) {
+            System.err.println("Validation failed: Course " + courseId + " has no chapters");
+            throw new RuntimeException("Khóa học phải có ít nhất 1 chương trước khi xuất bản. Vui lòng thêm nội dung cho khóa học.");
+        }
+
+        // Validation: Each chapter must have at least 1 lesson
+        for (Chapter chapter : chapters) {
+            // Load lessons for this chapter
+            List<Lesson> lessons = lessonRepository.findByChapterIdOrderByPositionAsc(chapter.getId());
+            if (lessons == null || lessons.isEmpty()) {
+                System.err.println("Validation failed: Chapter " + chapter.getId() + " (" + chapter.getTitle() + ") has no lessons");
+                throw new RuntimeException("Chương \"" + chapter.getTitle() + "\" phải có ít nhất 1 bài học. Vui lòng thêm bài học cho chương này.");
+            }
+        }
+        
+        System.out.println("Validation passed: Course has " + chapters.size() + " chapter(s) with lessons");
+
+        // Action: Update status to PUBLISHED
+        course.setStatus(ECourseStatus.PUBLISHED);
+        course.setIsPublished(true);
+        course.setUpdatedAt(LocalDateTime.now());
+        
+        Course savedCourse = courseRepository.save(course);
+        System.out.println("Course published successfully. New status: " + savedCourse.getStatus());
+        System.out.println("========================================");
+        
+        return savedCourse;
+    }
+
+    // Chức năng 10: Giảng viên gỡ khóa học (Unpublish) - PUBLISHED -> DRAFT
+    @Transactional
+    public Course unpublishCourse(Long courseId, UserDetailsImpl userDetails) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found!"));
 
@@ -439,21 +671,17 @@ public class CourseService {
                 .anyMatch(role -> role.equals(ERole.ROLE_ADMIN.name()));
 
         if (!isAdmin && !course.getInstructor().getId().equals(userDetails.getId())) {
-            throw new RuntimeException("You are not authorized to publish this course.");
+            throw new RuntimeException("You are not authorized to unpublish this course.");
         }
 
-        // Validation: Ensure the course is currently in DRAFT status
-        if (course.getStatus() != ECourseStatus.DRAFT) {
-            throw new RuntimeException("Only DRAFT courses can be published. Current status: " + course.getStatus());
+        // Validation: Ensure the course is currently in PUBLISHED status
+        if (course.getStatus() != ECourseStatus.PUBLISHED) {
+            throw new RuntimeException("Only PUBLISHED courses can be unpublished. Current status: " + course.getStatus());
         }
 
-        // Optional: Check if course has at least 1 chapter (recommended for marketplace)
-        if (course.getChapters() == null || course.getChapters().isEmpty()) {
-            throw new RuntimeException("Course must have at least one chapter before publishing.");
-        }
-
-        // Action: Update status to PUBLISHED
-        course.setStatus(ECourseStatus.PUBLISHED);
+        // Action: Update status to DRAFT
+        course.setStatus(ECourseStatus.DRAFT);
+        course.setIsPublished(false);
         course.setUpdatedAt(LocalDateTime.now());
         return courseRepository.save(course);
     }

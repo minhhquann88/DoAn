@@ -39,31 +39,49 @@ import { ROUTES, COURSE_LEVEL_LABELS } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import VideoPlayerModal from '@/components/course/VideoPlayerModal';
 import { getCourseContent, type ChapterResponse, type LessonResponse } from '@/services/contentService';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
+import { useCartStore } from '@/stores/cartStore';
+import { useUIStore } from '@/stores/uiStore';
+import { enrollCourse } from '@/services/enrollmentService';
 
 export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { course, isLoading } = useCourse(params.id as string);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const { addToCart, isLoading: isAddingToCart } = useCartStore();
   const [previewVideo, setPreviewVideo] = useState<{ url: string; title: string } | null>(null);
+  const { addToast } = useUIStore();
+  const queryClient = useQueryClient();
+  const [isEnrolling, setIsEnrolling] = React.useState(false);
   
   // Fetch curriculum data (chapters and lessons) - Use public preview endpoint
+  // Only use full content API if user is definitely enrolled (isEnrolled === true)
+  // Otherwise, use preview endpoint to avoid 403 errors
   const { data: curriculum, isLoading: isLoadingCurriculum } = useQuery<ChapterResponse[]>({
-    queryKey: ['course-preview', params.id],
+    queryKey: ['course-preview', params.id, course?.isEnrolled],
     queryFn: async () => {
       try {
-        // First try to fetch full content if authenticated and enrolled
-        if (isAuthenticated) {
+        // Only try to fetch full content if user is authenticated AND definitely enrolled
+        // Check isEnrolled === true (not just truthy) to avoid calling API unnecessarily
+        if (isAuthenticated && course?.isEnrolled === true) {
           try {
             return await getCourseContent(Number(params.id));
-          } catch (error) {
-            // If not enrolled, fall back to preview endpoint
+          } catch (error: any) {
+            // If error occurs even though enrolled, fall back to preview
+            // Silently handle 400/403 errors - they're expected in edge cases
+            if (error.response?.status === 400 || error.response?.status === 403 || error.response?.status === 401) {
+              // Fall back to preview endpoint silently
+            } else {
+              // Log unexpected errors only
+              console.error('Error fetching course content:', error);
+            }
           }
         }
-        // Use public preview endpoint (works for guests)
-        const response = await apiClient.get<ChapterResponse[]>(`/courses/${params.id}/preview`);
+        // Use public preview endpoint (works for guests and non-enrolled users)
+        // This is the default for all users who are not enrolled
+        const response = await apiClient.get<ChapterResponse[]>(`/v1/courses/${params.id}/preview`);
         return response.data;
       } catch (error) {
         console.error('Failed to fetch curriculum:', error);
@@ -74,27 +92,16 @@ export default function CourseDetailPage() {
   });
   
   const handlePreviewLesson = (lesson: LessonResponse) => {
-    // Check if lesson is preview - use isPreview from backend (priority)
-    // Fallback to isFree or videoUrl check for backward compatibility
-    const isPreview = lesson.isPreview === true || 
-                      lesson.isFree === true || 
-                      (lesson.videoUrl != null && lesson.videoUrl !== '');
-    
-    if (isPreview) {
-      // Use videoUrl from backend (backend returns videoUrl for preview lessons)
-      const videoUrl = lesson.videoUrl || lesson.contentUrl;
-      if (videoUrl) {
-        setPreviewVideo({
-          url: videoUrl,
-          title: lesson.title,
-        });
-      } else {
-        // No video URL available
-        console.warn('Preview lesson does not have a video URL');
-      }
+    // Only allow preview if backend explicitly marks it as preview
+    // Only the first lesson of the course is marked as preview
+    if (lesson.isPreview === true && lesson.videoUrl) {
+      // Use videoUrl from backend (backend returns videoUrl only for preview lessons)
+      setPreviewVideo({
+        url: lesson.videoUrl,
+        title: lesson.title,
+      });
     } else {
-      // Not a preview lesson - require authentication
-      // DO NOT redirect if it's a preview lesson (already handled above)
+      // Not a preview lesson - require authentication and enrollment
       if (!isAuthenticated) {
         router.push(ROUTES.LOGIN);
       } else {
@@ -143,19 +150,58 @@ export default function CourseDetailPage() {
     );
   }
   
-  const handleEnroll = () => {
+  const handleEnroll = async () => {
     if (!isAuthenticated) {
       router.push(ROUTES.LOGIN);
       return;
     }
     
-    // Handle enrollment or checkout
-    if (course.price > 0) {
-      router.push(ROUTES.CHECKOUT(course.id.toString()));
-    } else {
-      // Free course - enroll directly
-      // TODO: Implement enrollment API call
+    // If already enrolled, redirect to learn page
+    if (course.isEnrolled) {
       router.push(ROUTES.LEARN(course.id.toString()));
+      return;
+    }
+
+    // Check if course is free (price === 0)
+    if (course.price === 0 || course.price === null) {
+      // Free course - enroll directly without payment
+      try {
+        setIsEnrolling(true);
+        if (!user?.id) {
+          addToast({
+            type: 'error',
+            description: 'Không thể xác định người dùng',
+          });
+          return;
+        }
+        
+        await enrollCourse(course.id, user.id);
+        
+        // Invalidate queries to refresh course data
+        queryClient.invalidateQueries({ queryKey: ['course', params.id] });
+        queryClient.invalidateQueries({ queryKey: ['my-courses'] });
+        queryClient.invalidateQueries({ queryKey: ['featured-courses'] });
+        queryClient.invalidateQueries({ queryKey: ['courses'] });
+        
+        addToast({
+          type: 'success',
+          description: 'Đã đăng ký khóa học thành công!',
+        });
+        
+        // Redirect to learn page
+        router.push(ROUTES.LEARN(course.id.toString()));
+      } catch (error: any) {
+        console.error('Error enrolling in course:', error);
+        addToast({
+          type: 'error',
+          description: error.response?.data?.message || 'Không thể đăng ký khóa học',
+        });
+      } finally {
+        setIsEnrolling(false);
+      }
+    } else {
+      // Paid course - add to cart
+      await addToCart(course.id);
     }
   };
   
@@ -274,37 +320,61 @@ export default function CourseDetailPage() {
                 {/* Enrollment Card */}
                 <Card className="sticky top-4">
                   <CardContent className="p-6 space-y-4">
-                    {/* Price */}
-                    <div className="flex items-baseline gap-3">
-                      {course.discountPrice ? (
-                        <>
+                    {/* Price - Only show if not enrolled */}
+                    {!course.isEnrolled && (
+                      <div className="flex items-baseline gap-3">
+                        {course.discountPrice ? (
+                          <>
+                            <span className="text-3xl font-bold text-primary">
+                              {course.discountPrice.toLocaleString('vi-VN')}đ
+                            </span>
+                            <span className="text-lg text-muted-foreground line-through">
+                              {course.price.toLocaleString('vi-VN')}đ
+                            </span>
+                          </>
+                        ) : course.price > 0 ? (
                           <span className="text-3xl font-bold text-primary">
-                            {course.discountPrice.toLocaleString('vi-VN')}đ
-                          </span>
-                          <span className="text-lg text-muted-foreground line-through">
                             {course.price.toLocaleString('vi-VN')}đ
                           </span>
-                        </>
-                      ) : course.price > 0 ? (
-                        <span className="text-3xl font-bold text-primary">
-                          {course.price.toLocaleString('vi-VN')}đ
-                        </span>
-                      ) : (
-                        <span className="text-3xl font-bold text-accent">
-                          Miễn phí
-                        </span>
-                      )}
-                    </div>
+                        ) : (
+                          <span className="text-3xl font-bold text-accent">
+                            Miễn phí
+                          </span>
+                        )}
+                      </div>
+                    )}
                     
                     {/* CTA Buttons */}
                     <div className="space-y-2">
-                      <Button 
-                        className="w-full" 
-                        size="lg"
-                        onClick={handleEnroll}
-                      >
-                        {course.price > 0 ? 'Mua khóa học' : 'Đăng ký học'}
-                      </Button>
+                      {course.isEnrolled ? (
+                        // User is enrolled - Show "Tiếp tục học" or "Ôn tập lại" button
+                        <Button 
+                          className="w-full bg-green-600 hover:bg-green-700 text-white" 
+                          size="lg"
+                          onClick={() => router.push(ROUTES.LEARN(course.id.toString()))}
+                        >
+                          <PlayCircle className="h-4 w-4 mr-2" />
+                          {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100
+                            ? 'Ôn tập lại'
+                            : 'Tiếp tục học'}
+                        </Button>
+                      ) : (
+                        // User not enrolled - Show appropriate button based on price
+                        <Button 
+                          className="w-full" 
+                          size="lg"
+                          onClick={handleEnroll}
+                          disabled={isAddingToCart || isEnrolling}
+                        >
+                          {isEnrolling 
+                            ? 'Đang đăng ký...' 
+                            : isAddingToCart
+                            ? 'Đang thêm...'
+                            : (course.price === 0 || course.price === null)
+                            ? 'Vào học ngay'
+                            : 'Thêm vào giỏ hàng'}
+                        </Button>
+                      )}
                       <Button 
                         variant="outline" 
                         className="w-full"
@@ -585,25 +655,51 @@ export default function CourseDetailPage() {
             {/* Sidebar - Mobile sticky enrollment card */}
             <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-10">
               <div className="flex items-center justify-between">
-                <div>
-                  {course.discountPrice ? (
-                    <>
-                      <div className="text-2xl font-bold text-primary">
-                        {course.discountPrice.toLocaleString('vi-VN')}đ
-                      </div>
-                      <div className="text-sm text-muted-foreground line-through">
-                        {course.price.toLocaleString('vi-VN')}đ
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-2xl font-bold text-primary">
-                      {course.price > 0 ? `${course.price.toLocaleString('vi-VN')}đ` : 'Miễn phí'}
+                {course.isEnrolled ? (
+                  // User is enrolled - Show "Tiếp tục học" or "Ôn tập lại" button
+                  <Button 
+                    size="lg" 
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => router.push(ROUTES.LEARN(course.id.toString()))}
+                  >
+                    <PlayCircle className="h-4 w-4 mr-2" />
+                    {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100
+                      ? 'Ôn tập lại'
+                      : 'Tiếp tục học'}
+                  </Button>
+                ) : (
+                  <>
+                    <div>
+                      {course.discountPrice ? (
+                        <>
+                          <div className="text-2xl font-bold text-primary">
+                            {course.discountPrice.toLocaleString('vi-VN')}đ
+                          </div>
+                          <div className="text-sm text-muted-foreground line-through">
+                            {course.price.toLocaleString('vi-VN')}đ
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-2xl font-bold text-primary">
+                          {course.price > 0 ? `${course.price.toLocaleString('vi-VN')}đ` : 'Miễn phí'}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <Button size="lg" onClick={handleEnroll}>
-                  {course.price > 0 ? 'Mua ngay' : 'Đăng ký'}
-                </Button>
+                    <Button 
+                      size="lg" 
+                      onClick={handleEnroll}
+                      disabled={isAddingToCart || isEnrolling}
+                    >
+                      {isEnrolling 
+                        ? 'Đang đăng ký...' 
+                        : isAddingToCart
+                        ? 'Đang thêm...'
+                        : (course.price === 0 || course.price === null)
+                        ? 'Vào học ngay'
+                        : 'Thêm vào giỏ hàng'}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>

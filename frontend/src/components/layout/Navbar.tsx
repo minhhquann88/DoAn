@@ -17,50 +17,71 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
+import { useCartStore } from '@/stores/cartStore';
 import { useUIStore } from '@/stores/uiStore';
 import { ROUTES } from '@/lib/constants';
+import { useQuery } from '@tanstack/react-query';
+import { getUnreadCount, getNotifications, markAsRead, markAllAsRead, type Notification } from '@/services/notificationService';
 
 export function Navbar() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuthStore();
+  const { cart, fetchCart } = useCartStore();
   const { toggleTheme, theme } = useUIStore();
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [notificationCount, setNotificationCount] = React.useState(0);
-  const [cartCount, setCartCount] = React.useState(0);
-  const [isLoadingNotifications, setIsLoadingNotifications] = React.useState(false);
+  
+  // Fetch unread notification count
+  const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: getUnreadCount,
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+  
+  // Fetch notifications
+  const { data: notificationsData, refetch: refetchNotifications } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => getNotifications(0, 10),
+    enabled: isAuthenticated,
+  });
+  
+  const notifications = notificationsData?.content || [];
+  
+  // Get cart count from store
+  const cartCount = cart?.itemCount || 0;
   
   React.useEffect(() => {
-    if (isAuthenticated) {
-      // TODO: Fetch notification count from API
-      // const fetchNotifications = async () => {
-      //   try {
-      //     setIsLoadingNotifications(true);
-      //     const response = await fetch('/api/notifications/unread-count');
-      //     const data = await response.json();
-      //     setNotificationCount(data.count || 0);
-      //   } catch (error) {
-      //     console.error('Error fetching notifications:', error);
-      //   } finally {
-      //     setIsLoadingNotifications(false);
-      //   }
-      // };
-      // fetchNotifications();
+    // Only fetch cart if user is fully authenticated and is a student
+    // Check if token exists in localStorage before making API call
+    if (isAuthenticated && user?.role === 'ROLE_STUDENT' && user?.id) {
+      // Check if token exists
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem('auth_token') 
+        : null;
       
-      // TODO: Fetch cart count from API
-      // const fetchCartCount = async () => {
-      //   try {
-      //     const response = await fetch('/api/cart/count');
-      //     const data = await response.json();
-      //     setCartCount(data.count || 0);
-      //   } catch (error) {
-      //     console.error('Error fetching cart count:', error);
-      //   }
-      // };
-      // if (user?.role === 'ROLE_STUDENT') {
-      //   fetchCartCount();
-      // }
+      if (!token) {
+        // No token, skip fetching cart
+        return;
+      }
+      
+      // Small delay to ensure authentication token is ready
+      const timer = setTimeout(() => {
+        fetchCart().catch((error) => {
+          // Silently handle 400/401 errors (user might not be fully authenticated yet)
+          if (error.response?.status === 400 || error.response?.status === 401) {
+            // Don't log these errors - they're expected during initial load
+            return;
+          }
+          // Only log unexpected errors
+          if (error.response?.status !== 400 && error.response?.status !== 401) {
+            console.error('Error fetching cart:', error);
+          }
+        });
+      }, 200); // Increased delay to 200ms to ensure token is set
+      
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, user?.role]);
+  }, [isAuthenticated, user?.role, user?.id, fetchCart]);
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,30 +150,113 @@ export function Navbar() {
           {isAuthenticated ? (
             <>
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                {notificationCount > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                >
-                    {notificationCount > 99 ? '99+' : notificationCount}
-                </Badge>
-                )}
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <Badge 
+                        variant="destructive" 
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                      >
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-80 p-0" align="end">
+                  <div className="flex items-center justify-between p-4 border-b">
+                    <h3 className="font-semibold">Thông báo</h3>
+                    {unreadCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await markAllAsRead();
+                            refetchUnreadCount();
+                            refetchNotifications();
+                          } catch (error) {
+                            console.error('Error marking all as read:', error);
+                          }
+                        }}
+                      >
+                        Đánh dấu tất cả đã đọc
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground">
+                        <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p>Chưa có thông báo nào</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {notifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`p-4 hover:bg-muted/50 cursor-pointer transition-colors ${
+                              !notification.isRead ? 'bg-primary/5' : ''
+                            }`}
+                            onClick={async () => {
+                              if (!notification.isRead) {
+                                try {
+                                  await markAsRead(notification.id);
+                                  refetchUnreadCount();
+                                  refetchNotifications();
+                                } catch (error) {
+                                  console.error('Error marking as read:', error);
+                                }
+                              }
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`h-2 w-2 rounded-full mt-2 flex-shrink-0 ${
+                                !notification.isRead ? 'bg-primary' : 'bg-transparent'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm ${!notification.isRead ? 'font-semibold' : ''}`}>
+                                  {notification.message}
+                                </p>
+                                {notification.courseTitle && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {notification.courseTitle}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {new Date(notification.createdAt).toLocaleString('vi-VN')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
               
               {/* Shopping Cart - Only for students */}
               {user?.role === 'ROLE_STUDENT' && (
-                <Button variant="ghost" size="icon" className="relative">
-                  <ShoppingCart className="h-5 w-5" />
-                  {cartCount > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                  >
-                      {cartCount > 99 ? '99+' : cartCount}
-                  </Badge>
-                  )}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="relative"
+                  asChild
+                >
+                  <Link href={ROUTES.STUDENT.CART}>
+                    <ShoppingCart className="h-5 w-5" />
+                    {cartCount > 0 && (
+                      <Badge 
+                        variant="destructive" 
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                      >
+                        {cartCount > 99 ? '99+' : cartCount}
+                      </Badge>
+                    )}
+                  </Link>
                 </Button>
               )}
               

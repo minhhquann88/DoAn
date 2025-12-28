@@ -40,6 +40,13 @@ public class CertificateService {
     private PdfGeneratorService pdfGeneratorService; // Service để generate PDF
 
     /**
+     * Check if certificate exists for enrollment (no transaction, no exception)
+     */
+    public boolean existsByEnrollmentId(Long enrollmentId) {
+        return certificateRepository.existsByEnrollmentId(enrollmentId);
+    }
+    
+    /**
      * Tự động cấp chứng chỉ khi hoàn thành khóa học
      */
     @Transactional

@@ -11,46 +11,48 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ROUTES } from '@/lib/constants';
+import apiClient from '@/lib/api';
+import type { Course } from '@/types';
 
 export default function MyCoursesPage() {
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [sortBy, setSortBy] = React.useState('recent');
-  const [courses, setCourses] = React.useState<Array<{
-    id: number;
-    title: string;
-    thumbnail: string | null;
-    instructor: string;
-    progress: number;
-    totalLessons: number;
-    completedLessons: number;
-    enrolledAt: string;
-    lastAccessed: string;
-    status: string;
-    category: string;
-  }>>([]);
+  const [courses, setCourses] = React.useState<Course[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   
   React.useEffect(() => {
-    // TODO: Fetch data from API
-    // const fetchCourses = async () => {
-    //   try {
-    //     const response = await fetch('/api/enrollments/my-courses');
-    //     const data = await response.json();
-    //     setCourses(data);
-    //   } catch (error) {
-    //     console.error('Error fetching courses:', error);
-    //   } finally {
-    //     setIsLoading(false);
-    //   }
-    // };
-    // fetchCourses();
-    setIsLoading(false);
+    const fetchCourses = async () => {
+      try {
+        console.log('Fetching my courses...');
+        const response = await apiClient.get<Course[]>('/v1/courses/my-courses');
+        console.log('MY COURSES DATA:', response.data);
+        
+        // Ensure we have an array
+        if (Array.isArray(response.data)) {
+          setCourses(response.data);
+        } else {
+          console.warn('Response is not an array:', response.data);
+          setCourses([]);
+        }
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        setCourses([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCourses();
   }, []);
   
-  // Filter courses by status
-  const inProgressCourses = courses.filter(c => c.status === 'IN_PROGRESS');
-  const completedCourses = courses.filter(c => c.status === 'COMPLETED');
+  // Filter courses by status using enrollmentStatus
+  const inProgressCourses = Array.isArray(courses) 
+    ? courses.filter(c => !c.enrollmentStatus || c.enrollmentStatus === 'IN_PROGRESS' || (c.enrollmentProgress ?? 0) < 100)
+    : [];
+  const completedCourses = Array.isArray(courses)
+    ? courses.filter(c => c.enrollmentStatus === 'COMPLETED' || (c.enrollmentProgress ?? 0) >= 100)
+    : [];
   
   return (
     <div className="min-h-screen bg-background">
@@ -137,10 +139,10 @@ export default function MyCoursesPage() {
           <TabsContent value="all">
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
-            ) : courses.length === 0 ? (
+            ) : !Array.isArray(courses) || courses.length === 0 ? (
               <div className="text-center py-12">
                 <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">Chưa có khóa học nào</h3>
+                <h3 className="text-lg font-semibold mb-2">Bạn chưa mua khóa học nào</h3>
                 <p className="text-muted-foreground mb-6">
                   Bắt đầu học một khóa học mới ngay hôm nay!
                 </p>
@@ -152,28 +154,40 @@ export default function MyCoursesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {courses.map((course) => (
                   <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                      <BookOpen className="h-16 w-16 text-primary/50" />
+                    <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center relative overflow-hidden">
+                      {course.imageUrl ? (
+                        <img 
+                          src={course.imageUrl} 
+                          alt={course.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <BookOpen className="h-16 w-16 text-primary/50" />
+                      )}
                     </div>
                     <CardHeader>
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <Badge variant={course.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                          {course.status === 'COMPLETED' ? 'Hoàn thành' : 'Đang học'}
-                        </Badge>
-                        <Badge variant="outline">{course.category}</Badge>
+                        <Badge variant="secondary">Đang học</Badge>
+                        {course.category && (
+                          <Badge variant="outline">{course.category.name}</Badge>
+                        )}
                       </div>
                       <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                      <CardDescription>{course.instructor}</CardDescription>
+                      <CardDescription>
+                        {course.instructor?.fullName || 'Giảng viên'}
+                      </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">Tiến độ</span>
-                          <span className="font-medium">{course.progress}%</span>
+                          <span className="font-medium">{Math.round(course.enrollmentProgress ?? 0)}%</span>
                         </div>
-                        <Progress value={course.progress} />
+                        <Progress value={course.enrollmentProgress ?? 0} />
                         <p className="text-xs text-muted-foreground">
-                          {course.completedLessons} / {course.totalLessons} bài học
+                          {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100
+                            ? 'Đã hoàn thành'
+                            : 'Bắt đầu học ngay'}
                         </p>
                       </div>
                       
@@ -181,7 +195,7 @@ export default function MyCoursesPage() {
                         <Button asChild className="flex-1">
                           <Link href={ROUTES.LEARN(course.id.toString())}>
                             <PlayCircle className="h-4 w-4 mr-2" />
-                            {course.status === 'COMPLETED' ? 'Ôn tập' : 'Tiếp tục'}
+                            Tiếp tục học
                           </Link>
                         </Button>
                         <Button variant="outline" asChild>
@@ -189,11 +203,6 @@ export default function MyCoursesPage() {
                             Chi tiết
                           </Link>
                         </Button>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>Truy cập gần nhất: {new Date(course.lastAccessed).toLocaleDateString('vi-VN')}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -213,11 +222,11 @@ export default function MyCoursesPage() {
                           <div className="flex items-start justify-between gap-4 mb-2">
                             <div>
                               <h3 className="font-semibold text-lg mb-1">{course.title}</h3>
-                              <p className="text-sm text-muted-foreground">{course.instructor}</p>
+                              <p className="text-sm text-muted-foreground">{course.instructor?.fullName || course.instructor}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant={course.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                                {course.status === 'COMPLETED' ? 'Hoàn thành' : 'Đang học'}
+                              <Badge variant={course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100 ? 'default' : 'secondary'}>
+                                {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100 ? 'Hoàn thành' : 'Đang học'}
                               </Badge>
                             </div>
                           </div>
@@ -225,11 +234,13 @@ export default function MyCoursesPage() {
                           <div className="space-y-2 mb-4">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-muted-foreground">Tiến độ</span>
-                              <span className="font-medium">{course.progress}%</span>
+                              <span className="font-medium">{Math.round(course.enrollmentProgress ?? 0)}%</span>
                             </div>
-                            <Progress value={course.progress} className="h-2" />
+                            <Progress value={course.enrollmentProgress ?? 0} className="h-2" />
                             <p className="text-xs text-muted-foreground">
-                              {course.completedLessons} / {course.totalLessons} bài học hoàn thành
+                              {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100
+                                ? 'Đã hoàn thành khóa học'
+                                : 'Đang học tập'}
                             </p>
                           </div>
                           
@@ -241,7 +252,7 @@ export default function MyCoursesPage() {
                               <Button asChild>
                                 <Link href={ROUTES.LEARN(course.id.toString())}>
                                   <PlayCircle className="h-4 w-4 mr-2" />
-                                  {course.status === 'COMPLETED' ? 'Ôn tập' : 'Tiếp tục học'}
+                                  {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100 ? 'Ôn tập' : 'Tiếp tục học'}
                                 </Link>
                               </Button>
                               <Button variant="outline" asChild>

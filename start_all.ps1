@@ -9,11 +9,13 @@ Write-Host ""
 # Kiểm tra .env file cho frontend
 if (-not (Test-Path ".env")) {
     Write-Host "⚠️  Tạo file .env cho frontend..." -ForegroundColor Yellow
+    Write-Host "   ⚠️  Vui lòng điền GEMINI_API_KEY vào file .env" -ForegroundColor Yellow
     @"
 # Gemini API Key cho Frontend (React + Vite)
-VITE_GEMINI_API_KEY=AIzaSyCnTIWymkl8U_-u_WgFTAF4NRxqO3VwVHI
+# Lấy API key từ: https://ai.google.dev/
+VITE_GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
 "@ | Out-File -FilePath ".env" -Encoding UTF8
-    Write-Host "✅ Đã tạo file .env" -ForegroundColor Green
+    Write-Host "✅ Đã tạo file .env (vui lòng điền API key)" -ForegroundColor Green
 }
 
 # 1. Backend Spring Boot

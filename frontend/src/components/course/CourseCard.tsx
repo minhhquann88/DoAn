@@ -2,12 +2,14 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Clock, Users, Star, BookOpen, TrendingUp } from 'lucide-react';
+import { Clock, Users, Star, BookOpen, TrendingUp, PlayCircle } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
 import { Course } from '@/types';
 import { ROUTES, COURSE_LEVEL_LABELS } from '@/lib/constants';
 
@@ -17,13 +19,20 @@ interface CourseCardProps {
 }
 
 export function CourseCard({ course, priority = false }: CourseCardProps) {
+  const router = useRouter();
   const discountPercentage = course.discountPrice 
     ? Math.round(((course.price - course.discountPrice) / course.price) * 100)
     : 0;
   
+  const handleCardClick = () => {
+    router.push(ROUTES.COURSE_DETAIL(course.id.toString()));
+  };
+  
   return (
-    <Link href={ROUTES.COURSE_DETAIL(course.id.toString())}>
-      <Card className="group h-full overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <Card 
+      className="group h-full overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer"
+      onClick={handleCardClick}
+    >
         {/* Thumbnail */}
         <div className="relative aspect-video w-full overflow-hidden bg-muted">
           {course.imageUrl || course.thumbnail ? (
@@ -130,39 +139,68 @@ export function CourseCard({ course, priority = false }: CourseCardProps) {
           </div>
         </CardContent>
         
-        <CardFooter className="p-4 pt-0 flex items-center justify-between">
-          {/* Price */}
-          <div className="flex items-baseline gap-2">
-            {course.discountPrice ? (
-              <>
-                <span className="text-2xl font-bold text-primary">
-                  {course.discountPrice.toLocaleString('vi-VN')}đ
-                </span>
-                <span className="text-sm text-muted-foreground line-through">
-                  {course.price.toLocaleString('vi-VN')}đ
-                </span>
-              </>
-            ) : course.price > 0 ? (
-              <span className="text-2xl font-bold text-primary">
-                {course.price.toLocaleString('vi-VN')}đ
-              </span>
-            ) : (
-              <span className="text-2xl font-bold text-accent">
-                Miễn phí
-              </span>
-            )}
-          </div>
-          
-          {/* CTA Button */}
-          <Button 
-            size="sm" 
-            className="group-hover:bg-primary group-hover:text-primary-foreground"
-          >
-            Xem chi tiết
-          </Button>
+        <CardFooter className="p-4 pt-0">
+          {course.isEnrolled ? (
+            // User is enrolled - Show progress and "Tiếp tục học" button
+            <div className="w-full space-y-3">
+              {course.enrollmentProgress !== undefined && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Tiến độ</span>
+                    <span className="font-medium">{Math.round(course.enrollmentProgress)}%</span>
+                  </div>
+                  <Progress value={course.enrollmentProgress} className="h-2" />
+                </div>
+              )}
+              <Button 
+                size="sm" 
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                asChild
+              >
+                <Link href={ROUTES.LEARN(course.id.toString())} onClick={(e) => e.stopPropagation()}>
+                  <PlayCircle className="h-4 w-4 mr-2" />
+                  {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100
+                    ? 'Ôn tập lại'
+                    : 'Tiếp tục học'}
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between w-full">
+              {/* Price */}
+              <div className="flex items-baseline gap-2">
+                {course.discountPrice ? (
+                  <>
+                    <span className="text-2xl font-bold text-primary">
+                      {course.discountPrice.toLocaleString('vi-VN')}đ
+                    </span>
+                    <span className="text-sm text-muted-foreground line-through">
+                      {course.price.toLocaleString('vi-VN')}đ
+                    </span>
+                  </>
+                ) : course.price > 0 ? (
+                  <span className="text-2xl font-bold text-primary">
+                    {course.price.toLocaleString('vi-VN')}đ
+                  </span>
+                ) : (
+                  <span className="text-2xl font-bold text-accent">
+                    Miễn phí
+                  </span>
+                )}
+              </div>
+              
+              {/* CTA Button */}
+              <Button 
+                size="sm" 
+                className="group-hover:bg-primary group-hover:text-primary-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Xem chi tiết
+              </Button>
+            </div>
+          )}
         </CardFooter>
       </Card>
-    </Link>
   );
 }
 

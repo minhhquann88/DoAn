@@ -16,6 +16,11 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - Thêm token vào header
 apiClient.interceptors.request.use(
   (config) => {
+    // Nếu là FormData, không set Content-Type (browser sẽ tự động set với boundary)
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+    
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
       if (token) {
@@ -64,10 +69,31 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Skip logging for cart API 400 errors when user is not authenticated
+    // These are expected during initial page load
+    const isCartApi = error.config?.url?.includes('/cart');
+    const isContentApi = error.config?.url?.includes('/content/courses');
+    const is400Error = error.response?.status === 400;
+    const is403Error = error.response?.status === 403;
+    
     // Log error details for debugging (skip 400 validation errors to reduce console noise)
     if (error.response) {
-      // Only log non-400 errors (500, 401, 403, etc.) - validation errors (400) are handled in UI
-      if (error.response.status !== 400) {
+      // Skip logging cart 400 errors (expected when not authenticated)
+      if (isCartApi && is400Error) {
+        // Silently handle - don't log to console
+        return Promise.reject(error);
+      }
+      
+      // Skip logging content API 400/403 errors (expected when user is not enrolled)
+      if (isContentApi && (is400Error || is403Error)) {
+        // Silently handle - don't log to console
+        // These errors are expected and handled gracefully by the frontend
+        return Promise.reject(error);
+      }
+      
+      // Only log non-400 errors (500, etc.) - validation errors (400) and auth errors (401/403) are handled in UI
+      // Skip logging 403 errors from content API (already handled above)
+      if (error.response.status !== 400 && !(isContentApi && is403Error)) {
         console.error('API Error Response:', {
           status: error.response.status,
           statusText: error.response.statusText,

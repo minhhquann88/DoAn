@@ -135,8 +135,10 @@ export const ROUTES = {
   STUDENT: {
     DASHBOARD: '/student',
     MY_COURSES: '/student/my-courses',
+    CART: '/student/cart',
     PROGRESS: '/student/progress',
     CERTIFICATES: '/student/certificates',
+    TRANSACTIONS: '/student/transactions',
     PROFILE: '/student/profile',
   },
   
@@ -146,12 +148,21 @@ export const ROUTES = {
     COURSES: '/instructor/courses',
     CREATE_COURSE: '/instructor/courses/create',
     EDIT_COURSE: (id: string) => `/instructor/courses/${id}/edit`,
+    COURSE_CONTENT: (id: string) => `/instructor/courses/${id}/content`,
     STUDENTS: '/instructor/students',
     EARNINGS: '/instructor/earnings',
     PROFILE: '/instructor/profile',
   },
   
   // Admin Routes
+  ADMIN: {
+    DASHBOARD: '/admin',
+    USERS: '/admin/users',
+    CATEGORIES: '/admin/categories',
+    COURSES: '/admin/courses',
+    TRANSACTIONS: '/admin/transactions',
+  },
+  // Backward compatibility
   ADMIN_DASHBOARD: '/admin',
   ADMIN_COURSES: '/admin/courses',
   ADMIN_INSTRUCTORS: '/admin/instructors',
@@ -172,6 +183,7 @@ export const ROUTES = {
   INSTRUCTOR_COURSES: '/instructor/courses',
   INSTRUCTOR_CREATE_COURSE: '/instructor/courses/create',
   INSTRUCTOR_EDIT_COURSE: (id: string) => `/instructor/courses/${id}/edit`,
+  INSTRUCTOR_COURSE_CONTENT: (id: string) => `/instructor/courses/${id}/content`,
   INSTRUCTOR_STUDENTS: '/instructor/students',
   INSTRUCTOR_EARNINGS: '/instructor/earnings',
   INSTRUCTOR_PROFILE: '/instructor/profile',

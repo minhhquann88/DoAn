@@ -22,8 +22,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     // Tìm theo course
     Page<Transaction> findByCourseId(Long courseId, Pageable pageable);
     
-    // Tìm theo transaction code
+    // Tìm theo transaction code (có thể có nhiều transactions cùng code khi thanh toán giỏ hàng)
     Optional<Transaction> findByTransactionCode(String transactionCode);
+    
+    // Tìm tất cả transactions theo transaction code (cho cart checkout với nhiều courses)
+    List<Transaction> findAllByTransactionCode(String transactionCode);
     
     // Tìm theo status
     Page<Transaction> findByStatus(ETransactionStatus status, Pageable pageable);
@@ -84,4 +87,25 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+    
+    // Tính doanh thu từ transactions thành công của một course cụ thể
+    @Query("SELECT SUM(t.amount) FROM Transaction t " +
+           "WHERE t.status = 'SUCCESS' AND t.course.id = :courseId")
+    Double calculateRevenueByCourseId(@Param("courseId") Long courseId);
+    
+    // Doanh thu theo tháng cho một course cụ thể
+    @Query("SELECT MONTH(t.createdAt) as month, " +
+           "YEAR(t.createdAt) as year, " +
+           "SUM(t.amount) as revenue " +
+           "FROM Transaction t " +
+           "WHERE t.status = 'SUCCESS' AND t.course.id = :courseId AND YEAR(t.createdAt) = :year " +
+           "GROUP BY MONTH(t.createdAt), YEAR(t.createdAt) " +
+           "ORDER BY month")
+    List<Object[]> getMonthlyRevenueByCourse(@Param("courseId") Long courseId, @Param("year") int year);
+    
+    // Lấy tất cả transactions của instructor (để lọc và sắp xếp)
+    @Query("SELECT t FROM Transaction t " +
+           "WHERE t.course.instructor.id = :instructorId " +
+           "ORDER BY t.createdAt DESC")
+    List<Transaction> findByInstructorIdOrderByCreatedAtDesc(@Param("instructorId") Long instructorId);
 }

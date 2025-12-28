@@ -19,15 +19,18 @@ public class UserDetailsImpl implements UserDetails {
     private String email;
     @JsonIgnore
     private String password;
+    private Boolean enabled;
 
     private Collection<? extends GrantedAuthority> authorities;
 
     public UserDetailsImpl(Long id, String username, String email, String password,
+                           Boolean enabled,
                            Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.username = username;
         this.email = email;
         this.password = password;
+        this.enabled = enabled != null ? enabled : true; // Default to true if null
         this.authorities = authorities;
     }
 
@@ -41,6 +44,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getUsername(),
                 user.getEmail(),
                 user.getPassword(),
+                user.getIsEnabled(),
                 authorities);
     }
 
@@ -84,9 +88,9 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        // Bạn có thể dùng trường isEnabled của User ở đây
-        // return user.isEnabled();
-        return true;
+        // Check if user is enabled from the User entity
+        // This is set when building UserDetailsImpl
+        return enabled;
     }
 
     @Override

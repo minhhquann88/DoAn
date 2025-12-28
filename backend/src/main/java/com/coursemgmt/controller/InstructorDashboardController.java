@@ -3,6 +3,8 @@ package com.coursemgmt.controller;
 import com.coursemgmt.dto.InstructorDashboardStatsDTO;
 import com.coursemgmt.dto.InstructorCourseDTO;
 import com.coursemgmt.dto.InstructorChartDataDTO;
+import com.coursemgmt.dto.InstructorEarningsDTO;
+import com.coursemgmt.dto.InstructorStudentDTO;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.InstructorDashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +63,34 @@ public class InstructorDashboardController {
     ) {
         InstructorChartDataDTO chartData = instructorDashboardService.getChartData(userDetails.getId());
         return ResponseEntity.ok(chartData);
+    }
+    
+    /**
+     * 4. Lấy dữ liệu doanh thu chi tiết
+     * GET /api/instructor/earnings
+     * Security: Chỉ Instructor mới có quyền truy cập
+     */
+    @GetMapping("/earnings")
+    @PreAuthorize("hasRole('LECTURER')")
+    public ResponseEntity<InstructorEarningsDTO> getEarnings(
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        InstructorEarningsDTO earnings = instructorDashboardService.getEarnings(userDetails.getId());
+        return ResponseEntity.ok(earnings);
+    }
+    
+    /**
+     * 5. Lấy danh sách học viên đã đăng ký các khóa học
+     * GET /api/instructor/students
+     * Security: Chỉ Instructor mới có quyền truy cập
+     */
+    @GetMapping("/students")
+    @PreAuthorize("hasRole('LECTURER')")
+    public ResponseEntity<List<InstructorStudentDTO>> getStudents(
+            @AuthenticationPrincipal UserDetailsImpl userDetails
+    ) {
+        List<InstructorStudentDTO> students = instructorDashboardService.getStudents(userDetails.getId());
+        return ResponseEntity.ok(students);
     }
 }
 

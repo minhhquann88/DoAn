@@ -12,6 +12,11 @@ __pycache__/
 .env.*.local
 my_config.env
 
+# Application properties with sensitive data
+backend/src/main/resources/application.properties
+backend/src/main/resources/application-*.properties
+!backend/src/main/resources/application.properties.example
+
 # IDE
 .vscode/
 .idea/

@@ -18,36 +18,114 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/authStore';
 import { ROUTES } from '@/lib/constants';
-import { useMyEnrollments } from '@/hooks/useEnrollments';
+import apiClient from '@/lib/api';
+import type { Course } from '@/types';
+import { CourseCard } from '@/components/course/CourseCard';
+import { getMyCertificates, downloadCertificateByCode, type Certificate } from '@/services/paymentService';
+import { useQuery } from '@tanstack/react-query';
+import { Download, FileText } from 'lucide-react';
+import { useUIStore } from '@/stores/uiStore';
+import { studentService } from '@/services/studentService';
 
 export default function StudentDashboard() {
   const { user } = useAuthStore();
-  const { enrollments, activeCount, averageProgress, isLoading } = useMyEnrollments();
+  const { addToast } = useUIStore();
+  const [courses, setCourses] = React.useState<Course[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   
-  // Map enrollments to course format for UI
-  const enrolledCourses = React.useMemo(() => {
-    return enrollments.map((enrollment) => ({
-      id: enrollment.courseId,
-      title: enrollment.courseTitle || enrollment.course?.title || 'Khóa học',
-      thumbnail: enrollment.course?.imageUrl || enrollment.course?.thumbnail || null,
-      instructor: enrollment.instructorName || 'Giảng viên',
-      progress: Math.round(enrollment.progress || 0),
-      totalLessons: enrollment.totalLessons || 0,
-      completedLessons: enrollment.completedLessons || 0,
-      lastAccessed: enrollment.lastAccessedAt 
-        ? new Date(enrollment.lastAccessedAt).toLocaleDateString('vi-VN')
-        : enrollment.enrolledAt 
-        ? new Date(enrollment.enrolledAt).toLocaleDateString('vi-VN')
-        : '',
-      category: enrollment.course?.category || 'Khác',
-      status: enrollment.status,
-    }));
-  }, [enrollments]);
+  // Fetch my courses from API
+  React.useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        console.log('Fetching my courses for dashboard...');
+        const response = await apiClient.get<Course[]>('/v1/courses/my-courses');
+        console.log('Dashboard - MY COURSES DATA:', response.data);
+        
+        if (Array.isArray(response.data)) {
+          setCourses(response.data);
+        } else {
+          console.warn('Response is not an array:', response.data);
+          setCourses([]);
+        }
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        setCourses([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCourses();
+  }, []);
   
-  // Filter active courses (in progress, not completed)
-  const activeCourses = enrolledCourses.filter(
-    course => (course.progress > 0 && course.progress < 100) || course.status === 'ACTIVE'
-  );
+  // Fetch dashboard stats
+  const { data: dashboardStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['student-dashboard-stats', user?.id],
+    queryFn: () => studentService.getDashboardStats(),
+    enabled: !!user?.id,
+  });
+
+  // Fetch certificates
+  const { data: certificatesData } = useQuery({
+    queryKey: ['my-certificates', user?.id],
+    queryFn: async () => {
+      if (!user?.id) throw new Error('User not found');
+      return await getMyCertificates(user.id, { page: 0, size: 100 });
+    },
+    enabled: !!user?.id,
+  });
+  
+  const certificates = certificatesData?.content || [];
+
+  // Calculate stats from API or fallback to local calculation
+  const activeCount = dashboardStats?.activeCourses ?? courses.filter(c => !c.enrollmentStatus || c.enrollmentStatus === 'IN_PROGRESS' || (c.enrollmentProgress ?? 0) < 100).length;
+  const completedCount = certificates.length;
+  const averageProgress = dashboardStats?.averageProgress ?? (courses.length > 0
+    ? Math.round(courses.reduce((sum, c) => sum + (c.enrollmentProgress ?? 0), 0) / courses.length)
+    : 0);
+  const totalStudyHours = dashboardStats?.totalStudyHours ?? 0;
+  const weeklyStudyHours = dashboardStats?.weeklyStudyHours ?? 0;
+  const totalCertificates = dashboardStats?.totalCertificates ?? certificates.length;
+  
+  // Filter active courses (in-progress courses)
+  const activeCourses = courses.filter(c => !c.enrollmentStatus || c.enrollmentStatus === 'IN_PROGRESS' || (c.enrollmentProgress ?? 0) < 100);
+  
+  const handleDownloadCertificate = async (certificate: Certificate) => {
+    try {
+      if (certificate.pdfUrl) {
+        window.open(certificate.pdfUrl, '_blank');
+      } else if (certificate.certificateCode) {
+        const blob = await downloadCertificateByCode(certificate.certificateCode);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `certificate-${certificate.certificateCode}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        addToast({
+          type: 'success',
+          description: 'Đã tải chứng chỉ thành công!',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error downloading certificate:', error);
+      addToast({
+        type: 'error',
+        description: error.response?.data?.message || 'Không thể tải chứng chỉ',
+      });
+    }
+  };
+  
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
   
   return (
     <div className="min-h-screen bg-background">
@@ -86,7 +164,9 @@ export default function StudentDashboard() {
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{activeCount}</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '...' : activeCount}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {activeCount === 0 ? 'Chưa có khóa học' : 'Khóa học đang học'}
               </p>
@@ -101,9 +181,11 @@ export default function StudentDashboard() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">42.5</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '...' : totalStudyHours.toFixed(1)}
+              </div>
               <p className="text-xs text-muted-foreground">
-                +5.2 giờ tuần này
+                {statsLoading ? 'Đang tải...' : (weeklyStudyHours > 0 ? `+${weeklyStudyHours.toFixed(1)} giờ tuần này` : 'Chưa có dữ liệu tuần này')}
               </p>
             </CardContent>
           </Card>
@@ -116,16 +198,18 @@ export default function StudentDashboard() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{averageProgress}%</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '...' : Math.round(averageProgress)}%
+              </div>
               <p className="text-xs text-muted-foreground">
-                {enrollments.length > 0 
-                  ? `Từ ${enrollments.length} khóa học` 
+                {courses.length > 0 
+                  ? `Từ ${courses.length} khóa học` 
                   : 'Chưa có dữ liệu'}
               </p>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => window.location.href = ROUTES.STUDENT.CERTIFICATES}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
                 Chứng chỉ
@@ -133,9 +217,11 @@ export default function StudentDashboard() {
               <Award className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">5</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '...' : totalCertificates}
+              </div>
               <p className="text-xs text-muted-foreground">
-                +2 tháng này
+                {totalCertificates === 0 ? 'Chưa có chứng chỉ' : `${totalCertificates} chứng chỉ đã đạt được`}
               </p>
             </CardContent>
           </Card>
@@ -146,6 +232,7 @@ export default function StudentDashboard() {
           <TabsList>
             <TabsTrigger value="continue">Tiếp tục học</TabsTrigger>
             <TabsTrigger value="all">Tất cả khóa học</TabsTrigger>
+            <TabsTrigger value="certificates">Chứng chỉ của tôi</TabsTrigger>
             <TabsTrigger value="activity">Hoạt động gần đây</TabsTrigger>
           </TabsList>
           
@@ -165,58 +252,15 @@ export default function StudentDashboard() {
                 </Button>
               </div>
             ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {activeCourses.map((course) => (
-                  <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                      <PlayCircle className="h-16 w-16 text-primary/50" />
-                    </div>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <Badge variant="secondary" className="mb-2">
-                            {course.category}
-                          </Badge>
-                          <CardTitle className="line-clamp-2 mb-2">
-                            {course.title}
-                          </CardTitle>
-                          <CardDescription>
-                            Giảng viên: {course.instructor}
-                          </CardDescription>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Progress */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Tiến độ</span>
-                          <span className="font-medium">{course.progress}%</span>
-                        </div>
-                        <Progress value={course.progress} />
-                        <p className="text-xs text-muted-foreground">
-                          {course.completedLessons} / {course.totalLessons} bài học hoàn thành
-                        </p>
-                      </div>
-                      
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        <Button asChild className="flex-1">
-                          <Link href={ROUTES.LEARN(course.id.toString())}>
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Tiếp tục học
-                          </Link>
-                        </Button>
-                        <Button variant="outline" asChild>
-                          <Link href={ROUTES.COURSE_DETAIL(course.id.toString())}>
-                            Chi tiết
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activeCourses.map((course, index) => (
+                  <CourseCard 
+                    key={course.id} 
+                    course={course} 
+                    priority={index < 4} // Prioritize first 4 images for LCP
+                  />
                 ))}
-            </div>
+              </div>
             )}
           </TabsContent>
           
@@ -224,7 +268,7 @@ export default function StudentDashboard() {
           <TabsContent value="all" className="space-y-6">
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
-            ) : enrolledCourses.length === 0 ? (
+            ) : courses.length === 0 ? (
               <div className="text-center py-12">
                 <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold mb-2">Chưa có khóa học nào</h3>
@@ -236,38 +280,97 @@ export default function StudentDashboard() {
                 </Button>
               </div>
             ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {enrolledCourses.map((course) => (
-                <Card key={course.id} className="hover:shadow-lg transition-shadow">
-                  <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                    <BookOpen className="h-12 w-12 text-primary/50" />
-                  </div>
-                  <CardHeader>
-                    <Badge variant="secondary" className="w-fit mb-2">
-                      {course.category}
-                    </Badge>
-                    <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                    <CardDescription>{course.instructor}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Tiến độ</span>
-                        <span className="font-medium">{course.progress}%</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {courses.map((course, index) => (
+                  <CourseCard 
+                    key={course.id} 
+                    course={course} 
+                    priority={index < 4} // Prioritize first 4 images for LCP
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+          
+          {/* Certificates */}
+          <TabsContent value="certificates" className="space-y-6">
+            {certificates.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Award className="h-16 w-16 text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Chưa có chứng chỉ nào</h3>
+                  <p className="text-muted-foreground mb-6 text-center max-w-md">
+                    Hoàn thành các khóa học để nhận chứng chỉ. Chứng chỉ sẽ được cấp tự động khi bạn hoàn thành 100% khóa học.
+                  </p>
+                  <Button asChild>
+                    <Link href={ROUTES.COURSES}>
+                      Khám phá khóa học
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {certificates.map((certificate) => (
+                  <Card key={certificate.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Award className="h-6 w-6 text-yellow-500" />
+                          <CardTitle className="text-lg">Chứng chỉ</CardTitle>
+                        </div>
+                        <Badge 
+                          variant={certificate.status === 'ACTIVE' ? 'default' : 'secondary'}
+                        >
+                          {certificate.status === 'ACTIVE' ? 'Hoạt động' : 'Đã thu hồi'}
+                        </Badge>
                       </div>
-                      <Progress value={course.progress} />
-                    </div>
-                    
-                    <Button asChild className="w-full">
-                      <Link href={ROUTES.LEARN(course.id.toString())}>
-                        {course.progress === 0 ? 'Bắt đầu học' : 
-                         course.progress === 100 ? 'Ôn tập' : 'Tiếp tục học'}
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      <CardDescription className="text-base font-semibold text-foreground">
+                        {certificate.courseName || 'Khóa học'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Certificate Info */}
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <FileText className="h-4 w-4" />
+                          <span className="font-mono text-xs">{certificate.certificateCode}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <span>Cấp ngày: {formatDate(certificate.issueDate || certificate.completionDate)}</span>
+                        </div>
+                        {certificate.score !== undefined && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <BookOpen className="h-4 w-4" />
+                            <span>Điểm số: {certificate.score}/100</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleDownloadCertificate(certificate)}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Tải về
+                        </Button>
+                        <Button
+                          variant="outline"
+                          asChild
+                        >
+                          <Link href={ROUTES.COURSE_DETAIL(certificate.courseId.toString())}>
+                            <BookOpen className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </TabsContent>
           
@@ -283,7 +386,7 @@ export default function StudentDashboard() {
               <CardContent>
                 {isLoading ? (
                   <div className="text-center py-8 text-muted-foreground">Đang tải...</div>
-                ) : enrollments.length === 0 ? (
+                ) : courses.length === 0 ? (
                   <div className="text-center py-8">
                     <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-muted-foreground mb-4">Chưa có hoạt động nào</p>
@@ -292,19 +395,18 @@ export default function StudentDashboard() {
                     </Button>
                   </div>
                 ) : (
-                <div className="space-y-4">
-                    {enrollments
-                      .filter(e => e.lastAccessedAt || e.enrolledAt)
+                  <div className="space-y-4">
+                    {courses
                       .sort((a, b) => {
-                        const dateA = a.lastAccessedAt ? new Date(a.lastAccessedAt).getTime() : new Date(a.enrolledAt).getTime();
-                        const dateB = b.lastAccessedAt ? new Date(b.lastAccessedAt).getTime() : new Date(b.enrolledAt).getTime();
+                        // Sort by createdAt (most recent first)
+                        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
                         return dateB - dateA;
                       })
                       .slice(0, 10)
-                      .map((enrollment) => {
-                        const lastAccess = enrollment.lastAccessedAt || enrollment.enrolledAt;
-                        const timeAgo = lastAccess 
-                          ? new Date(lastAccess).toLocaleDateString('vi-VN', { 
+                      .map((course) => {
+                        const timeAgo = course.createdAt 
+                          ? new Date(course.createdAt).toLocaleDateString('vi-VN', { 
                               day: 'numeric', 
                               month: 'short',
                               year: 'numeric'
@@ -313,24 +415,19 @@ export default function StudentDashboard() {
                         
                         return (
                           <div 
-                            key={enrollment.id}
-                            className="flex items-start gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                            key={course.id}
+                            className="flex items-start gap-4 p-4 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                            onClick={() => window.location.href = ROUTES.LEARN(course.id.toString())}
                           >
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                              {enrollment.status === 'COMPLETED' ? (
-                                <Award className="h-5 w-5 text-secondary" />
-                              ) : (
-                                <PlayCircle className="h-5 w-5 text-primary" />
-                              )}
+                              <PlayCircle className="h-5 w-5 text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium">
-                                {enrollment.status === 'COMPLETED' 
-                                  ? `Đã hoàn thành: ${enrollment.courseTitle || 'Khóa học'}`
-                                  : `Đang học: ${enrollment.courseTitle || 'Khóa học'}`}
+                                Đang học: {course.title}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                Tiến độ: {Math.round(enrollment.progress || 0)}%
+                                {course.instructor?.fullName || 'Giảng viên'}
                               </p>
                             </div>
                             <p className="text-sm text-muted-foreground whitespace-nowrap">
@@ -339,7 +436,7 @@ export default function StudentDashboard() {
                           </div>
                         );
                       })}
-                </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -347,7 +444,7 @@ export default function StudentDashboard() {
         </Tabs>
         
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mt-8">
           <Link href={ROUTES.STUDENT.CERTIFICATES}>
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
@@ -359,16 +456,6 @@ export default function StudentDashboard() {
               </CardHeader>
             </Card>
           </Link>
-          
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <Calendar className="h-8 w-8 text-secondary mb-2" />
-              <CardTitle>Lịch học</CardTitle>
-              <CardDescription>
-                Quản lý thời gian học tập hiệu quả
-              </CardDescription>
-            </CardHeader>
-          </Card>
         </div>
       </div>
     </div>

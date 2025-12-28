@@ -102,10 +102,20 @@ public class PaymentController {
     public ResponseEntity<Map<String, String>> processCallback(
             @RequestBody Map<String, Object> payload
     ) {
+        System.out.println("========================================");
+        System.out.println("IPN Mock Callback Received");
+        System.out.println("Full Payload: " + payload);
+        System.out.println("========================================");
+        
         try {
             String txnCode = (String) payload.get("txnCode");
             String status = (String) payload.get("status");
             String cartId = payload.containsKey("cartId") ? payload.get("cartId").toString() : null;
+            
+            System.out.println(">>> Parsed values:");
+            System.out.println("    txnCode: " + txnCode);
+            System.out.println("    status: " + status);
+            System.out.println("    cartId: " + cartId);
             
             if (txnCode == null || status == null) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -122,6 +132,8 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
+            System.err.println(">>> ERROR in IPN callback: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to process callback: " + e.getMessage()));
         }

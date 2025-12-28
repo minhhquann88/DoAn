@@ -40,4 +40,40 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
            "LEFT JOIN FETCH c.category " +
            "WHERE e.user.id = :userId")
     List<Enrollment> findByUserIdWithCourse(@Param("userId") Long userId);
+    
+    // Count enrollments by course and status
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.course.id = :courseId AND e.status = :status")
+    Long countByCourseIdAndStatus(@Param("courseId") Long courseId, @Param("status") EEnrollmentStatus status);
+    
+    // Get enrollments by course
+    List<Enrollment> findByCourseId(Long courseId);
+    
+    // Get monthly enrollment count for a course
+    @Query("SELECT MONTH(e.enrolledAt) as month, " +
+           "YEAR(e.enrolledAt) as year, " +
+           "COUNT(e) as count " +
+           "FROM Enrollment e " +
+           "WHERE e.course.id = :courseId AND YEAR(e.enrolledAt) = :year " +
+           "GROUP BY MONTH(e.enrolledAt), YEAR(e.enrolledAt) " +
+           "ORDER BY month")
+    List<Object[]> getMonthlyEnrollmentsByCourse(@Param("courseId") Long courseId, @Param("year") int year);
+    
+    // Count enrollments by instructor's courses in a date range
+    @Query("SELECT COUNT(e) FROM Enrollment e " +
+           "WHERE e.course.instructor.id = :instructorId " +
+           "AND e.enrolledAt BETWEEN :startDate AND :endDate")
+    Long countEnrollmentsByInstructorAndDateRange(
+        @Param("instructorId") Long instructorId,
+        @Param("startDate") java.time.LocalDateTime startDate,
+        @Param("endDate") java.time.LocalDateTime endDate
+    );
+    
+    // Lấy enrollments của instructor với user và course được load sẵn
+    @Query("SELECT DISTINCT e FROM Enrollment e " +
+           "LEFT JOIN FETCH e.user " +
+           "LEFT JOIN FETCH e.course " +
+           "LEFT JOIN FETCH e.progresses " +
+           "WHERE e.course.instructor.id = :instructorId " +
+           "ORDER BY e.enrolledAt DESC")
+    List<Enrollment> findByInstructorIdWithDetails(@Param("instructorId") Long instructorId);
 }

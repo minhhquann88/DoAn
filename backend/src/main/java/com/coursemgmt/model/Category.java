@@ -1,5 +1,6 @@
 package com.coursemgmt.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.List;
@@ -18,7 +19,8 @@ public class Category {
 
     private String description;
 
-    // (1-n) 1 Category có nhiều Course
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<Course> courses;
 }
+

@@ -16,6 +16,7 @@ import {
   Menu,
   Bell,
   Search,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -32,6 +33,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { ROUTES, STORAGE_KEYS } from '@/lib/constants';
+import { useQuery } from '@tanstack/react-query';
+import { getUnreadCount, getNotifications, markAsRead, markAllAsRead } from '@/services/notificationService';
 
 interface NavItem {
   title: string;
@@ -51,6 +54,11 @@ const STUDENT_NAV: NavItem[] = [
     title: 'Khóa học của tôi',
     href: ROUTES.STUDENT.MY_COURSES,
     icon: <BookOpen className="h-5 w-5" />,
+  },
+  {
+    title: 'Lịch sử giao dịch',
+    href: ROUTES.STUDENT.TRANSACTIONS,
+    icon: <CreditCard className="h-5 w-5" />,
   },
 ];
 
@@ -127,6 +135,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { sidebarCollapsed, toggleSidebarCollapse } = useUIStore();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [isInitialized, setIsInitialized] = React.useState(false);
+  
+  // Fetch unread notification count
+  const { data: unreadCount = 0, refetch: refetchUnreadCount } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: getUnreadCount,
+    enabled: isAuthenticated,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+  
+  // Fetch notifications
+  const { data: notificationsData, refetch: refetchNotifications } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => getNotifications(0, 10),
+    enabled: isAuthenticated,
+  });
+  
+  const notifications = notificationsData?.content || [];
   
   // Initialize auth state from localStorage on mount
   React.useEffect(() => {
@@ -406,9 +431,93 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <span className="font-poppins font-bold">EduLearn</span>
           </Link>
           
-          <Button variant="ghost" size="icon">
-            <Bell className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-80 p-0" align="end">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="font-semibold">Thông báo</h3>
+                {unreadCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await markAllAsRead();
+                        refetchUnreadCount();
+                        refetchNotifications();
+                      } catch (error) {
+                        console.error('Error marking all as read:', error);
+                      }
+                    }}
+                  >
+                    Đánh dấu tất cả đã đọc
+                  </Button>
+                )}
+              </div>
+              <div className="max-h-[400px] overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Chưa có thông báo nào</p>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-4 hover:bg-muted/50 cursor-pointer transition-colors ${
+                          !notification.isRead ? 'bg-primary/5' : ''
+                        }`}
+                        onClick={async () => {
+                          if (!notification.isRead) {
+                            try {
+                              await markAsRead(notification.id);
+                              refetchUnreadCount();
+                              refetchNotifications();
+                            } catch (error) {
+                              console.error('Error marking as read:', error);
+                            }
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`h-2 w-2 rounded-full mt-2 flex-shrink-0 ${
+                            !notification.isRead ? 'bg-primary' : 'bg-transparent'
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm ${!notification.isRead ? 'font-semibold' : ''}`}>
+                              {notification.message}
+                            </p>
+                            {notification.courseTitle && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {notification.courseTitle}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(notification.createdAt).toLocaleString('vi-VN')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         
         {/* Main Content Area - Add padding for proper spacing from sidebar */}

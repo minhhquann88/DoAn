@@ -21,11 +21,16 @@ public interface CertificateRepository extends JpaRepository<Certificate, Long> 
     // Tìm theo enrollment
     Optional<Certificate> findByEnrollmentId(Long enrollmentId);
     
+    // Kiểm tra certificate đã tồn tại cho enrollment
+    boolean existsByEnrollmentId(Long enrollmentId);
+    
     // Tìm tất cả certificate của 1 user
-    Page<Certificate> findByEnrollmentUserId(Long userId, Pageable pageable);
+    @Query("SELECT c FROM Certificate c WHERE c.enrollment.user.id = :userId")
+    Page<Certificate> findByEnrollmentUserId(@Param("userId") Long userId, Pageable pageable);
     
     // Tìm tất cả certificate của 1 course
-    Page<Certificate> findByEnrollmentCourseId(Long courseId, Pageable pageable);
+    @Query("SELECT c FROM Certificate c WHERE c.enrollment.course.id = :courseId")
+    Page<Certificate> findByEnrollmentCourseId(@Param("courseId") Long courseId, Pageable pageable);
     
     // Đếm số certificate đã cấp theo khoảng thời gian
     @Query("SELECT COUNT(c) FROM Certificate c WHERE " +

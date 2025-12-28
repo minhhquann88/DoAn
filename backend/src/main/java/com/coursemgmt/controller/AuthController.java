@@ -18,12 +18,10 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        try {
-            JwtResponse jwtResponse = authService.loginUser(loginRequest);
-            return ResponseEntity.ok(jwtResponse);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error: " + e.getMessage()));
-        }
+        // Don't catch BadCredentialsException here - let GlobalExceptionHandler handle it
+        // This allows proper 401 status code for authentication failures
+        JwtResponse jwtResponse = authService.loginUser(loginRequest);
+        return ResponseEntity.ok(jwtResponse);
     }
 
     @PostMapping("/register")

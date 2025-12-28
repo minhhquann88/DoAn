@@ -33,13 +33,16 @@ public class ChatController {
      * UC-CHAT-01: Gửi câu hỏi đến chatbot
      * POST /api/v1/chat/message
      * 
+     * Cho phép cả người dùng đã đăng nhập và khách (guest) sử dụng
+     * 
      * Hệ thống sẽ:
      * 1. Lấy context từ khóa học (RAG)
+     *    - Guest: chỉ lấy thông tin khóa học công khai
+     *    - Authenticated: lấy thông tin user + khóa học
      * 2. Gọi Google Gemini API
      * 3. Trả về câu trả lời
      */
     @PostMapping("/message")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ChatResponse> sendMessage(@Valid @RequestBody ChatRequest request) {
         System.out.println("========================================");
         System.out.println("Chat Request received");

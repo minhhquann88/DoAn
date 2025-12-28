@@ -13,21 +13,26 @@ import {
   Users,
   DollarSign,
   Calendar,
-  Search
+  Search,
+  Upload,
+  Download,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/lib/constants';
-import { useCourses, useDeleteCourse } from '@/hooks/useCourses';
+import { useInstructorCourses, useDeleteCourse, usePublishCourse, useUnpublishCourse } from '@/hooks/useCourses';
 import { useUIStore } from '@/stores/uiStore';
 
 export default function InstructorCoursesPage() {
   const router = useRouter();
   const { addToast } = useUIStore();
-  const { courses, isLoading } = useCourses();
+  const { courses, isLoading } = useInstructorCourses();
   const deleteCourse = useDeleteCourse();
+  const publishCourse = usePublishCourse();
+  const unpublishCourse = useUnpublishCourse();
   const [searchQuery, setSearchQuery] = React.useState('');
 
   // Filter courses by search query
@@ -46,15 +51,32 @@ export default function InstructorCoursesPage() {
     
     try {
       await deleteCourse.mutateAsync(courseId);
-      addToast({
-        type: 'success',
-        description: 'Xóa khóa học thành công!',
-      });
     } catch (error) {
-      addToast({
-        type: 'error',
-        description: 'Có lỗi xảy ra khi xóa khóa học.',
-      });
+      // Error already handled by hook
+    }
+  };
+
+  const handlePublish = async (courseId: number) => {
+    if (!confirm('Bạn có chắc chắn muốn xuất bản khóa học này? Khóa học sẽ được hiển thị công khai ngay lập tức.')) {
+      return;
+    }
+    
+    try {
+      await publishCourse.mutateAsync(courseId);
+    } catch (error) {
+      // Error already handled by hook
+    }
+  };
+
+  const handleUnpublish = async (courseId: number) => {
+    if (!confirm('Bạn có chắc chắn muốn gỡ khóa học này? Khóa học sẽ không còn hiển thị công khai.')) {
+      return;
+    }
+    
+    try {
+      await unpublishCourse.mutateAsync(courseId);
+    } catch (error) {
+      // Error already handled by hook
     }
   };
 
@@ -143,7 +165,7 @@ export default function InstructorCoursesPage() {
                     <th className="text-left p-4 font-semibold">Khóa học</th>
                     <th className="text-left p-4 font-semibold">Trạng thái</th>
                     <th className="text-left p-4 font-semibold">Học viên</th>
-                    <th className="text-left p-4 font-semibold">Doanh thu</th>
+                    <th className="text-left p-4 font-semibold">Giá thành</th>
                     <th className="text-left p-4 font-semibold">Cập nhật</th>
                     <th className="text-right p-4 font-semibold">Thao tác</th>
                   </tr>
@@ -214,11 +236,44 @@ export default function InstructorCoursesPage() {
                             variant="ghost"
                             size="sm"
                             asChild
+                            title="Quản lý nội dung"
+                          >
+                            <Link href={ROUTES.INSTRUCTOR.COURSE_CONTENT(course.id.toString())}>
+                              <FileText className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            title="Chỉnh sửa thông tin"
                           >
                             <Link href={ROUTES.INSTRUCTOR_EDIT_COURSE(course.id.toString())}>
                               <Edit className="h-4 w-4" />
                             </Link>
                           </Button>
+                          {course.status === 'DRAFT' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePublish(course.id)}
+                              className="text-green-600 hover:text-green-700"
+                              title="Xuất bản khóa học"
+                            >
+                              <Upload className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {course.status === 'PUBLISHED' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUnpublish(course.id)}
+                              className="text-orange-600 hover:text-orange-700"
+                              title="Gỡ khóa học"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"

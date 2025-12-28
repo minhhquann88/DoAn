@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -54,6 +55,23 @@ public class AuthService {
 
     // Chức năng Đăng nhập
     public JwtResponse loginUser(LoginRequest loginRequest) {
+        // Kiểm tra tài khoản có bị khóa không trước khi authenticate
+        Optional<User> userOptional = userRepository.findByUsernameOrEmail(
+                loginRequest.getUsernameOrEmail(), 
+                loginRequest.getUsernameOrEmail()
+        );
+        
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            if (user.getIsEnabled() != null && !user.getIsEnabled()) {
+                // Tài khoản bị khóa, ném DisabledException với message rõ ràng
+                String lockMessage = user.getLockReason() != null && !user.getLockReason().trim().isEmpty()
+                    ? user.getLockReason()
+                    : "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.";
+                throw new org.springframework.security.authentication.DisabledException(lockMessage);
+            }
+        }
+        
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getUsernameOrEmail(),

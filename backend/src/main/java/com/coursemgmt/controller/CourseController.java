@@ -3,11 +3,14 @@ package com.coursemgmt.controller;
 import com.coursemgmt.dto.CourseRequest;
 import com.coursemgmt.dto.CourseResponse;
 import com.coursemgmt.dto.CourseStatisticsResponse;
+import com.coursemgmt.dto.CourseAnalyticsResponse;
 import com.coursemgmt.dto.MessageResponse;
 import com.coursemgmt.dto.ChapterResponse;
 import com.coursemgmt.model.Course;
+import com.coursemgmt.repository.CourseRepository;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.CourseService;
+import com.coursemgmt.service.FileStorageService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -15,10 +18,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
@@ -28,6 +34,12 @@ public class CourseController {
 
     @Autowired
     private CourseService courseService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    @Autowired
+    private CourseRepository courseRepository;
 
     // Valid sort fields for Course entity
     private static final Set<String> VALID_SORT_FIELDS = new HashSet<>(Arrays.asList(
@@ -74,6 +86,70 @@ public class CourseController {
                                                        @Valid @RequestBody CourseRequest request) {
         Course updatedCourse = courseService.updateCourse(id, request);
         return ResponseEntity.ok(CourseResponse.fromEntity(updatedCourse));
+    }
+
+    // 2.1. Upload ảnh bìa khóa học
+    @PostMapping(value = "/{id}/image", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
+    public ResponseEntity<?> uploadCourseImage(@PathVariable Long id,
+                                                @RequestParam("file") MultipartFile file) {
+        try {
+            System.out.println("========================================");
+            System.out.println("Upload Course Image Request");
+            System.out.println("Course ID: " + id);
+            
+            // Validate file
+            if (file == null || file.isEmpty()) {
+                System.err.println("File is null or empty!");
+                return ResponseEntity.badRequest().body(new MessageResponse("File is required and cannot be empty"));
+            }
+            
+            System.out.println("File name: " + file.getOriginalFilename());
+            System.out.println("File size: " + file.getSize());
+            System.out.println("Content type: " + file.getContentType());
+            System.out.println("File is empty: " + file.isEmpty());
+            System.out.println("========================================");
+
+            // Validate course exists (getCourseById throws exception if not found)
+            CourseResponse courseResponse = courseService.getCourseById(id);
+            System.out.println("Course found: " + courseResponse.getTitle());
+
+            // Store the image file
+            String imageUrl = fileStorageService.storeCourseImage(file, id);
+            System.out.println("Image stored at: " + imageUrl);
+
+            // Update course with new image URL
+            // Get current course entity to preserve other fields
+            Course currentCourse = courseRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Course not found!"));
+            
+            CourseRequest updateRequest = new CourseRequest();
+            updateRequest.setTitle(currentCourse.getTitle());
+            updateRequest.setDescription(currentCourse.getDescription());
+            updateRequest.setPrice(currentCourse.getPrice());
+            if (currentCourse.getCategory() != null && currentCourse.getCategory().getId() != null) {
+                updateRequest.setCategoryId(currentCourse.getCategory().getId());
+            } else {
+                throw new RuntimeException("Course category is missing!");
+            }
+            updateRequest.setImageUrl(imageUrl);
+            if (currentCourse.getTotalDurationInHours() != null) {
+                updateRequest.setTotalDurationInHours(currentCourse.getTotalDurationInHours());
+            }
+            
+            Course updatedCourse = courseService.updateCourse(id, updateRequest);
+            System.out.println("Course updated successfully");
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Course image uploaded successfully");
+            response.put("imageUrl", imageUrl);
+            response.put("course", CourseResponse.fromEntity(updatedCourse));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error uploading course image: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(new MessageResponse("Error uploading course image: " + e.getMessage()));
+        }
     }
 
     // 3. Xóa khóa học (Admin hoặc Giảng viên sở hữu)
@@ -141,6 +217,14 @@ public class CourseController {
         CourseStatisticsResponse stats = courseService.getCourseStatistics(id);
         return ResponseEntity.ok(stats);
     }
+    
+    // 8. Analytics chi tiết (Admin hoặc Giảng viên sở hữu)
+    @GetMapping("/{id}/analytics")
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
+    public ResponseEntity<CourseAnalyticsResponse> getCourseAnalytics(@PathVariable Long id) {
+        CourseAnalyticsResponse analytics = courseService.getCourseAnalytics(id);
+        return ResponseEntity.ok(analytics);
+    }
 
     // 8. Giảng viên gửi yêu cầu phê duyệt khóa học
     @PostMapping("/{id}/request-approval")
@@ -158,6 +242,15 @@ public class CourseController {
                                                          @AuthenticationPrincipal UserDetailsImpl userDetails) {
         Course publishedCourse = courseService.publishCourse(id, userDetails);
         return ResponseEntity.ok(CourseResponse.fromEntity(publishedCourse));
+    }
+
+    // 10. Giảng viên gỡ khóa học (Unpublish) - PUBLISHED -> DRAFT
+    @PostMapping("/{id}/unpublish")
+    @PreAuthorize("hasRole('LECTURER') or hasRole('ADMIN')")
+    public ResponseEntity<CourseResponse> unpublishCourse(@PathVariable Long id,
+                                                           @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        Course unpublishedCourse = courseService.unpublishCourse(id, userDetails);
+        return ResponseEntity.ok(CourseResponse.fromEntity(unpublishedCourse));
     }
 
     // 10. Đánh dấu khóa học là nổi bật (Featured) - Chỉ Admin

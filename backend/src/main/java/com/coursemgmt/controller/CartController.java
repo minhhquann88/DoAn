@@ -31,12 +31,23 @@ public class CartController {
     public ResponseEntity<CartResponse> getCart(
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
+        // @PreAuthorize should handle authentication, but double-check
         if (userDetails == null || userDetails.getId() == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(null);
         }
-        CartResponse cart = cartService.getCart(userDetails.getId());
-        return ResponseEntity.ok(cart);
+        
+        try {
+            CartResponse cart = cartService.getCart(userDetails.getId());
+            return ResponseEntity.ok(cart);
+        } catch (Exception e) {
+            // Log error for debugging
+            System.err.println("Error getting cart for user " + userDetails.getId() + ": " + e.getMessage());
+            e.printStackTrace();
+            // Return 500 for unexpected errors, not 400
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
+        }
     }
 
     /**

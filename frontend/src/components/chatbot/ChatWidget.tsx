@@ -7,13 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
+import { useAuthStore } from '@/stores/authStore';
+import { useChatStore, type ChatMessage } from '@/stores/chatStore';
 
 const quickReplies = [
   'Tôi muốn tìm khóa học về lập trình',
@@ -22,20 +17,82 @@ const quickReplies = [
   'Tôi quên mật khẩu',
 ];
 
-export function ChatWidget() {
+interface ChatWidgetProps {
+  courseId?: number; // Optional: để lấy context cụ thể từ khóa học
+}
+
+// Initial welcome message
+const getInitialMessage = (): ChatMessage => ({
+  id: '1',
+  role: 'assistant',
+  content: 'Xin chào! Tôi là trợ lý ảo của EduLearn. Tôi có thể giúp gì cho bạn?',
+  timestamp: new Date(),
+});
+
+export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
+  const { user, isAuthenticated } = useAuthStore();
+  const { addMessage, setMessages, clearMessages } = useChatStore();
+  
   const [isOpen, setIsOpen] = React.useState(false);
   const [isMinimized, setIsMinimized] = React.useState(false);
-  const [messages, setMessages] = React.useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: 'Xin chào! Tôi là trợ lý ảo của EduLearn. Tôi có thể giúp gì cho bạn?',
-      timestamp: new Date(),
-    },
-  ]);
   const [inputValue, setInputValue] = React.useState('');
   const [isTyping, setIsTyping] = React.useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  
+  // Get current user ID (null for guest)
+  const currentUserId = user?.id?.toString() || null;
+  
+  // Cache userKey để tránh re-render không cần thiết
+  const userKey = React.useMemo(() => {
+    return currentUserId ? `user_${currentUserId}` : 'guest';
+  }, [currentUserId]);
+  
+  // Subscribe vào toàn bộ messagesByUser để tránh warning "getServerSnapshot should be cached"
+  // Filter messages cho user hiện tại trong useMemo
+  const messagesByUser = useChatStore((state) => state.messagesByUser);
+  
+  // Filter messages cho user hiện tại
+  const rawMessages = React.useMemo(() => {
+    return messagesByUser[userKey] || [];
+  }, [messagesByUser, userKey]);
+  
+  // Convert messages và thêm initial message nếu cần
+  const messages = React.useMemo(() => {
+    if (rawMessages.length === 0) {
+      return [getInitialMessage()];
+    }
+    // Convert timestamp strings back to Date objects
+    return rawMessages.map(msg => ({
+      ...msg,
+      timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp,
+    }));
+  }, [rawMessages]);
+  
+  // Track previous authentication state để phát hiện khi logout
+  const prevIsAuthenticatedRef = React.useRef(isAuthenticated);
+  
+  // Reset messages khi user thay đổi (login/logout)
+  React.useEffect(() => {
+    if (rawMessages.length === 0) {
+      // Nếu chưa có messages cho user này, khởi tạo với welcome message
+      setMessages(currentUserId, [getInitialMessage()]);
+    }
+  }, [currentUserId, rawMessages.length, setMessages]);
+  
+  // Đóng chat khi user logout (chuyển từ authenticated sang guest)
+  // Nhưng không chặn guest users mở chat
+  React.useEffect(() => {
+    const wasAuthenticated = prevIsAuthenticatedRef.current;
+    const isNowGuest = !isAuthenticated;
+    
+    // Chỉ đóng chat nếu chuyển từ authenticated sang guest (logout)
+    if (wasAuthenticated && isNowGuest && isOpen) {
+      setIsOpen(false);
+    }
+    
+    // Update ref cho lần sau
+    prevIsAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated, isOpen]);
   
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,14 +105,15 @@ export function ChatWidget() {
   const handleSend = async () => {
     if (!inputValue.trim()) return;
     
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       content: inputValue,
       timestamp: new Date(),
     };
     
-    setMessages(prev => [...prev, userMessage]);
+    // Add user message to store
+    addMessage(currentUserId, userMessage);
     const currentInput = inputValue;
     setInputValue('');
     setIsTyping(true);
@@ -64,29 +122,31 @@ export function ChatWidget() {
       // Import dynamically để avoid build errors
       const { sendChatMessage } = await import('@/services/chatbotService');
       
-      // Send to chatbot backend
-      const response = await sendChatMessage(currentInput);
+      // Send to chatbot backend với courseId nếu có
+      const response = await sendChatMessage(currentInput, courseId);
       
-      const botMessage: Message = {
+      const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: response.response,
         timestamp: new Date(),
       };
       
-      setMessages(prev => [...prev, botMessage]);
+      // Add bot response to store
+      addMessage(currentUserId, botMessage);
     } catch (error) {
       console.error('Chatbot error:', error);
       
       // Fallback response
-      const botMessage: Message = {
+      const botMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: 'Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.',
         timestamp: new Date(),
       };
       
-      setMessages(prev => [...prev, botMessage]);
+      // Add error message to store
+      addMessage(currentUserId, botMessage);
     } finally {
       setIsTyping(false);
     }
@@ -188,7 +248,10 @@ export function ChatWidget() {
                       message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                     )}
                   >
-                    {message.timestamp.toLocaleTimeString('vi-VN', {
+                    {(message.timestamp instanceof Date 
+                      ? message.timestamp 
+                      : new Date(message.timestamp)
+                    ).toLocaleTimeString('vi-VN', {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}

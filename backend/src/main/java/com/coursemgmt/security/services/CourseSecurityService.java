@@ -53,43 +53,61 @@ public class CourseSecurityService {
     // Kiểm tra đã ghi danh (cho bài học)
     public boolean isEnrolled(Authentication authentication, Long lessonId) {
         try {
+            System.out.println("DEBUG isEnrolled: Checking enrollment for lessonId=" + lessonId);
+            
             if (authentication == null || authentication.getPrincipal() == null) {
                 logger.warn("isEnrolled: Authentication or principal is null");
+                System.out.println("DEBUG isEnrolled: Authentication or principal is null");
                 return false;
             }
             
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            System.out.println("DEBUG isEnrolled: userId=" + userDetails.getId() + ", username=" + userDetails.getUsername());
+            
             User user = userRepository.findById(userDetails.getId()).orElse(null);
             Lesson lesson = lessonRepository.findById(lessonId).orElse(null);
 
             if (user == null) {
                 logger.warn("isEnrolled: User not found for ID: {}", userDetails.getId());
+                System.out.println("DEBUG isEnrolled: User not found for ID: " + userDetails.getId());
                 return false;
             }
             
             if (lesson == null) {
                 logger.warn("isEnrolled: Lesson not found for ID: {}", lessonId);
+                System.out.println("DEBUG isEnrolled: Lesson not found for ID: " + lessonId);
                 return false;
             }
+            
+            System.out.println("DEBUG isEnrolled: Found lesson '" + lesson.getTitle() + "'");
 
             // Load chapter and course to avoid LazyInitializationException
             Chapter chapter = lesson.getChapter();
             if (chapter == null) {
                 logger.warn("isEnrolled: Chapter not found for lesson ID: {}", lessonId);
+                System.out.println("DEBUG isEnrolled: Chapter not found for lesson");
                 return false;
             }
+            
+            System.out.println("DEBUG isEnrolled: Found chapter '" + chapter.getTitle() + "'");
             
             Course course = chapter.getCourse();
             if (course == null) {
                 logger.warn("isEnrolled: Course not found for chapter ID: {}", chapter.getId());
+                System.out.println("DEBUG isEnrolled: Course not found for chapter");
                 return false;
             }
+            
+            System.out.println("DEBUG isEnrolled: Found course '" + course.getTitle() + "' (ID=" + course.getId() + ")");
 
             boolean enrolled = enrollmentRepository.findByUserAndCourse(user, course).isPresent();
+            System.out.println("DEBUG isEnrolled: User " + user.getId() + " enrolled in course " + course.getId() + ": " + enrolled);
             logger.debug("isEnrolled: User {} enrolled in course {}: {}", user.getId(), course.getId(), enrolled);
             return enrolled;
         } catch (Exception e) {
             logger.error("Error in isEnrolled for lessonId {}: {}", lessonId, e.getMessage(), e);
+            System.out.println("DEBUG isEnrolled ERROR: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }

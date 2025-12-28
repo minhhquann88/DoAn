@@ -124,7 +124,10 @@ export default function LoginPage() {
       // Success is handled by useAuth hook (redirects automatically)
     } catch (error: any) {
       // Handle login errors
-      if (error?.response?.status === 400 || error?.response?.status === 401) {
+      if (error?.response?.status === 403) {
+        // Tài khoản bị khóa - hiển thị message từ server (lockReason)
+        setLoginError(error?.response?.data?.message || 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.');
+      } else if (error?.response?.status === 400 || error?.response?.status === 401) {
         setLoginError('Tên đăng nhập hoặc mật khẩu không chính xác');
       } else if (error?.response?.data?.message) {
         setLoginError(error.response.data.message);

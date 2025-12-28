@@ -52,6 +52,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.removeItem(STORAGE_KEYS.USER_DATA);
       // Remove cookie
       document.cookie = 'token=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+      
+      // Clear chat messages của user đang logout
+      // Import dynamically để tránh circular dependency
+      import('@/stores/chatStore').then(({ useChatStore }) => {
+        const currentUserId = get().user?.id?.toString() || null;
+        if (currentUserId) {
+          useChatStore.getState().clearMessages(currentUserId);
+        }
+      });
     }
     set({ user: null, isAuthenticated: false });
   },

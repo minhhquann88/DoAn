@@ -3,6 +3,7 @@ package com.coursemgmt.controller;
 import com.coursemgmt.dto.ChapterResponse;
 import com.coursemgmt.dto.LessonProgressRequest;
 import com.coursemgmt.dto.MessageResponse;
+import com.coursemgmt.security.services.CourseSecurityService;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.ContentService;
 import jakarta.validation.Valid;
@@ -22,6 +23,9 @@ public class ContentAccessController {
     @Autowired
     private ContentService contentService;
 
+    @Autowired
+    private CourseSecurityService courseSecurityService;
+
     // API để Học viên (đã đăng ký) hoặc Giảng viên xem toàn bộ nội dung khóa học
     @GetMapping("/courses/{courseId}")
     @PreAuthorize("isAuthenticated()")
@@ -36,8 +40,20 @@ public class ContentAccessController {
     @PreAuthorize("hasRole('STUDENT') and @courseSecurityService.isEnrolled(authentication, #lessonId)")
     public ResponseEntity<MessageResponse> markLessonAsCompleted(@PathVariable Long lessonId,
                                                                  @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        contentService.markLessonAsCompleted(lessonId, userDetails);
-        return ResponseEntity.ok(new MessageResponse("Lesson marked as completed!"));
+        try {
+            System.out.println("DEBUG ContentAccessController: markLessonAsCompleted called for lessonId=" + lessonId);
+            if (userDetails != null) {
+                System.out.println("DEBUG ContentAccessController: userId=" + userDetails.getId() + ", username=" + userDetails.getUsername());
+            } else {
+                System.out.println("DEBUG ContentAccessController: userDetails is null!");
+            }
+            contentService.markLessonAsCompleted(lessonId, userDetails);
+            return ResponseEntity.ok(new MessageResponse("Lesson marked as completed!"));
+        } catch (Exception e) {
+            System.err.println("ERROR in markLessonAsCompleted: " + e.getMessage());
+            e.printStackTrace();
+            throw e; // Re-throw to be handled by GlobalExceptionHandler
+        }
     }
 
     // API để cập nhật tiến độ xem video (Auto-Progress: Auto-complete khi >90%)

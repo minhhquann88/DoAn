@@ -12,6 +12,7 @@ public class LessonResponse {
     private EContentType contentType;
     private String videoUrl;
     private String documentUrl;
+    private String slideUrl;
     private String content;
     private Integer durationInMinutes;
     private Integer position;
@@ -37,6 +38,7 @@ public class LessonResponse {
         // Học viên cần xem video để học, không phải chỉ khi đã hoàn thành
         dto.setVideoUrl(lesson.getVideoUrl());
         dto.setDocumentUrl(lesson.getDocumentUrl());
+        dto.setSlideUrl(lesson.getSlideUrl());
         dto.setContent(lesson.getContent());
 
         return dto;

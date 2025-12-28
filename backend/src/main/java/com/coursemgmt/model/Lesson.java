@@ -24,6 +24,8 @@ public class Lesson {
 
     private String documentUrl;
 
+    private String slideUrl; // URL cho slide bài giảng (PPT, PPTX, ODP)
+
     @Lob // Dùng cho nội dung text dài
     private String content;
 

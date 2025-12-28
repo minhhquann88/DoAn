@@ -5,12 +5,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +36,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<MessageResponse> handleBadCredentialsException(BadCredentialsException ex) {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(new MessageResponse("Invalid username or password"));
+                .body(new MessageResponse("Tên đăng nhập hoặc mật khẩu không chính xác"));
+    }
+
+    // Handle Disabled Account (403)
+    @ExceptionHandler(DisabledException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ResponseEntity<MessageResponse> handleDisabledException(DisabledException ex) {
+        // Trả về message từ exception (đã được set trong AuthService với lockReason)
+        String message = ex.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            message = "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.";
+        }
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(new MessageResponse(message));
     }
 
     // Handle Username Not Found (404)
@@ -101,10 +118,33 @@ public class GlobalExceptionHandler {
                 .body(new MessageResponse(message != null ? message : "An error occurred"));
     }
 
+    // Handle Multipart Exceptions (400)
+    @ExceptionHandler(MultipartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<MessageResponse> handleMultipartException(MultipartException ex) {
+        System.err.println("MultipartException: " + ex.getMessage());
+        ex.printStackTrace();
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new MessageResponse("File upload error: " + ex.getMessage()));
+    }
+
+    // Handle Max Upload Size Exceeded (400)
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ResponseEntity<MessageResponse> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
+        System.err.println("MaxUploadSizeExceededException: " + ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new MessageResponse("File size exceeds the maximum allowed size"));
+    }
+
     // Handle all other exceptions (500)
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ResponseEntity<MessageResponse> handleAllExceptions(Exception ex) {
+        System.err.println("Unexpected exception: " + ex.getClass().getName() + " - " + ex.getMessage());
+        ex.printStackTrace();
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Internal server error: " + ex.getMessage()));

@@ -125,6 +125,20 @@
             <version>1.0.10</version>
         </dependency>
         
+        <!-- Apache PDFBox for PDF Generation from Slides -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>2.0.29</version>
+        </dependency>
+        
+        <!-- Apache POI Scratchpad for ODP support -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-scratchpad</artifactId>
+            <version>5.2.3</version>
+        </dependency>
+        
         <!-- HTTP Client for Google Gemini API -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -11,10 +11,11 @@ public class LessonRequest {
     private String title;
 
     @NotNull
-    private EContentType contentType; // VIDEO, TEXT, DOCUMENT
+    private EContentType contentType; // VIDEO, TEXT, DOCUMENT, SLIDE
 
     private String videoUrl;
     private String documentUrl;
+    private String slideUrl; // URL cho slide bài giảng
     private String content; // Dùng cho bài đọc
 
     @NotNull

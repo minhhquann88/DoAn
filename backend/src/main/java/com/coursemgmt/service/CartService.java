@@ -93,19 +93,17 @@ public class CartService {
 
     /**
      * Lấy giỏ hàng của user
+     * Note: Not read-only because it may need to create a new cart if one doesn't exist
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public CartResponse getCart(Long userId) {
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-                .orElseGet(() -> {
-                    // Create empty cart if not exists
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-                    Cart newCart = new Cart();
-                    newCart.setUser(user);
-                    return cartRepository.save(newCart);
-                });
-
+        // Use getOrCreateCart to ensure cart exists (handles creation if needed)
+        Cart cart = getOrCreateCart(userId);
+        
+        // Fetch cart with items loaded (JOIN FETCH)
+        cart = cartRepository.findByUserIdWithItems(userId)
+                .orElse(cart); // Fallback to the cart we just got/created
+        
         return mapToCartResponse(cart);
     }
 
@@ -129,11 +127,17 @@ public class CartService {
 
     /**
      * Xóa tất cả items khỏi giỏ hàng
+     * Uses orphanRemoval on Cart.items for automatic deletion
      */
     @Transactional
     public void clearCart(Long userId) {
-        Cart cart = getOrCreateCart(userId);
-        cartItemRepository.deleteByCart(cart);
+        Cart cart = cartRepository.findByUserIdWithItems(userId)
+                .orElse(getOrCreateCart(userId));
+        
+        if (cart.getItems() != null && !cart.getItems().isEmpty()) {
+            cart.getItems().clear();
+            cartRepository.save(cart);
+        }
     }
 
     /**
@@ -160,30 +164,30 @@ public class CartService {
             }
         }
 
-        // Create one transaction for the total amount
-        // Use the first course as the main course (for Transaction entity requirement)
-        // When payment succeeds, we'll create enrollments for all courses in cart
-        Course firstCourse = cart.getItems().get(0).getCourse();
-        
         // Calculate total amount
         Double totalAmount = cart.getItems().stream()
                 .mapToDouble(item -> item.getCourse().getPrice())
                 .sum();
 
-        // Create main transaction with total amount
-        Transaction mainTransaction = new Transaction();
-        mainTransaction.setUser(user);
-        mainTransaction.setCourse(firstCourse); // Use first course (required by entity)
-        mainTransaction.setAmount(totalAmount);
-        mainTransaction.setStatus(ETransactionStatus.PENDING);
-        mainTransaction.setPaymentGateway(EPaymentGateway.VNPAY);
-        mainTransaction.setCreatedAt(LocalDateTime.now());
-        
-        // Generate unique transaction code
+        // Generate unique transaction code (shared by all transactions in this cart checkout)
         String transactionCode = generateTransactionCode();
-        mainTransaction.setTransactionCode(transactionCode);
         
-        Transaction savedTransaction = transactionRepository.save(mainTransaction);
+        // Create a transaction for EACH course in the cart
+        // All transactions share the same transactionCode for tracking
+        for (CartItem item : cart.getItems()) {
+            Course course = item.getCourse();
+            
+            Transaction transaction = new Transaction();
+            transaction.setUser(user);
+            transaction.setCourse(course);
+            transaction.setAmount(course.getPrice()); // Individual course price
+            transaction.setStatus(ETransactionStatus.PENDING);
+            transaction.setPaymentGateway(EPaymentGateway.VNPAY);
+            transaction.setCreatedAt(LocalDateTime.now());
+            transaction.setTransactionCode(transactionCode); // Same code for all
+            
+            transactionRepository.save(transaction);
+        }
 
         // MOCK LOGIC: Return mock payment URL
         // In real implementation, this would call VNPay/MoMo API with total amount

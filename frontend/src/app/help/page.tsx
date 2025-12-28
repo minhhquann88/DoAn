@@ -26,7 +26,6 @@ const helpCategories = [
       'Cách đăng ký tài khoản',
       'Tìm và chọn khóa học phù hợp',
       'Cách truy cập nội dung khóa học',
-      'Sử dụng tính năng ghi chú',
     ],
   },
   {

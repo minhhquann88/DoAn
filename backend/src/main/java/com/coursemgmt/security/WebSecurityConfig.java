@@ -77,7 +77,20 @@ public class WebSecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
+                // Allow iframe embedding for file viewing endpoints
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.sameOrigin())
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives("frame-ancestors 'self' http://localhost:3000 http://localhost:5173 http://localhost:5177")
+                        )
+                )
                 .authorizeHttpRequests(auth -> auth
+                        // Allow file viewing endpoints without authentication
+                        .requestMatchers("/api/files/view/**").permitAll()
+                        .requestMatchers("/api/files/download/**").permitAll()
+                        .requestMatchers("/api/files/lessons/**").permitAll()
+                        .requestMatchers("/api/files/courses/**").permitAll()
+                        .requestMatchers("/api/files/avatars/**").permitAll()
                         // Allow enrollments endpoints for authenticated users (ADMIN, LECTURER, STUDENT)
                         .requestMatchers("/api/v1/enrollments/**").hasAnyRole("ADMIN", "LECTURER", "STUDENT")
                         // All other requests are permitted (method-level security will handle authorization)

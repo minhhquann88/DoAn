@@ -40,39 +40,38 @@ export interface Chapter {
 export interface ChapterResponse {
   id: number;
   title: string;
-  description?: string;
-  orderIndex: number;
+  position: number;
   lessons: LessonResponse[];
 }
 
 export interface LessonResponse {
   id: number;
   title: string;
-  description?: string;
-  contentType: string;
-  contentUrl?: string;
-  duration?: number;
-  orderIndex: number;
-  isFree: boolean;
+  contentType: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
+  videoUrl?: string;
+  documentUrl?: string;
+  slideUrl?: string;
+  content?: string;
+  durationInMinutes?: number;
+  position: number;
   isCompleted?: boolean;
   isPreview?: boolean; // Lesson có thể xem trước (cho guests)
-  videoUrl?: string; // Video URL for preview lessons
 }
 
 export interface ChapterRequest {
   title: string;
-  description?: string;
-  orderIndex: number;
+  position: number;
 }
 
 export interface LessonRequest {
   title: string;
-  description?: string;
-  contentType: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'QUIZ';
-  contentUrl?: string;
-  duration?: number;
-  orderIndex: number;
-  isFree?: boolean;
+  contentType: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
+  videoUrl?: string;
+  documentUrl?: string;
+  slideUrl?: string;
+  content?: string; // For TEXT content type
+  durationInMinutes: number;
+  position: number;
 }
 
 export interface UserProgress {
@@ -91,6 +90,7 @@ export interface UserProgress {
  * Requires authentication - user must be enrolled or instructor
  */
 export const getCourseContent = async (courseId: number): Promise<ChapterResponse[]> => {
+  // Use /api/content endpoint for students (allows enrolled users or instructors)
   const response = await apiClient.get<ChapterResponse[]>(`/content/courses/${courseId}`);
   return response.data;
 };
@@ -100,6 +100,21 @@ export const getCourseContent = async (courseId: number): Promise<ChapterRespons
  */
 export const markLessonAsCompleted = async (lessonId: number): Promise<{ message: string }> => {
   const response = await apiClient.post(`/content/lessons/${lessonId}/complete`);
+  return response.data;
+};
+
+/**
+ * Update lesson watch time/progress (for video lessons)
+ */
+export const updateLessonProgress = async (
+  lessonId: number,
+  watchedTime: number, // seconds
+  totalDuration: number // seconds
+): Promise<{ message: string }> => {
+  const response = await apiClient.post(`/content/lessons/${lessonId}/progress`, {
+    watchedTime: Math.round(watchedTime),
+    totalDuration: Math.round(totalDuration),
+  });
   return response.data;
 };
 
@@ -113,24 +128,24 @@ export const markLessonAsCompleted = async (lessonId: number): Promise<{ message
 /**
  * Create a new chapter in a course
  */
-export const createChapter = async (courseId: number, data: ChapterRequest): Promise<Chapter> => {
-  const response = await apiClient.post<Chapter>(`/manage/content/courses/${courseId}/chapters`, data);
-  return response.data;
+export const createChapter = async (courseId: number, data: ChapterRequest): Promise<ChapterResponse> => {
+  const response = await apiClient.post<{ chapter: ChapterResponse }>(`/v1/courses/${courseId}/chapters`, data);
+  return response.data.chapter;
 };
 
 /**
  * Update a chapter
  */
-export const updateChapter = async (chapterId: number, data: ChapterRequest): Promise<Chapter> => {
-  const response = await apiClient.put<Chapter>(`/manage/content/chapters/${chapterId}`, data);
-  return response.data;
+export const updateChapter = async (courseId: number, chapterId: number, data: ChapterRequest): Promise<ChapterResponse> => {
+  const response = await apiClient.put<{ chapter: ChapterResponse }>(`/v1/courses/${courseId}/chapters/${chapterId}`, data);
+  return response.data.chapter;
 };
 
 /**
  * Delete a chapter
  */
-export const deleteChapter = async (chapterId: number): Promise<{ message: string }> => {
-  const response = await apiClient.delete(`/manage/content/chapters/${chapterId}`);
+export const deleteChapter = async (courseId: number, chapterId: number): Promise<{ message: string }> => {
+  const response = await apiClient.delete(`/v1/courses/${courseId}/chapters/${chapterId}`);
   return response.data;
 };
 
@@ -139,24 +154,84 @@ export const deleteChapter = async (chapterId: number): Promise<{ message: strin
 /**
  * Create a new lesson in a chapter
  */
-export const createLesson = async (chapterId: number, data: LessonRequest): Promise<Lesson> => {
-  const response = await apiClient.post<Lesson>(`/manage/content/chapters/${chapterId}/lessons`, data);
-  return response.data;
+export const createLesson = async (courseId: number, chapterId: number, data: LessonRequest): Promise<LessonResponse> => {
+  const response = await apiClient.post<{ lesson: LessonResponse }>(`/v1/courses/${courseId}/chapters/${chapterId}/lessons`, data);
+  return response.data.lesson;
 };
 
 /**
  * Update a lesson
  */
-export const updateLesson = async (lessonId: number, data: LessonRequest): Promise<Lesson> => {
-  const response = await apiClient.put<Lesson>(`/manage/content/lessons/${lessonId}`, data);
-  return response.data;
+export const updateLesson = async (courseId: number, chapterId: number, lessonId: number, data: LessonRequest): Promise<LessonResponse> => {
+  const response = await apiClient.put<{ lesson: LessonResponse }>(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`, data);
+  return response.data.lesson;
 };
 
 /**
  * Delete a lesson
  */
-export const deleteLesson = async (lessonId: number): Promise<{ message: string }> => {
-  const response = await apiClient.delete(`/manage/content/lessons/${lessonId}`);
+export const deleteLesson = async (courseId: number, chapterId: number, lessonId: number): Promise<{ message: string }> => {
+  const response = await apiClient.delete(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`);
+  return response.data;
+};
+
+/**
+ * Upload video file for a lesson
+ * Note: Longer timeout for large video files
+ */
+export const uploadLessonVideo = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post<{ videoUrl: string }>(
+    `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-video`, 
+    formData,
+    { timeout: 600000 } // 10 minutes timeout for large videos
+  );
+  return response.data.videoUrl;
+};
+
+/**
+ * Upload document file for a lesson
+ */
+export const uploadLessonDocument = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post<{ documentUrl: string }>(
+    `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-document`, 
+    formData,
+    { timeout: 120000 } // 2 minutes timeout for documents
+  );
+  return response.data.documentUrl;
+};
+
+/**
+ * Upload slide file for a lesson
+ * Note: Longer timeout because PPT/PPTX files are converted to PDF on server
+ */
+export const uploadLessonSlide = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post<{ slideUrl: string }>(
+    `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-slide`, 
+    formData,
+    { timeout: 300000 } // 5 minutes timeout for slide conversion
+  );
+  return response.data.slideUrl;
+};
+
+/**
+ * Reorder chapters
+ */
+export const reorderChapters = async (courseId: number, chapterPositions: Record<number, number>): Promise<{ message: string }> => {
+  const response = await apiClient.patch(`/v1/courses/${courseId}/chapters/reorder`, chapterPositions);
+  return response.data;
+};
+
+/**
+ * Reorder lessons in a chapter
+ */
+export const reorderLessons = async (courseId: number, chapterId: number, lessonPositions: Record<number, number>): Promise<{ message: string }> => {
+  const response = await apiClient.patch(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/reorder`, lessonPositions);
   return response.data;
 };
 

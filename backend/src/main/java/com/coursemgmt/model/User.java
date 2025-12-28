@@ -47,6 +47,9 @@ public class User {
 
     private Boolean isEnabled = false; // Mặc định là false để kích hoạt
 
+    @Column(length = 500)
+    private String lockReason; // Lý do khóa tài khoản
+
     // (n-n) User có nhiều Role
     @ManyToMany(fetch = FetchType.EAGER) // Tải Role ngay khi tải User
     @JoinTable(name = "user_roles",

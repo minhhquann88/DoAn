@@ -10,11 +10,13 @@ import com.coursemgmt.model.*;
 import com.coursemgmt.repository.*;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -82,6 +84,7 @@ public class ContentService {
         lesson.setContentType(request.getContentType());
         lesson.setVideoUrl(request.getVideoUrl());
         lesson.setDocumentUrl(request.getDocumentUrl());
+        lesson.setSlideUrl(request.getSlideUrl());
         lesson.setContent(request.getContent());
         lesson.setPosition(request.getPosition());
         lesson.setDurationInMinutes(request.getDurationInMinutes());
@@ -99,6 +102,7 @@ public class ContentService {
         lesson.setContentType(request.getContentType());
         lesson.setVideoUrl(request.getVideoUrl());
         lesson.setDocumentUrl(request.getDocumentUrl());
+        lesson.setSlideUrl(request.getSlideUrl());
         lesson.setContent(request.getContent());
         lesson.setPosition(request.getPosition());
         lesson.setDurationInMinutes(request.getDurationInMinutes());
@@ -111,6 +115,43 @@ public class ContentService {
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new RuntimeException("Lesson not found!"));
         lessonRepository.delete(lesson);
+    }
+
+    // Helper method to get lessons for a chapter
+    public List<Lesson> getChapterLessons(Long chapterId) {
+        return lessonRepository.findByChapterIdOrderByPositionAsc(chapterId);
+    }
+
+    // Get lesson by ID
+    public Lesson getLessonById(Long lessonId) {
+        return lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new RuntimeException("Lesson not found!"));
+    }
+
+    // Reorder chapters
+    @Transactional
+    public void reorderChapters(Long courseId, Map<Long, Integer> chapterPositions) {
+        for (Map.Entry<Long, Integer> entry : chapterPositions.entrySet()) {
+            Chapter chapter = chapterRepository.findById(entry.getKey())
+                    .orElseThrow(() -> new RuntimeException("Chapter not found: " + entry.getKey()));
+            if (chapter.getCourse().getId().equals(courseId)) {
+                chapter.setPosition(entry.getValue());
+                chapterRepository.save(chapter);
+            }
+        }
+    }
+
+    // Reorder lessons in a chapter
+    @Transactional
+    public void reorderLessons(Long chapterId, Map<Long, Integer> lessonPositions) {
+        for (Map.Entry<Long, Integer> entry : lessonPositions.entrySet()) {
+            Lesson lesson = lessonRepository.findById(entry.getKey())
+                    .orElseThrow(() -> new RuntimeException("Lesson not found: " + entry.getKey()));
+            if (lesson.getChapter().getId().equals(chapterId)) {
+                lesson.setPosition(entry.getValue());
+                lessonRepository.save(lesson);
+            }
+        }
     }
 
     // --- Lấy nội dung (cho Học viên) ---
@@ -135,10 +176,10 @@ public class ContentService {
         System.out.println("User found: " + user.getUsername() + " (ID: " + user.getId() + ")");
         System.out.println("Course found: " + course.getTitle() + " (ID: " + course.getId() + ")");
 
-        // Kiểm tra xem user có phải là chủ khóa học không
+        // Kiểm tra xem user có phải là chủ khóa học không (chỉ khóa học của chính họ)
         boolean isInstructor = course.getInstructor() != null && 
                                course.getInstructor().getId().equals(user.getId());
-        System.out.println("Is Instructor: " + isInstructor);
+        System.out.println("Is Instructor (owner of this course): " + isInstructor);
 
         // Lấy thông tin Enrollment - Try multiple methods
         System.out.println("Attempting to find enrollment...");
@@ -168,10 +209,14 @@ public class ContentService {
             System.out.println("Enrollment Progress: " + enrollment.getProgress() + "%");
         }
 
-        // Nếu không phải Giảng viên VÀ chưa đăng ký, ném lỗi
+        // Authorization logic:
+        // - Cho phép nếu là instructor của khóa học này (chỉ khóa học của chính họ)
+        // - Cho phép nếu đã enrolled (bất kỳ ai, kể cả giảng viên khác xem khóa học của giảng viên khác)
+        // - Từ chối nếu không phải instructor và chưa enrolled
         if (!isInstructor && enrollment == null) {
-            System.err.println("ERROR: User " + user.getId() + " is not enrolled in course " + courseId);
-            throw new RuntimeException("Bạn chưa đăng ký khóa học này! Vui lòng đăng ký để xem nội dung.");
+            System.err.println("ERROR: User " + user.getId() + " is not the instructor of course " + courseId + " and is not enrolled");
+            // Throw AccessDeniedException instead of RuntimeException to return 403 instead of 400
+            throw new AccessDeniedException("Bạn chưa đăng ký khóa học này! Vui lòng đăng ký để xem nội dung.");
         }
         
         System.out.println("Access granted - proceeding to fetch content");
@@ -264,13 +309,32 @@ public class ContentService {
     // --- Chức năng: Theo dõi tiến độ ---
     @Transactional
     public void markLessonAsCompleted(Long lessonId, UserDetailsImpl userDetails) {
-        User user = userRepository.findById(userDetails.getId()).orElseThrow(() -> new RuntimeException("User not found!"));
-        Lesson lesson = lessonRepository.findById(lessonId).orElseThrow(() -> new RuntimeException("Lesson not found!"));
-        Course course = lesson.getChapter().getCourse();
+        System.out.println("DEBUG: markLessonAsCompleted called for lessonId=" + lessonId + ", userId=" + userDetails.getId());
+        
+        User user = userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
+        
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy bài học với ID: " + lessonId));
+        
+        // Safely get chapter and course with null checks
+        Chapter chapter = lesson.getChapter();
+        if (chapter == null) {
+            throw new RuntimeException("Bài học chưa được gán vào chương nào!");
+        }
+        
+        Course course = chapter.getCourse();
+        if (course == null) {
+            throw new RuntimeException("Chương chưa được gán vào khóa học nào!");
+        }
+        
+        System.out.println("DEBUG: Found lesson '" + lesson.getTitle() + "' in course '" + course.getTitle() + "'");
 
         // Tìm enrollment của user cho khóa học này
         Enrollment enrollment = enrollmentRepository.findByUserAndCourse(user, course)
                 .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký khóa học này!"));
+        
+        System.out.println("DEBUG: Found enrollment ID=" + enrollment.getId());
 
         // Tìm hoặc tạo mới User_Progress
         User_Progress progress = userProgressRepository.findByEnrollmentAndLesson(enrollment, lesson)
@@ -281,9 +345,13 @@ public class ContentService {
         progress.setIsCompleted(true);
         progress.setCompletedAt(LocalDateTime.now());
         userProgressRepository.save(progress);
+        
+        System.out.println("DEBUG: Marked lesson as completed, updating enrollment progress...");
 
         // Cập nhật lại % tiến độ tổng của Enrollment
         updateEnrollmentProgress(enrollment);
+        
+        System.out.println("DEBUG: markLessonAsCompleted completed successfully");
     }
 
     // --- Chức năng: Cập nhật tiến độ xem video (Auto-Progress) ---
@@ -369,27 +437,27 @@ public class ContentService {
 
     /**
      * Auto-issue certificate when enrollment reaches 100% completion
+     * Check if certificate already exists BEFORE calling issueCertificate to avoid transaction rollback
      */
     private void autoIssueCertificate(Enrollment enrollment) {
         try {
+            // Check if certificate already exists for this enrollment
+            // This prevents the transaction from being marked for rollback
+            boolean certificateExists = certificateService.existsByEnrollmentId(enrollment.getId());
+            
+            if (certificateExists) {
+                logger.info("Certificate already exists for Enrollment ID: " + enrollment.getId() + " - Skipping auto-issue");
+                return;
+            }
+            
             CertificateRequest certRequest = new CertificateRequest();
             certRequest.setEnrollmentId(enrollment.getId());
-            // Optional: Set final score if available
-            // certRequest.setFinalScore(calculateFinalScore(enrollment));
             
             certificateService.issueCertificate(certRequest);
             logger.info("Auto-issued certificate for Enrollment ID: " + enrollment.getId());
-        } catch (RuntimeException e) {
-            // Handle cases where certificate already exists or other errors
-            // Log but don't fail the enrollment update
-            if (e.getMessage() != null && e.getMessage().contains("already issued")) {
-                logger.info("Certificate already exists for Enrollment ID: " + enrollment.getId() + " - Skipping auto-issue");
-            } else {
-                logger.warning("Failed to auto-issue certificate for Enrollment ID: " + enrollment.getId() + " - Error: " + e.getMessage());
-            }
         } catch (Exception e) {
-            // Catch any other unexpected exceptions
-            logger.severe("Unexpected error while auto-issuing certificate for Enrollment ID: " + enrollment.getId() + " - Error: " + e.getMessage());
+            // Log but don't fail the enrollment update
+            logger.warning("Failed to auto-issue certificate for Enrollment ID: " + enrollment.getId() + " - Error: " + e.getMessage());
         }
     }
 }

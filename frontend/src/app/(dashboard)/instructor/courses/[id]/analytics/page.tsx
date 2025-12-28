@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCourse } from '@/hooks/useCourses';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '@/lib/api';
 import {
   BarChart,
   Bar,
@@ -20,30 +22,36 @@ import {
   Legend,
 } from 'recharts';
 
+interface CourseAnalyticsResponse {
+  courseId: number;
+  courseTitle: string;
+  totalEnrollments: number;
+  totalRevenue: number;
+  completionRate: number;
+  averageRating: number | null;
+  monthlyEnrollments: Array<{ month: string; enrollments: number }>;
+  monthlyRevenue: Array<{ month: string; revenue: number }>;
+}
+
 export default function CourseAnalyticsPage() {
   const params = useParams();
   const router = useRouter();
   const courseId = params.id as string;
   const { course, isLoading } = useCourse(courseId);
 
-  // Mock analytics data
-  const enrollmentData = [
-    { month: 'Tháng 1', enrollments: 5 },
-    { month: 'Tháng 2', enrollments: 12 },
-    { month: 'Tháng 3', enrollments: 8 },
-    { month: 'Tháng 4', enrollments: 15 },
-    { month: 'Tháng 5', enrollments: 20 },
-    { month: 'Tháng 6', enrollments: 25 },
-  ];
+  // Fetch analytics data from API
+  const { data: analytics, isLoading: isLoadingAnalytics } = useQuery<CourseAnalyticsResponse>({
+    queryKey: ['course-analytics', courseId],
+    queryFn: async () => {
+      const response = await apiClient.get<CourseAnalyticsResponse>(`/v1/courses/${courseId}/analytics`);
+      return response.data;
+    },
+    enabled: !!courseId,
+  });
 
-  const revenueData = [
-    { month: 'Tháng 1', revenue: 3000000 },
-    { month: 'Tháng 2', revenue: 7200000 },
-    { month: 'Tháng 3', revenue: 4400000 },
-    { month: 'Tháng 4', revenue: 9000000 },
-    { month: 'Tháng 5', revenue: 12000000 },
-    { month: 'Tháng 6', revenue: 15000000 },
-  ];
+  // Prepare chart data
+  const enrollmentData = analytics?.monthlyEnrollments || [];
+  const revenueData = analytics?.monthlyRevenue || [];
 
   return (
     <div className="p-6 space-y-6">
@@ -68,8 +76,14 @@ export default function CourseAnalyticsPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{course?.enrollmentCount || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Học viên đã đăng ký</p>
+              {isLoadingAnalytics ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{analytics?.totalEnrollments || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Học viên đã đăng ký</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -79,10 +93,16 @@ export default function CourseAnalyticsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {((course?.enrollmentCount || 0) * (course?.price || 0)).toLocaleString('vi-VN')} đ
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Tổng doanh thu</p>
+              {isLoadingAnalytics ? (
+                <Skeleton className="h-8 w-32" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {(analytics?.totalRevenue || 0).toLocaleString('vi-VN')} đ
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Tổng doanh thu</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -92,8 +112,16 @@ export default function CourseAnalyticsPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">65%</div>
-              <p className="text-xs text-muted-foreground mt-1">Học viên hoàn thành</p>
+              {isLoadingAnalytics ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {analytics?.completionRate ? `${analytics.completionRate.toFixed(1)}%` : '0%'}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Học viên hoàn thành</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -103,8 +131,16 @@ export default function CourseAnalyticsPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">4.8</div>
-              <p className="text-xs text-muted-foreground mt-1">Trung bình 5 sao</p>
+              {isLoadingAnalytics ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {analytics?.averageRating ? analytics.averageRating.toFixed(1) : 'N/A'}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Trung bình 5 sao</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -117,8 +153,12 @@ export default function CourseAnalyticsPage() {
               <CardDescription>Số lượng học viên đăng ký mới</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {isLoadingAnalytics ? (
                 <Skeleton className="h-[300px] w-full" />
+              ) : enrollmentData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Chưa có dữ liệu đăng ký
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={enrollmentData}>
@@ -140,8 +180,12 @@ export default function CourseAnalyticsPage() {
               <CardDescription>Thu nhập từ khóa học</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {isLoadingAnalytics ? (
                 <Skeleton className="h-[300px] w-full" />
+              ) : revenueData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Chưa có dữ liệu doanh thu
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={revenueData}>

@@ -35,6 +35,9 @@ public class PaymentService {
 
     @Autowired
     private CartItemRepository cartItemRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     /**
      * Tạo payment URL cho việc mua khóa học
@@ -112,19 +115,21 @@ public class PaymentService {
         System.out.println("Status Received: " + status);
         System.out.println("========================================");
         
-        // 1. Find Transaction by transactionCode
-        Transaction transaction = transactionRepository.findByTransactionCode(txnCode)
-                .orElseThrow(() -> {
-                    System.err.println("ERROR: Transaction not found with code: " + txnCode);
-                    return new ResourceNotFoundException(
-                        "Transaction not found with code: " + txnCode
-                    );
-                });
+        // 1. Find ALL Transactions by transactionCode (can be multiple for cart checkout)
+        java.util.List<Transaction> transactions = transactionRepository.findAllByTransactionCode(txnCode);
         
-        System.out.println("Transaction found: ID=" + transaction.getId() + 
-                          ", User=" + transaction.getUser().getId() + 
-                          ", Course=" + transaction.getCourse().getId() + 
-                          ", Amount=" + transaction.getAmount());
+        if (transactions.isEmpty()) {
+            System.err.println("ERROR: No transactions found with code: " + txnCode);
+            throw new ResourceNotFoundException("Transaction not found with code: " + txnCode);
+        }
+        
+        System.out.println("Found " + transactions.size() + " transaction(s) with code: " + txnCode);
+        for (Transaction t : transactions) {
+            System.out.println("  - Transaction ID=" + t.getId() + 
+                              ", Course=" + t.getCourse().getId() + 
+                              " (" + t.getCourse().getTitle() + ")" +
+                              ", Amount=" + t.getAmount());
+        }
         
         // 2. Normalize Status (Case Insensitive)
         ETransactionStatus newStatus;
@@ -136,15 +141,17 @@ public class PaymentService {
             throw new IllegalArgumentException("Invalid status: " + status + ". Must be SUCCESS or FAILED");
         }
         
-        // 3. Update transaction status
-        transaction.setStatus(newStatus);
-        Transaction savedTransaction = transactionRepository.save(transaction);
-        System.out.println("Transaction status updated to: " + savedTransaction.getStatus());
+        // 3. Update ALL transaction statuses
+        for (Transaction transaction : transactions) {
+            transaction.setStatus(newStatus);
+            transactionRepository.save(transaction);
+            System.out.println("Transaction " + transaction.getId() + " status updated to: " + newStatus);
+        }
         
-        // 4. Create Enrollment IF Success
+        // 4. Create Enrollments IF Success
         if (newStatus == ETransactionStatus.SUCCESS) {
-            System.out.println("Status is SUCCESS - Creating Enrollment...");
-            createEnrollmentAfterPayment(transaction, cartId);
+            System.out.println("Status is SUCCESS - Creating Enrollments for all courses...");
+            createEnrollmentsAfterPayment(transactions, cartId);
         } else {
             System.out.println("Status is " + newStatus + " - Skipping Enrollment creation");
         }
@@ -156,62 +163,58 @@ public class PaymentService {
         return Map.of(
             "message", "Payment callback processed successfully",
             "transactionCode", txnCode,
-            "status", savedTransaction.getStatus().toString()
+            "status", newStatus.toString(),
+            "coursesCount", String.valueOf(transactions.size())
         );
     }
 
     /**
      * Tự động tạo enrollment sau khi thanh toán thành công
-     * @param transaction Transaction đã thanh toán thành công
+     * @param transactions List các transactions đã thanh toán thành công (có thể là nhiều courses)
      * @param cartId Cart ID nếu thanh toán từ giỏ hàng (null nếu thanh toán đơn lẻ)
      */
-    private void createEnrollmentAfterPayment(Transaction transaction, String cartId) {
-        Long userId = transaction.getUser().getId();
+    private void createEnrollmentsAfterPayment(java.util.List<Transaction> transactions, String cartId) {
+        if (transactions.isEmpty()) return;
         
+        // User is same for all transactions
+        Long userId = transactions.get(0).getUser().getId();
+        
+        // Create enrollment for each transaction's course
+        System.out.println(">>> Creating enrollments for " + transactions.size() + " course(s)");
+        
+        for (Transaction transaction : transactions) {
+            Course course = transaction.getCourse();
+            createSingleEnrollment(userId, course, transaction);
+        }
+        
+        // Clear cart if cartId is provided
         if (cartId != null && !cartId.isEmpty()) {
-            // Cart checkout: Create enrollments for all courses in cart
-            System.out.println(">>> Processing CART CHECKOUT - Cart ID: " + cartId);
-            
             try {
                 Long cartIdLong = Long.parseLong(cartId);
-                Optional<Cart> cartOpt = cartRepository.findById(cartIdLong);
+                Optional<Cart> cartOpt = cartRepository.findByIdWithItems(cartIdLong);
                 
                 if (cartOpt.isPresent()) {
                     Cart cart = cartOpt.get();
                     if (cart.getItems() != null && !cart.getItems().isEmpty()) {
-                        System.out.println(">>> Found " + cart.getItems().size() + " courses in cart");
+                        int itemCount = cart.getItems().size();
+                        System.out.println(">>> Clearing " + itemCount + " items from cart ID: " + cart.getId());
                         
-                        // Create enrollments for all courses in cart
-                        for (CartItem item : cart.getItems()) {
-                            Course course = item.getCourse();
-                            createSingleEnrollment(userId, course);
-                        }
+                        cart.getItems().clear();
+                        cartRepository.save(cart);
                         
-                        // Clear cart after successful payment
-                        cartItemRepository.deleteByCart(cart);
-                        System.out.println(">>> Cart cleared after successful payment");
+                        System.out.println(">>> Cart cleared successfully after payment");
                     }
-                } else {
-                    System.err.println(">>> WARNING: Cart not found with ID: " + cartId);
-                    // Fallback: Create enrollment for the transaction's course
-                    createSingleEnrollment(userId, transaction.getCourse());
                 }
             } catch (NumberFormatException e) {
                 System.err.println(">>> ERROR: Invalid cartId format: " + cartId);
-                // Fallback: Create enrollment for the transaction's course
-                createSingleEnrollment(userId, transaction.getCourse());
             }
-        } else {
-            // Single course payment: Create enrollment for the transaction's course
-            System.out.println(">>> Processing SINGLE COURSE PAYMENT");
-            createSingleEnrollment(userId, transaction.getCourse());
         }
     }
     
     /**
      * Tạo enrollment cho một course
      */
-    private void createSingleEnrollment(Long userId, Course course) {
+    private void createSingleEnrollment(Long userId, Course course, Transaction transaction) {
         Long courseId = course.getId();
         
         System.out.println(">>> Creating Enrollment for User ID: " + userId + ", Course ID: " + courseId);
@@ -253,8 +256,19 @@ public class PaymentService {
         } else {
             System.err.println(">>> ERROR: Enrollment was not saved properly! ID: " + savedEnrollment.getId());
         }
+        
+        // Tạo thông báo cho instructor khi có học viên mua khóa học
+        try {
+            if (course.getInstructor() != null && transaction != null) {
+                Long transactionId = transaction.getId();
+                notificationService.notifyCoursePurchased(userId, courseId, transactionId);
+            }
+        } catch (Exception e) {
+            // Log error nhưng không throw để không ảnh hưởng đến quá trình thanh toán
+            System.err.println(">>> ERROR: Failed to create notification: " + e.getMessage());
+        }
     }
-
+    
     /**
      * Generate unique transaction code
      */

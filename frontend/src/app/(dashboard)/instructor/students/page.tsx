@@ -14,79 +14,51 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useAuthStore } from '@/stores/authStore';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '@/lib/api';
 
 interface Student {
-  id: number;
-  name: string;
-  email: string;
+  enrollmentId: number;
+  studentId: number;
+  studentName: string;
+  studentEmail: string;
+  courseId: number;
   courseTitle: string;
   progress: number;
-  joinDate: string;
+  enrolledAt: string;
   lastActive: string;
+  status: string;
 }
-
-// Mock data - sẽ thay thế bằng API call sau
-const mockStudents: Student[] = [
-  {
-    id: 1,
-    name: 'Nguyễn Văn A',
-    email: 'nguyenvana@example.com',
-    courseTitle: 'React.js từ cơ bản đến nâng cao',
-    progress: 75,
-    joinDate: '2024-01-15',
-    lastActive: '2024-12-20',
-  },
-  {
-    id: 2,
-    name: 'Trần Thị B',
-    email: 'tranthib@example.com',
-    courseTitle: 'Node.js và Express',
-    progress: 45,
-    joinDate: '2024-02-10',
-    lastActive: '2024-12-19',
-  },
-  {
-    id: 3,
-    name: 'Lê Văn C',
-    email: 'levanc@example.com',
-    courseTitle: 'React.js từ cơ bản đến nâng cao',
-    progress: 90,
-    joinDate: '2024-01-20',
-    lastActive: '2024-12-21',
-  },
-  {
-    id: 4,
-    name: 'Phạm Thị D',
-    email: 'phamthid@example.com',
-    courseTitle: 'Python cho Data Science',
-    progress: 30,
-    joinDate: '2024-03-05',
-    lastActive: '2024-12-18',
-  },
-  {
-    id: 5,
-    name: 'Hoàng Văn E',
-    email: 'hoangvane@example.com',
-    courseTitle: 'Node.js và Express',
-    progress: 100,
-    joinDate: '2024-01-10',
-    lastActive: '2024-12-21',
-  },
-];
 
 export default function InstructorStudentsPage() {
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [isLoading] = React.useState(false);
+
+  // Fetch students data from API
+  const { data: students = [], isLoading } = useQuery<Student[]>({
+    queryKey: ['instructor-students'],
+    queryFn: async () => {
+      const response = await apiClient.get<Student[]>('/instructor/students');
+      return response.data;
+    },
+  });
 
   const filteredStudents = React.useMemo(() => {
-    if (!searchQuery) return mockStudents;
-    return mockStudents.filter(student =>
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    if (!searchQuery) return students;
+    return students.filter(student =>
+      student.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.studentEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.courseTitle.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [students, searchQuery]);
+
+  // Calculate stats
+  const totalStudents = students.length;
+  const studyingCount = students.filter(s => s.progress > 0 && s.progress < 100).length;
+  const completedCount = students.filter(s => s.progress === 100 || s.status === 'COMPLETED').length;
+  const averageProgress = students.length > 0
+    ? Math.round(students.reduce((acc, s) => acc + s.progress, 0) / students.length)
+    : 0;
 
   const getProgressColor = (progress: number) => {
     if (progress >= 80) return 'bg-green-500';
@@ -110,7 +82,11 @@ export default function InstructorStudentsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Tổng học viên</p>
-                <p className="text-2xl font-bold mt-1">{mockStudents.length}</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold mt-1">{totalStudents}</p>
+                )}
               </div>
               <Users className="h-8 w-8 text-primary" />
             </div>
@@ -119,9 +95,11 @@ export default function InstructorStudentsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Đang học</p>
-                <p className="text-2xl font-bold mt-1">
-                  {mockStudents.filter(s => s.progress > 0 && s.progress < 100).length}
-                </p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold mt-1">{studyingCount}</p>
+                )}
               </div>
               <BookOpen className="h-8 w-8 text-blue-500" />
             </div>
@@ -130,9 +108,11 @@ export default function InstructorStudentsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Đã hoàn thành</p>
-                <p className="text-2xl font-bold mt-1">
-                  {mockStudents.filter(s => s.progress === 100).length}
-                </p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold mt-1">{completedCount}</p>
+                )}
               </div>
               <GraduationCap className="h-8 w-8 text-green-500" />
             </div>
@@ -141,9 +121,11 @@ export default function InstructorStudentsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Tiến độ TB</p>
-                <p className="text-2xl font-bold mt-1">
-                  {Math.round(mockStudents.reduce((acc, s) => acc + s.progress, 0) / mockStudents.length)}%
-                </p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold mt-1">{averageProgress}%</p>
+                )}
               </div>
               <TrendingUp className="h-8 w-8 text-orange-500" />
             </div>
@@ -204,17 +186,17 @@ export default function InstructorStudentsPage() {
                 </thead>
                 <tbody>
                   {filteredStudents.map((student) => (
-                    <tr key={student.id} className="border-b hover:bg-muted/50 transition-colors">
+                    <tr key={student.enrollmentId} className="border-b hover:bg-muted/50 transition-colors">
                       <td className="p-4">
                         <div className="flex items-center space-x-3">
                           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                             <span className="text-sm font-semibold text-primary">
-                              {student.name.charAt(0)}
+                              {student.studentName.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div>
-                            <p className="font-semibold">{student.name}</p>
-                            <p className="text-sm text-muted-foreground">{student.email}</p>
+                            <p className="font-semibold">{student.studentName}</p>
+                            <p className="text-sm text-muted-foreground">{student.studentEmail}</p>
                           </div>
                         </div>
                       </td>
@@ -224,8 +206,8 @@ export default function InstructorStudentsPage() {
                       <td className="p-4">
                         <div className="space-y-2 min-w-[200px]">
                           <div className="flex items-center justify-between text-sm">
-                            <span>{student.progress}%</span>
-                            {student.progress === 100 && (
+                            <span>{Math.round(student.progress)}%</span>
+                            {(student.progress === 100 || student.status === 'COMPLETED') && (
                               <Badge variant="default" className="text-xs">Hoàn thành</Badge>
                             )}
                           </div>
@@ -238,13 +220,13 @@ export default function InstructorStudentsPage() {
                       <td className="p-4">
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4" />
-                          <span>{new Date(student.joinDate).toLocaleDateString('vi-VN')}</span>
+                          <span>{student.enrolledAt ? new Date(student.enrolledAt).toLocaleDateString('vi-VN') : 'N/A'}</span>
                         </div>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4" />
-                          <span>{new Date(student.lastActive).toLocaleDateString('vi-VN')}</span>
+                          <span>{student.lastActive ? new Date(student.lastActive).toLocaleDateString('vi-VN') : 'N/A'}</span>
                         </div>
                       </td>
                     </tr>

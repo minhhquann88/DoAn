@@ -44,7 +44,7 @@ export const useCourses = (filters?: SearchFilters) => {
       if (filters?.sortBy === 'price_high') sortParam = 'price,desc';
       params.append('sort', sortParam);
       
-      const response = await apiClient.get(`/courses?${params.toString()}`);
+      const response = await apiClient.get(`/v1/courses?${params.toString()}`);
       return response.data;
     },
   });
@@ -67,7 +67,7 @@ export const useCourse = (id: number | string) => {
   } = useQuery<Course>({
     queryKey: ['course', id],
     queryFn: async () => {
-      const response = await apiClient.get(`/courses/${id}`);
+      const response = await apiClient.get(`/v1/courses/${id}`);
       return response.data;
     },
     enabled: !!id,
@@ -82,15 +82,13 @@ export const useCreateCourse = () => {
   
   return useMutation({
     mutationFn: async (data: CourseRequest) => {
-      const response = await apiClient.post('/courses', data);
+      const response = await apiClient.post('/v1/courses', data);
       return response.data;
     },
     onSuccess: () => {
+      // Invalidate both general courses and instructor courses queries to refresh the list
       queryClient.invalidateQueries({ queryKey: ['courses'] });
-      addToast({
-        type: 'success',
-        description: 'Tạo khóa học thành công!',
-      });
+      queryClient.invalidateQueries({ queryKey: ['instructor-courses'] });
     },
     onError: (error: any) => {
       addToast({
@@ -107,7 +105,7 @@ export const useUpdateCourse = (id: number) => {
   
   return useMutation({
     mutationFn: async (data: CourseRequest) => {
-      const response = await apiClient.put(`/courses/${id}`, data);
+      const response = await apiClient.put(`/v1/courses/${id}`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -133,7 +131,7 @@ export const useDeleteCourse = () => {
   
   return useMutation({
     mutationFn: async (id: number) => {
-      await apiClient.delete(`/courses/${id}`);
+      await apiClient.delete(`/v1/courses/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['courses'] });
@@ -153,7 +151,7 @@ export const useDeleteCourse = () => {
 
 /**
  * Hook để lấy danh sách khóa học nổi bật (Featured Courses)
- * Gọi trực tiếp endpoint /courses/featured từ backend
+ * Gọi trực tiếp endpoint /v1/courses/featured từ backend
  */
 export const useFeaturedCourses = () => {
   const {
@@ -163,7 +161,7 @@ export const useFeaturedCourses = () => {
   } = useQuery<Course[]>({
     queryKey: ['featured-courses'],
     queryFn: async () => {
-      const response = await apiClient.get<Course[]>('/courses/featured');
+      const response = await apiClient.get<Course[]>('/v1/courses/featured');
       return response.data;
     },
   });
@@ -173,5 +171,90 @@ export const useFeaturedCourses = () => {
     isLoading,
     error,
   };
+};
+
+/**
+ * Hook để lấy danh sách khóa học của giảng viên
+ */
+export const useInstructorCourses = () => {
+  const {
+    data: courses,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<Course[]>({
+    queryKey: ['instructor-courses'],
+    queryFn: async () => {
+      const response = await apiClient.get<Course[]>('/instructor/courses');
+      return response.data;
+    },
+  });
+  
+  return {
+    courses: courses || [],
+    isLoading,
+    error,
+    refetch,
+  };
+};
+
+/**
+ * Hook để publish khóa học (DRAFT -> PUBLISHED)
+ */
+export const usePublishCourse = () => {
+  const queryClient = useQueryClient();
+  const { addToast } = useUIStore();
+  
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiClient.post(`/v1/courses/${id}/publish`);
+      return response.data;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+      queryClient.invalidateQueries({ queryKey: ['instructor-courses'] });
+      queryClient.invalidateQueries({ queryKey: ['course', id] });
+      addToast({
+        type: 'success',
+        description: 'Xuất bản khóa học thành công!',
+      });
+    },
+    onError: (error: any) => {
+      addToast({
+        type: 'error',
+        description: handleApiError(error),
+      });
+    },
+  });
+};
+
+/**
+ * Hook để unpublish khóa học (PUBLISHED -> DRAFT)
+ */
+export const useUnpublishCourse = () => {
+  const queryClient = useQueryClient();
+  const { addToast } = useUIStore();
+  
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiClient.post(`/v1/courses/${id}/unpublish`);
+      return response.data;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+      queryClient.invalidateQueries({ queryKey: ['instructor-courses'] });
+      queryClient.invalidateQueries({ queryKey: ['course', id] });
+      addToast({
+        type: 'success',
+        description: 'Đã gỡ khóa học thành công!',
+      });
+    },
+    onError: (error: any) => {
+      addToast({
+        type: 'error',
+        description: handleApiError(error),
+      });
+    },
+  });
 };
 

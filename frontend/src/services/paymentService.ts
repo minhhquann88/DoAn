@@ -15,16 +15,23 @@ const CERTIFICATE_PREFIX = '/v1/certificates';
 export interface Transaction {
   id: number;
   userId: number;
+  userFullName?: string;
   courseId: number;
-  courseName?: string;
+  courseTitle?: string;
   amount: number;
-  currency: string;
-  paymentMethod: 'VNPAY' | 'MOMO' | 'BANK_TRANSFER' | 'CREDIT_CARD';
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
-  transactionCode?: string;
-  description?: string;
+  paymentGateway: 'VNPAY' | 'MOMO' | 'BANK_TRANSFER';
+  transactionStatus: 'PENDING' | 'SUCCESS' | 'FAILED' | 'REFUNDED';
+  transactionCode: string;
+  bankCode?: string;
+  cardType?: string;
   createdAt: string;
   completedAt?: string;
+  // Legacy fields for backward compatibility
+  courseName?: string;
+  currency?: string;
+  paymentMethod?: 'VNPAY' | 'MOMO' | 'BANK_TRANSFER' | 'CREDIT_CARD';
+  status?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  description?: string;
   failureReason?: string;
 }
 
@@ -86,6 +93,28 @@ export interface CertificateVerification {
 // =====================
 
 /**
+ * UC-PAY-01: Create payment URL for course purchase
+ * POST /api/v1/payment/create
+ */
+export const createPayment = async (courseId: number): Promise<{ paymentUrl: string; transactionCode: string; amount: string }> => {
+  const response = await apiClient.post('/v1/payment/create', { courseId });
+  return response.data;
+};
+
+/**
+ * UC-PAY-01: Mock process payment callback (IPN)
+ * POST /api/v1/payment/ipn-mock
+ */
+export const mockProcessPayment = async (txnCode: string, status: 'SUCCESS' | 'FAILED', cartId?: string): Promise<{ message: string; transactionCode: string; status: string }> => {
+  const payload: { txnCode: string; status: string; cartId?: string } = { txnCode, status };
+  if (cartId) {
+    payload.cartId = cartId;
+  }
+  const response = await apiClient.post('/v1/payment/ipn-mock', payload);
+  return response.data;
+};
+
+/**
  * Create payment transaction for course enrollment
  */
 export const createTransaction = async (
@@ -104,23 +133,40 @@ export const getTransactionById = async (transactionId: number): Promise<Transac
 };
 
 /**
- * Get user's transactions
+ * UC-PAY-02: Get current user's transactions (Lịch sử giao dịch)
+ * GET /api/v1/transactions/my-transactions
  */
-export const getMyTransactions = async (
+export const getMyTransactions = async (params?: {
+  page?: number;
+  size?: number;
+}): Promise<{
+  content: Transaction[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  first: boolean;
+  last: boolean;
+}> => {
+  const response = await apiClient.get(`${TRANSACTION_PREFIX}/my-transactions`, { params });
+  return response.data;
+};
+
+/**
+ * Get user's transactions by userId (Admin or for specific user)
+ * GET /api/v1/transactions/user/{userId}
+ */
+export const getUserTransactions = async (
   userId: number,
   params?: {
-    status?: Transaction['status'];
     page?: number;
     size?: number;
-    startDate?: string;
-    endDate?: string;
   }
 ): Promise<{
   content: Transaction[];
   totalElements: number;
   totalPages: number;
 }> => {
-  // Backend uses /v1/transactions/user/{userId}
   const response = await apiClient.get(`${TRANSACTION_PREFIX}/user/${userId}`, { params });
   return response.data;
 };
@@ -430,7 +476,10 @@ export const formatAmount = (amount: number, currency: string = 'VND'): string =
 };
 
 export default {
-  // Payment
+  // Payment (UC-PAY-01)
+  createPayment,
+  mockProcessPayment,
+  // Payment (Legacy)
   createTransaction,
   getTransactionById,
   getMyTransactions,

@@ -3,12 +3,18 @@ package com.coursemgmt.service;
 import com.coursemgmt.dto.InstructorDashboardStatsDTO;
 import com.coursemgmt.dto.InstructorCourseDTO;
 import com.coursemgmt.dto.InstructorChartDataDTO;
+import com.coursemgmt.dto.InstructorEarningsDTO;
+import com.coursemgmt.dto.InstructorStudentDTO;
 import com.coursemgmt.model.Course;
 import com.coursemgmt.model.ECourseStatus;
+import com.coursemgmt.model.ETransactionStatus;
 import com.coursemgmt.model.Transaction;
+import com.coursemgmt.model.Enrollment;
+import com.coursemgmt.model.User_Progress;
 import com.coursemgmt.repository.CourseRepository;
 import com.coursemgmt.repository.EnrollmentRepository;
 import com.coursemgmt.repository.TransactionRepository;
+import com.coursemgmt.repository.UserProgressRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +38,9 @@ public class InstructorDashboardService {
 
     @Autowired
     private TransactionRepository transactionRepository;
+    
+    @Autowired
+    private UserProgressRepository userProgressRepository;
 
     /**
      * Lấy thống kê tổng quan cho Instructor Dashboard
@@ -124,39 +133,171 @@ public class InstructorDashboardService {
                     .mapToDouble(t -> t.getAmount() != null ? t.getAmount() : 0.0)
                     .sum();
             
-            // Nếu không có dữ liệu thật, tạo mock trend
-            if (monthlyEarnings == 0.0 && i < 3) {
-                // Tạo trend tăng dần từ tháng đầu đến tháng hiện tại
-                monthlyEarnings = (6 - i) * 2000000.0; // Tăng dần từ 2M đến 12M
-            }
-            
             earningsData.add(new InstructorChartDataDTO.MonthlyData(monthLabel, monthlyEarnings));
             
-            // Tính số lượng đăng ký trong tháng này
-            Long monthlyEnrollments = 0L;
-            if (!courseIds.isEmpty()) {
-                for (Long courseId : courseIds) {
-                    // Đếm enrollments trong tháng này
-                    List<com.coursemgmt.model.Enrollment> enrollments = enrollmentRepository.findAll()
-                            .stream()
-                            .filter(e -> e.getCourse() != null && e.getCourse().getId().equals(courseId))
-                            .filter(e -> e.getEnrolledAt() != null && 
-                                    e.getEnrolledAt().isAfter(monthStart.minusSeconds(1)) && 
-                                    e.getEnrolledAt().isBefore(monthEnd.plusSeconds(1)))
-                            .collect(Collectors.toList());
-                    monthlyEnrollments += enrollments.size();
-                }
-            }
-            
-            // Nếu không có dữ liệu thật, tạo mock trend
-            if (monthlyEnrollments == 0 && i < 3) {
-                monthlyEnrollments = (6 - i) * 5L; // Tăng dần từ 5 đến 30
+            // Tính số lượng đăng ký trong tháng này (sử dụng query tối ưu)
+            Long monthlyEnrollments = enrollmentRepository.countEnrollmentsByInstructorAndDateRange(
+                instructorId, monthStart, monthEnd
+            );
+            if (monthlyEnrollments == null) {
+                monthlyEnrollments = 0L;
             }
             
             enrollmentsData.add(new InstructorChartDataDTO.MonthlyData(monthLabel, monthlyEnrollments.doubleValue()));
         }
         
         return new InstructorChartDataDTO(earningsData, enrollmentsData);
+    }
+    
+    /**
+     * Lấy dữ liệu doanh thu chi tiết cho trang Doanh thu
+     */
+    @Transactional(readOnly = true)
+    public InstructorEarningsDTO getEarnings(Long instructorId) {
+        // 1. Tổng doanh thu (từ transactions thành công)
+        Double totalRevenue = transactionRepository.calculateRevenueByInstructor(instructorId);
+        if (totalRevenue == null) {
+            totalRevenue = 0.0;
+        }
+        
+        // 2. Đang chờ thanh toán (từ transactions PENDING)
+        List<Course> instructorCourses = courseRepository.findByInstructorId(instructorId);
+        List<Long> courseIds = instructorCourses.stream()
+                .map(Course::getId)
+                .collect(Collectors.toList());
+        
+        Double pendingBalance = 0.0;
+        if (!courseIds.isEmpty()) {
+            List<Transaction> pendingTransactions = transactionRepository.findAll()
+                    .stream()
+                    .filter(t -> t.getCourse() != null && courseIds.contains(t.getCourse().getId()))
+                    .filter(t -> t.getStatus() == ETransactionStatus.PENDING)
+                    .collect(Collectors.toList());
+            
+            pendingBalance = pendingTransactions.stream()
+                    .mapToDouble(t -> t.getAmount() != null ? t.getAmount() : 0.0)
+                    .sum();
+        }
+        
+        // 3. Có thể rút = Tổng doanh thu - Đang chờ
+        Double availableBalance = totalRevenue - pendingBalance;
+        if (availableBalance < 0) {
+            availableBalance = 0.0;
+        }
+        
+        // 4. Tính tăng trưởng (so sánh tháng đầu và tháng cuối trong 6 tháng gần nhất)
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime firstMonthStart = now.minusMonths(5).with(TemporalAdjusters.firstDayOfMonth())
+                .withHour(0).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime firstMonthEnd = firstMonthStart.with(TemporalAdjusters.lastDayOfMonth())
+                .withHour(23).withMinute(59).withSecond(59).withNano(999999999);
+        
+        LocalDateTime lastMonthStart = now.minusMonths(0).with(TemporalAdjusters.firstDayOfMonth())
+                .withHour(0).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime lastMonthEnd = lastMonthStart.with(TemporalAdjusters.lastDayOfMonth())
+                .withHour(23).withMinute(59).withSecond(59).withNano(999999999);
+        
+        List<Transaction> firstMonthTransactions = transactionRepository
+                .findSuccessfulTransactionsByInstructorAndDateRange(instructorId, firstMonthStart, firstMonthEnd);
+        Double firstMonthRevenue = firstMonthTransactions.stream()
+                .mapToDouble(t -> t.getAmount() != null ? t.getAmount() : 0.0)
+                .sum();
+        
+        List<Transaction> lastMonthTransactions = transactionRepository
+                .findSuccessfulTransactionsByInstructorAndDateRange(instructorId, lastMonthStart, lastMonthEnd);
+        Double lastMonthRevenue = lastMonthTransactions.stream()
+                .mapToDouble(t -> t.getAmount() != null ? t.getAmount() : 0.0)
+                .sum();
+        
+        Double growthRate = 0.0;
+        if (firstMonthRevenue > 0) {
+            growthRate = ((lastMonthRevenue - firstMonthRevenue) / firstMonthRevenue) * 100.0;
+        } else if (lastMonthRevenue > 0) {
+            growthRate = 100.0; // Tăng từ 0 lên có doanh thu
+        }
+        
+        // 5. Lấy giao dịch gần đây (10 giao dịch mới nhất)
+        List<Transaction> allTransactions = transactionRepository
+                .findByInstructorIdOrderByCreatedAtDesc(instructorId)
+                .stream()
+                .limit(10)
+                .collect(Collectors.toList());
+        
+        List<InstructorEarningsDTO.TransactionDTO> recentTransactions = allTransactions.stream()
+                .map(t -> {
+                    InstructorEarningsDTO.TransactionDTO dto = new InstructorEarningsDTO.TransactionDTO();
+                    dto.setId(t.getId());
+                    dto.setCourseTitle(t.getCourse() != null ? t.getCourse().getTitle() : "N/A");
+                    dto.setStudentName(t.getUser() != null ? t.getUser().getFullName() : "N/A");
+                    dto.setAmount(t.getAmount() != null ? t.getAmount() : 0.0);
+                    dto.setDate(t.getCreatedAt() != null ? 
+                            t.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A");
+                    dto.setStatus(t.getStatus() == ETransactionStatus.SUCCESS ? "completed" : 
+                                 t.getStatus() == ETransactionStatus.PENDING ? "pending" : "failed");
+                    return dto;
+                })
+                .collect(Collectors.toList());
+        
+        return new InstructorEarningsDTO(
+            totalRevenue,
+            availableBalance,
+            pendingBalance,
+            growthRate,
+            recentTransactions
+        );
+    }
+    
+    /**
+     * Lấy danh sách học viên đã đăng ký các khóa học của Instructor
+     */
+    @Transactional(readOnly = true)
+    public List<InstructorStudentDTO> getStudents(Long instructorId) {
+        // Lấy tất cả courses của instructor
+        List<Course> instructorCourses = courseRepository.findByInstructorId(instructorId);
+        List<Long> courseIds = instructorCourses.stream()
+                .map(Course::getId)
+                .collect(Collectors.toList());
+        
+        if (courseIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        // Lấy tất cả enrollments của các courses này (sử dụng query tối ưu)
+        List<Enrollment> enrollments = enrollmentRepository.findByInstructorIdWithDetails(instructorId);
+        
+        // Convert sang DTO
+        return enrollments.stream().map(enrollment -> {
+            InstructorStudentDTO dto = new InstructorStudentDTO();
+            dto.setEnrollmentId(enrollment.getId());
+            dto.setStudentId(enrollment.getUser().getId());
+            dto.setStudentName(enrollment.getUser().getFullName() != null ? 
+                    enrollment.getUser().getFullName() : enrollment.getUser().getUsername());
+            dto.setStudentEmail(enrollment.getUser().getEmail());
+            dto.setCourseId(enrollment.getCourse().getId());
+            dto.setCourseTitle(enrollment.getCourse().getTitle());
+            dto.setProgress(enrollment.getProgress() != null ? enrollment.getProgress() : 0.0);
+            dto.setEnrolledAt(enrollment.getEnrolledAt());
+            dto.setStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : "IN_PROGRESS");
+            
+            // Lấy lastActive từ User_Progress mới nhất
+            LocalDateTime lastActive = null;
+            if (enrollment.getProgresses() != null && !enrollment.getProgresses().isEmpty()) {
+                lastActive = enrollment.getProgresses().stream()
+                        .filter(p -> p.getCompletedAt() != null)
+                        .map(User_Progress::getCompletedAt)
+                        .max(LocalDateTime::compareTo)
+                        .orElse(null);
+            }
+            
+            // Nếu không có completedAt, lấy enrolledAt
+            if (lastActive == null) {
+                lastActive = enrollment.getEnrolledAt();
+            }
+            
+            dto.setLastActive(lastActive);
+            
+            return dto;
+        }).collect(Collectors.toList());
     }
 }
 

@@ -1,56 +1,76 @@
 package com.coursemgmt.config;
 
-import com.coursemgmt.model.ERole;
-import com.coursemgmt.model.Role;
-import com.coursemgmt.repository.RoleRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.coursemgmt.model.Category;
+import com.coursemgmt.repository.CategoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-/**
- * DataLoader - Tự động khởi tạo dữ liệu cần thiết khi ứng dụng khởi động
- */
 @Component
 public class DataLoader implements CommandLineRunner {
 
-    private static final Logger logger = LoggerFactory.getLogger(DataLoader.class);
-
     @Autowired
-    private RoleRepository roleRepository;
+    private CategoryRepository categoryRepository;
 
     @Override
     public void run(String... args) throws Exception {
-        initRoles();
-    }
+        if (categoryRepository.count() == 0) {
+            System.out.println("Initializing categories...");
 
-    private void initRoles() {
-        // Tạo ROLE_STUDENT nếu chưa có
-        if (roleRepository.findByName(ERole.ROLE_STUDENT).isEmpty()) {
-            Role studentRole = new Role();
-            studentRole.setName(ERole.ROLE_STUDENT);
-            roleRepository.save(studentRole);
-            logger.info("Created role: ROLE_STUDENT");
+            Category cat1 = new Category();
+            cat1.setName("Lập trình");
+            cat1.setDescription("Các khóa học về lập trình và phát triển phần mềm");
+            categoryRepository.save(cat1);
+
+            Category cat2 = new Category();
+            cat2.setName("Web Development");
+            cat2.setDescription("Phát triển ứng dụng web");
+            categoryRepository.save(cat2);
+
+            Category cat3 = new Category();
+            cat3.setName("Mobile Development");
+            cat3.setDescription("Phát triển ứng dụng di động");
+            categoryRepository.save(cat3);
+
+            Category cat4 = new Category();
+            cat4.setName("Data Science");
+            cat4.setDescription("Khoa học dữ liệu và phân tích");
+            categoryRepository.save(cat4);
+
+            Category cat5 = new Category();
+            cat5.setName("Front-end");
+            cat5.setDescription("Phát triển giao diện người dùng");
+            categoryRepository.save(cat5);
+
+            Category cat6 = new Category();
+            cat6.setName("Back-end");
+            cat6.setDescription("Phát triển server và API");
+            categoryRepository.save(cat6);
+
+            Category cat7 = new Category();
+            cat7.setName("Mobile App");
+            cat7.setDescription("Phát triển ứng dụng di động");
+            categoryRepository.save(cat7);
+
+            Category cat8 = new Category();
+            cat8.setName("DevOps");
+            cat8.setDescription("Vận hành và triển khai phần mềm");
+            categoryRepository.save(cat8);
+
+            Category cat9 = new Category();
+            cat9.setName("UI/UX Design");
+            cat9.setDescription("Thiết kế giao diện và trải nghiệm người dùng");
+            categoryRepository.save(cat9);
+
+            Category cat10 = new Category();
+            cat10.setName("Database");
+            cat10.setDescription("Quản lý và phát triển cơ sở dữ liệu");
+            categoryRepository.save(cat10);
+
+            System.out.println("Categories initialized successfully!");
+        } else {
+            System.out.println("Categories already exist. Skipping initialization.");
         }
-
-        // Tạo ROLE_LECTURER nếu chưa có
-        if (roleRepository.findByName(ERole.ROLE_LECTURER).isEmpty()) {
-            Role lecturerRole = new Role();
-            lecturerRole.setName(ERole.ROLE_LECTURER);
-            roleRepository.save(lecturerRole);
-            logger.info("Created role: ROLE_LECTURER");
-        }
-
-        // Tạo ROLE_ADMIN nếu chưa có
-        if (roleRepository.findByName(ERole.ROLE_ADMIN).isEmpty()) {
-            Role adminRole = new Role();
-            adminRole.setName(ERole.ROLE_ADMIN);
-            roleRepository.save(adminRole);
-            logger.info("Created role: ROLE_ADMIN");
-        }
-
-        logger.info("Roles initialization completed!");
     }
 }
 

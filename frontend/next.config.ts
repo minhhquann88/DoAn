@@ -10,8 +10,22 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'files.fullstack.edu.vn', // Dự phòng
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8080',
+        pathname: '/api/files/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: '8080',
+        pathname: '/api/files/**',
       }
     ],
+    // Tắt image optimization trong development để tránh lỗi private IP
+    unoptimized: process.env.NODE_ENV === 'development',
   },
 };
 

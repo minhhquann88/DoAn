@@ -74,22 +74,29 @@ export interface Course {
   requirements?: string[];
   isFeatured: boolean;
   isPublished?: boolean; // Khóa học đã được publish
+  isEnrolled?: boolean; // Người dùng hiện tại đã đăng ký khóa học này chưa
   status: 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED';
   createdAt: string;
   updatedAt?: string;
+  // Enrollment progress (chỉ có khi lấy my-courses)
+  enrollmentProgress?: number; // Tiến độ học tập 0-100%
+  enrollmentStatus?: 'IN_PROGRESS' | 'COMPLETED'; // Trạng thái enrollment
 }
 
 export interface CourseRequest {
   title: string;
   description: string;
+  price: number;
+  imageUrl?: string;
+  totalDurationInHours?: number;
+  categoryId: number;
+  // Optional fields for future use
   shortDescription?: string;
   thumbnail?: string;
   promoVideo?: string;
-  price: number;
   discountPrice?: number;
-  level: string;
-  language: string;
-  categoryId?: number;
+  level?: string;
+  language?: string;
   tags?: string[];
   whatYouLearn?: string[];
   requirements?: string[];
