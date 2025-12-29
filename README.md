@@ -1,4 +1,4 @@
-# 🎓 E-LEARNING PLATFORM - EDULEARN
+# 🎓 E-LEARNING PLATFORM
 
 ## 📚 Nền tảng học trực tuyến hiện đại với Next.js 16 + Spring Boot + AI Chatbot
 
@@ -443,8 +443,8 @@ vercel deploy --prod
 
 ### **Backend (Docker):**
 ```bash
-docker build -t edulearn-backend ./backend
-docker run -p 8080:8080 edulearn-backend
+docker build -t elearn-backend ./backend
+docker run -p 8080:8080 elearn-backend
 ```
 
 ---

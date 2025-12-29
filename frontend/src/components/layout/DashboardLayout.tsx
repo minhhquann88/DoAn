@@ -244,7 +244,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <BookOpen className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="font-poppins font-bold">EduLearn</span>
+              <span className="font-poppins font-bold">E-learning</span>
             </Link>
           )}
           <Button
@@ -373,7 +373,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <BookOpen className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="font-poppins font-bold">EduLearn</span>
+            <span className="font-poppins font-bold">E-learning</span>
           </Link>
           <Button
             variant="ghost"
@@ -434,7 +434,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <BookOpen className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="font-poppins font-bold">EduLearn</span>
+            <span className="font-poppins font-bold">E-learning</span>
           </Link>
           
           <DropdownMenu>

@@ -160,7 +160,7 @@ export default function RegisterPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
             <BookOpen className="h-7 w-7 text-primary-foreground" />
           </div>
-          <span className="font-poppins text-2xl font-bold">EduLearn</span>
+          <span className="font-poppins text-2xl font-bold">E-learning</span>
         </Link>
         
         <Card className="shadow-lg">

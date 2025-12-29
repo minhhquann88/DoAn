@@ -20,7 +20,7 @@ public class EmailService {
             message.setTo(to);
             message.setSubject(subject);
             message.setText(content);
-            message.setFrom("noreply@edulearn.com");
+            message.setFrom("noreply@elearn.com");
             
         mailSender.send(message);
             System.out.println(">>> Email sent successfully to: " + to);
@@ -38,11 +38,11 @@ public class EmailService {
         String subject = "Khóa học mới: " + courseTitle;
         String content = String.format(
             "Xin chào!\n\n" +
-            "Chúng tôi xin thông báo có khóa học mới trên EduLearn:\n\n" +
+            "Chúng tôi xin thông báo có khóa học mới trên E-learning:\n\n" +
             "📚 %s\n\n" +
             "Hãy truy cập để xem chi tiết: %s\n\n" +
             "Trân trọng,\n" +
-            "Đội ngũ EduLearn",
+            "Đội ngũ E-learning",
             courseTitle, courseUrl
         );
         sendEmail(to, subject, content);
@@ -52,17 +52,17 @@ public class EmailService {
      * Gửi email chào mừng đăng ký nhận tin tức
      */
     public void sendWelcomeNewsletterEmail(String to) {
-        String subject = "Cảm ơn bạn đã đăng ký nhận tin tức từ EduLearn";
+        String subject = "Cảm ơn bạn đã đăng ký nhận tin tức từ E-learning";
         String content = String.format(
             "Xin chào!\n\n" +
-            "Cảm ơn bạn đã đăng ký nhận tin tức từ EduLearn!\n\n" +
+            "Cảm ơn bạn đã đăng ký nhận tin tức từ E-learning!\n\n" +
             "Bạn sẽ nhận được các thông tin về:\n" +
             "• Khóa học mới\n" +
             "• Ưu đãi đặc biệt\n" +
             "• Cập nhật và tin tức mới nhất\n\n" +
             "Nếu bạn không muốn nhận email này nữa, bạn có thể hủy đăng ký trong phần cài đặt tài khoản.\n\n" +
             "Trân trọng,\n" +
-            "Đội ngũ EduLearn"
+            "Đội ngũ E-learning"
         );
         sendEmail(to, subject, content);
     }
@@ -71,16 +71,16 @@ public class EmailService {
      * Gửi email đặt lại mật khẩu
      */
     public void sendPasswordResetEmail(String to, String resetLink) {
-        String subject = "Đặt lại mật khẩu EduLearn";
+        String subject = "Đặt lại mật khẩu E-learning";
         String content = String.format(
             "Xin chào!\n\n" +
-            "Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản EduLearn.\n\n" +
+            "Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản E-learning.\n\n" +
             "Vui lòng click vào link sau để đặt lại mật khẩu:\n" +
             "%s\n\n" +
             "Link này sẽ hết hạn sau 1 giờ.\n\n" +
             "Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.\n\n" +
             "Trân trọng,\n" +
-            "Đội ngũ EduLearn",
+            "Đội ngũ E-learning",
             resetLink
         );
         sendEmail(to, subject, content);

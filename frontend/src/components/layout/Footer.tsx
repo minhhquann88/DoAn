@@ -54,7 +54,7 @@ export function Footer() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
                 <BookOpen className="h-6 w-6 text-primary-foreground" />
               </div>
-              <span className="font-poppins text-xl font-bold">EduLearn</span>
+              <span className="font-poppins text-xl font-bold">E-learning</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-4 max-w-sm">
               Nền tảng học trực tuyến hàng đầu với hàng ngàn khóa học chất lượng cao. 
@@ -161,7 +161,7 @@ export function Footer() {
         {/* Copyright */}
         <div className="flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            © {currentYear} EduLearn. All rights reserved.
+            © {currentYear} E-learning. All rights reserved.
           </p>
           <p className="text-sm text-muted-foreground">
             Made with ❤️ in Vietnam

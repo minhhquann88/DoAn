@@ -103,7 +103,7 @@ export default function HelpPage() {
               Trung tâm trợ giúp
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
-              Tìm câu trả lời và hướng dẫn chi tiết về cách sử dụng EduLearn
+              Tìm câu trả lời và hướng dẫn chi tiết về cách sử dụng E-learning
             </p>
             
             {/* Search Bar */}

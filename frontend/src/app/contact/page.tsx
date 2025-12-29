@@ -66,8 +66,8 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold mb-1">Email</h3>
-                        <p className="text-muted-foreground">support@edulearn.vn</p>
-                        <p className="text-muted-foreground">info@edulearn.vn</p>
+                        <p className="text-muted-foreground">support@elearn.vn</p>
+                        <p className="text-muted-foreground">info@elearn.vn</p>
                       </div>
                     </div>
 

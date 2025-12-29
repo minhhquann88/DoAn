@@ -25,7 +25,7 @@ interface ChatWidgetProps {
 const getInitialMessage = (): ChatMessage => ({
   id: '1',
   role: 'assistant',
-  content: 'Xin chào! Tôi là trợ lý ảo của EduLearn. Tôi có thể giúp gì cho bạn?',
+  content: 'Xin chào! Tôi là trợ lý ảo của E-learning. Tôi có thể giúp gì cho bạn?',
   timestamp: new Date(),
 });
 
@@ -188,7 +188,7 @@ export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
             <span className="absolute bottom-0 right-0 h-3 w-3 bg-accent rounded-full border-2 border-primary" />
           </div>
           <div>
-            <h3 className="font-semibold">Trợ lý EduLearn</h3>
+            <h3 className="font-semibold">Trợ lý E-learning</h3>
             <p className="text-xs opacity-90">Luôn sẵn sàng hỗ trợ</p>
           </div>
         </div>

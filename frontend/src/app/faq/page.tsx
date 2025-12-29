@@ -14,11 +14,11 @@ interface FAQItem {
 const faqs: FAQItem[] = [
   {
     question: 'Làm thế nào để đăng ký khóa học?',
-    answer: 'Bạn có thể đăng ký khóa học bằng cách tạo tài khoản trên EduLearn, duyệt các khóa học có sẵn, và nhấn nút "Đăng ký ngay". Sau đó, bạn có thể thanh toán trực tuyến hoặc sử dụng mã giảm giá nếu có.',
+    answer: 'Bạn có thể đăng ký khóa học bằng cách tạo tài khoản trên E-learning, duyệt các khóa học có sẵn, và nhấn nút "Đăng ký ngay". Sau đó, bạn có thể thanh toán trực tuyến hoặc sử dụng mã giảm giá nếu có.',
   },
   {
     question: 'Tôi có thể học trên điện thoại không?',
-    answer: 'Có! EduLearn được thiết kế responsive và hoàn toàn tương thích với mọi thiết bị, bao gồm điện thoại, máy tính bảng và máy tính. Bạn có thể học mọi lúc, mọi nơi.',
+    answer: 'Có! E-learning được thiết kế responsive và hoàn toàn tương thích với mọi thiết bị, bao gồm điện thoại, máy tính bảng và máy tính. Bạn có thể học mọi lúc, mọi nơi.',
   },
   {
     question: 'Khóa học có thời hạn không?',
@@ -37,7 +37,7 @@ const faqs: FAQItem[] = [
     answer: 'Không. Mỗi tài khoản chỉ dành cho một người sử dụng. Chia sẻ tài khoản vi phạm điều khoản sử dụng và có thể dẫn đến việc khóa tài khoản.',
   },
   {
-    question: 'Làm thế nào để trở thành giảng viên trên EduLearn?',
+    question: 'Làm thế nào để trở thành giảng viên trên E-learning?',
     answer: 'Nếu bạn muốn trở thành giảng viên, vui lòng đăng ký tài khoản với vai trò "Giảng viên" và gửi hồ sơ của bạn. Đội ngũ của chúng tôi sẽ xem xét và liên hệ với bạn trong vòng 5-7 ngày làm việc.',
   },
   {
@@ -70,7 +70,7 @@ export default function FAQPage() {
               Câu hỏi thường gặp
             </h1>
             <p className="text-lg text-muted-foreground">
-              Tìm câu trả lời cho những thắc mắc phổ biến về EduLearn
+              Tìm câu trả lời cho những thắc mắc phổ biến về E-learning
             </p>
           </div>
         </div>

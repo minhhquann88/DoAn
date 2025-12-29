@@ -67,7 +67,7 @@ export default function PrivacyPage() {
               <ul className="list-disc pl-6 space-y-2 mt-4">
                 <li><strong>Nhà cung cấp dịch vụ:</strong> Các đối tác giúp chúng tôi vận hành nền tảng (xử lý thanh toán, lưu trữ dữ liệu)</li>
                 <li><strong>Yêu cầu pháp lý:</strong> Khi được yêu cầu bởi cơ quan pháp luật</li>
-                <li><strong>Bảo vệ quyền lợi:</strong> Để bảo vệ quyền, tài sản hoặc an toàn của EduLearn, người dùng hoặc công chúng</li>
+                <li><strong>Bảo vệ quyền lợi:</strong> Để bảo vệ quyền, tài sản hoặc an toàn của E-learning, người dùng hoặc công chúng</li>
               </ul>
             </section>
 
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
               <p>
                 Nếu bạn có câu hỏi về chính sách bảo mật này, vui lòng liên hệ với chúng tôi tại 
                 <a href="/contact" className="text-primary hover:underline"> trang liên hệ</a> hoặc 
-                gửi email đến privacy@edulearn.vn.
+                gửi email đến privacy@elearn.vn.
               </p>
             </section>
           </div>

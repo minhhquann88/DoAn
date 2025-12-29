@@ -121,7 +121,7 @@ export function Navbar() {
             <BookOpen className="h-6 w-6 text-primary-foreground" />
           </div>
           <span className="font-poppins text-xl font-bold hidden sm:inline-block">
-            EduLearn
+            E-learning
           </span>
         </Link>
         

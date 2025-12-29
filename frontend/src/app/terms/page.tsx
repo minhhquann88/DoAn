@@ -37,7 +37,7 @@ export default function TermsPage() {
               <section>
                 <h2 className="text-2xl font-bold text-foreground mb-4">1. Chấp nhận điều khoản</h2>
                 <p>
-                  Bằng việc truy cập và sử dụng nền tảng EduLearn, bạn đồng ý tuân thủ và bị ràng buộc 
+                  Bằng việc truy cập và sử dụng nền tảng E-learning, bạn đồng ý tuân thủ và bị ràng buộc 
                   bởi các điều khoản và điều kiện này. Nếu bạn không đồng ý với bất kỳ phần nào của 
                   các điều khoản này, bạn không được phép sử dụng dịch vụ của chúng tôi.
                 </p>
@@ -46,7 +46,7 @@ export default function TermsPage() {
               <section>
                 <h2 className="text-2xl font-bold text-foreground mb-4">2. Tài khoản người dùng</h2>
                 <p>
-                  Khi tạo tài khoản trên EduLearn, bạn cam kết:
+                  Khi tạo tài khoản trên E-learning, bạn cam kết:
                 </p>
                 <ul className="list-disc pl-6 space-y-2 mt-4">
                   <li>Cung cấp thông tin chính xác, đầy đủ và cập nhật</li>
@@ -71,8 +71,8 @@ export default function TermsPage() {
               <section>
                 <h2 className="text-2xl font-bold text-foreground mb-4">4. Quyền sở hữu trí tuệ</h2>
                 <p>
-                  Tất cả nội dung trên EduLearn, bao gồm nhưng không giới hạn ở video, tài liệu, 
-                  hình ảnh, và văn bản, đều thuộc quyền sở hữu của EduLearn hoặc các đối tác của 
+                  Tất cả nội dung trên E-learning, bao gồm nhưng không giới hạn ở video, tài liệu, 
+                  hình ảnh, và văn bản, đều thuộc quyền sở hữu của E-learning hoặc các đối tác của 
                   chúng tôi. Bạn không được phép sao chép, phân phối, hoặc sử dụng nội dung này 
                   mà không có sự cho phép bằng văn bản.
                 </p>

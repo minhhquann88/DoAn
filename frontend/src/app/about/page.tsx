@@ -15,7 +15,7 @@ export default function AboutPage() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold font-poppins mb-4">
-              Về EduLearn
+              Về E-learning
             </h1>
             <p className="text-lg text-muted-foreground">
               Nền tảng học trực tuyến hàng đầu, mang đến cơ hội học tập chất lượng cao cho mọi người
@@ -32,7 +32,7 @@ export default function AboutPage() {
             <div>
               <h2 className="text-3xl font-bold font-poppins mb-4">Sứ mệnh của chúng tôi</h2>
               <p className="text-muted-foreground leading-relaxed">
-                EduLearn được thành lập với sứ mệnh mang đến nền giáo dục trực tuyến chất lượng cao, 
+                E-learning được thành lập với sứ mệnh mang đến nền giáo dục trực tuyến chất lượng cao, 
                 dễ tiếp cận cho mọi người. Chúng tôi tin rằng giáo dục là quyền cơ bản của mỗi người 
                 và không nên bị giới hạn bởi địa lý, thời gian hay tài chính.
               </p>
@@ -100,7 +100,7 @@ export default function AboutPage() {
               <h2 className="text-3xl font-bold font-poppins mb-4">Câu chuyện của chúng tôi</h2>
               <div className="space-y-4 text-muted-foreground leading-relaxed">
                 <p>
-                  EduLearn được thành lập vào năm 2024 bởi một nhóm các nhà giáo dục và công nghệ 
+                  E-learning được thành lập vào năm 2024 bởi một nhóm các nhà giáo dục và công nghệ 
                   đam mê, với mong muốn tạo ra một nền tảng học tập trực tuyến có thể tiếp cận được 
                   với mọi người.
                 </p>
