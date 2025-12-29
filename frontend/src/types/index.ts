@@ -303,7 +303,8 @@ export interface SearchFilters {
   maxPrice?: number;
   isFree?: boolean; // Filter for free courses (price = 0)
   isPaid?: boolean; // Filter for paid courses (price > 0)
-  rating?: number;
+  rating?: number; // Filter by exact rating (1-5 stars)
+  hasNoRating?: boolean; // Filter courses with no ratings
   language?: string;
   sortBy?: 'popular' | 'rating' | 'newest' | 'price_low' | 'price_high';
   page?: number; // Current page number (0-indexed)

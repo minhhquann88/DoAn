@@ -54,6 +54,175 @@ export default function MyCoursesPage() {
     ? courses.filter(c => c.enrollmentStatus === 'COMPLETED' || (c.enrollmentProgress ?? 0) >= 100)
     : [];
   
+  // Filter and sort courses
+  const filterAndSortCourses = (courseList: Course[]) => {
+    let filtered = courseList;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(c => 
+        c.title.toLowerCase().includes(query) ||
+        (typeof c.instructor === 'string' ? c.instructor.toLowerCase().includes(query) : c.instructor?.fullName?.toLowerCase().includes(query))
+      );
+    }
+    
+    // Apply sort
+    switch (sortBy) {
+      case 'progress':
+        filtered = [...filtered].sort((a, b) => (b.enrollmentProgress ?? 0) - (a.enrollmentProgress ?? 0));
+        break;
+      case 'title':
+        filtered = [...filtered].sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'enrolled':
+        filtered = [...filtered].sort((a, b) => {
+          const dateA = new Date(a.lastAccessed || 0).getTime();
+          const dateB = new Date(b.lastAccessed || 0).getTime();
+          return dateB - dateA;
+        });
+        break;
+      case 'recent':
+      default:
+        filtered = [...filtered].sort((a, b) => {
+          const dateA = new Date(a.lastAccessed || 0).getTime();
+          const dateB = new Date(b.lastAccessed || 0).getTime();
+          return dateB - dateA;
+        });
+        break;
+    }
+    
+    return filtered;
+  };
+  
+  // Render course card component
+  const renderCourseCard = (course: Course, viewMode: 'grid' | 'list') => {
+    const instructorName = typeof course.instructor === 'string' 
+      ? course.instructor 
+      : course.instructor?.fullName || 'Giảng viên';
+    const isCompleted = course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100;
+    
+    if (viewMode === 'grid') {
+      return (
+        <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+          <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center relative overflow-hidden">
+            {course.imageUrl ? (
+              <img 
+                src={course.imageUrl} 
+                alt={course.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <BookOpen className="h-16 w-16 text-primary/50" />
+            )}
+          </div>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <Badge variant={isCompleted ? 'default' : 'secondary'}>
+                {isCompleted ? 'Hoàn thành' : 'Đang học'}
+              </Badge>
+              {course.category && (
+                <Badge variant="outline">{course.category.name}</Badge>
+              )}
+            </div>
+            <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+            <CardDescription>{instructorName}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Tiến độ</span>
+                <span className="font-medium">{Math.round(course.enrollmentProgress ?? 0)}%</span>
+              </div>
+              <Progress value={course.enrollmentProgress ?? 0} />
+              <p className="text-xs text-muted-foreground">
+                {isCompleted ? 'Đã hoàn thành' : 'Bắt đầu học ngay'}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button asChild className="flex-1">
+                <Link href={ROUTES.LEARN(course.id.toString())}>
+                  <PlayCircle className="h-4 w-4 mr-2" />
+                  {isCompleted ? 'Ôn tập' : 'Tiếp tục học'}
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href={ROUTES.COURSE_DETAIL(course.id.toString())}>
+                  Chi tiết
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    } else {
+      return (
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-6">
+              <div className="w-40 aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {course.imageUrl ? (
+                  <img 
+                    src={course.imageUrl} 
+                    alt={course.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <BookOpen className="h-12 w-12 text-primary/50" />
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-4 mb-2">
+                  <div>
+                    <h3 className="font-semibold text-lg mb-1">{course.title}</h3>
+                    <p className="text-sm text-muted-foreground">{instructorName}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isCompleted ? 'default' : 'secondary'}>
+                      {isCompleted ? 'Hoàn thành' : 'Đang học'}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Tiến độ</span>
+                    <span className="font-medium">{Math.round(course.enrollmentProgress ?? 0)}%</span>
+                  </div>
+                  <Progress value={course.enrollmentProgress ?? 0} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {isCompleted ? 'Đã hoàn thành khóa học' : 'Đang học tập'}
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    {course.lastAccessed ? `Truy cập: ${new Date(course.lastAccessed).toLocaleDateString('vi-VN')}` : ''}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button asChild>
+                      <Link href={ROUTES.LEARN(course.id.toString())}>
+                        <PlayCircle className="h-4 w-4 mr-2" />
+                        {isCompleted ? 'Ôn tập' : 'Tiếp tục học'}
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href={ROUTES.COURSE_DETAIL(course.id.toString())}>
+                        Chi tiết
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -150,190 +319,84 @@ export default function MyCoursesPage() {
                   <Link href={ROUTES.COURSES}>Khám phá khóa học</Link>
                 </Button>
               </div>
-            ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {courses.map((course) => (
-                  <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center relative overflow-hidden">
-                      {course.imageUrl ? (
-                        <img 
-                          src={course.imageUrl} 
-                          alt={course.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <BookOpen className="h-16 w-16 text-primary/50" />
-                      )}
-                    </div>
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <Badge variant="secondary">Đang học</Badge>
-                        {course.category && (
-                          <Badge variant="outline">{course.category.name}</Badge>
-                        )}
-                      </div>
-                      <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                      <CardDescription>
-                        {course.instructor?.fullName || 'Giảng viên'}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Tiến độ</span>
-                          <span className="font-medium">{Math.round(course.enrollmentProgress ?? 0)}%</span>
-                        </div>
-                        <Progress value={course.enrollmentProgress ?? 0} />
-                        <p className="text-xs text-muted-foreground">
-                          {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100
-                            ? 'Đã hoàn thành'
-                            : 'Bắt đầu học ngay'}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button asChild className="flex-1">
-                          <Link href={ROUTES.LEARN(course.id.toString())}>
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Tiếp tục học
-                          </Link>
-                        </Button>
-                        <Button variant="outline" asChild>
-                          <Link href={ROUTES.COURSE_DETAIL(course.id.toString())}>
-                            Chi tiết
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {courses.map((course) => (
-                  <Card key={course.id} className="hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-6">
-                        <div className="w-40 aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <BookOpen className="h-12 w-12 text-primary/50" />
-                        </div>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4 mb-2">
-                            <div>
-                              <h3 className="font-semibold text-lg mb-1">{course.title}</h3>
-                              <p className="text-sm text-muted-foreground">{course.instructor?.fullName || course.instructor}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant={course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100 ? 'default' : 'secondary'}>
-                                {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100 ? 'Hoàn thành' : 'Đang học'}
-                              </Badge>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-2 mb-4">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Tiến độ</span>
-                              <span className="font-medium">{Math.round(course.enrollmentProgress ?? 0)}%</span>
-                            </div>
-                            <Progress value={course.enrollmentProgress ?? 0} className="h-2" />
-                            <p className="text-xs text-muted-foreground">
-                              {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100
-                                ? 'Đã hoàn thành khóa học'
-                                : 'Đang học tập'}
-                            </p>
-                          </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs text-muted-foreground">
-                              Truy cập: {new Date(course.lastAccessed).toLocaleDateString('vi-VN')}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button asChild>
-                                <Link href={ROUTES.LEARN(course.id.toString())}>
-                                  <PlayCircle className="h-4 w-4 mr-2" />
-                                  {course.enrollmentStatus === 'COMPLETED' || (course.enrollmentProgress ?? 0) >= 100 ? 'Ôn tập' : 'Tiếp tục học'}
-                                </Link>
-                              </Button>
-                              <Button variant="outline" asChild>
-                                <Link href={ROUTES.COURSE_DETAIL(course.id.toString())}>
-                                  Chi tiết
-                                </Link>
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            ) : (() => {
+              const filteredCourses = filterAndSortCourses(courses);
+              return filteredCourses.length === 0 ? (
+                <div className="text-center py-12">
+                  <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">Không tìm thấy khóa học</h3>
+                  <p className="text-muted-foreground">
+                    Thử tìm kiếm với từ khóa khác
+                  </p>
+                </div>
+              ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredCourses.map((course) => (
+                    <React.Fragment key={course.id}>
+                      {renderCourseCard(course, 'grid')}
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredCourses.map((course) => (
+                    <React.Fragment key={course.id}>
+                      {renderCourseCard(course, 'list')}
+                    </React.Fragment>
+                  ))}
+                </div>
+              );
+            })()}
           </TabsContent>
           
           <TabsContent value="in-progress">
-            {/* Similar structure for in-progress courses */}
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-              {inProgressCourses.length > 0 ? (
-                inProgressCourses.map((course) => (
-                  <div key={course.id}>
-                    {/* Same card component as above */}
-                    <p className="text-center text-muted-foreground">Course card here</p>
-                  </div>
-                ))
-              ) : (
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
+            ) : inProgressCourses.length === 0 ? (
+              <div className="text-center py-12">
+                <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">Chưa có khóa học đang học</h3>
+                <p className="text-muted-foreground mb-6">
+                  Bắt đầu học một khóa học mới ngay hôm nay!
+                </p>
+                <Button asChild>
+                  <Link href={ROUTES.COURSES}>Khám phá khóa học</Link>
+                </Button>
+              </div>
+            ) : (() => {
+              const filteredCourses = filterAndSortCourses(inProgressCourses);
+              return filteredCourses.length === 0 ? (
                 <div className="text-center py-12">
                   <BookOpen className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">Chưa có khóa học đang học</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Bắt đầu học một khóa học mới ngay hôm nay!
+                  <h3 className="text-lg font-semibold mb-2">Không tìm thấy khóa học</h3>
+                  <p className="text-muted-foreground">
+                    Thử tìm kiếm với từ khóa khác
                   </p>
-                  <Button asChild>
-                    <Link href={ROUTES.COURSES}>Khám phá khóa học</Link>
-                  </Button>
                 </div>
-              )}
-            </div>
+              ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredCourses.map((course) => (
+                    <React.Fragment key={course.id}>
+                      {renderCourseCard(course, 'grid')}
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredCourses.map((course) => (
+                    <React.Fragment key={course.id}>
+                      {renderCourseCard(course, 'list')}
+                    </React.Fragment>
+                  ))}
+                </div>
+              );
+            })()}
           </TabsContent>
           
           <TabsContent value="completed">
-            {completedCourses.length > 0 ? (
-              <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-                {completedCourses.map((course) => (
-                  <Card key={course.id} className="overflow-hidden">
-                    <div className="aspect-video bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center relative">
-                      <CheckCircle2 className="h-16 w-16 text-accent" />
-                      <Badge className="absolute top-4 right-4 bg-accent">
-                        Hoàn thành
-                      </Badge>
-                    </div>
-                    <CardHeader>
-                      <CardTitle className="line-clamp-2">{course.title}</CardTitle>
-                      <CardDescription>{course.instructor}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">100% hoàn thành</span>
-                        <Badge variant="outline">Chứng chỉ</Badge>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button asChild className="flex-1" variant="outline">
-                          <Link href={ROUTES.LEARN(course.id.toString())}>
-                            Ôn tập
-                          </Link>
-                        </Button>
-                        <Button asChild className="flex-1">
-                          <Link href={`/student/certificates/${course.id}`}>
-                            Xem chứng chỉ
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
+            ) : completedCourses.length === 0 ? (
               <div className="text-center py-12">
                 <CheckCircle2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold mb-2">Chưa hoàn thành khóa học nào</h3>
@@ -341,7 +404,126 @@ export default function MyCoursesPage() {
                   Tiếp tục học tập để hoàn thành khóa học đầu tiên!
                 </p>
               </div>
-            )}
+            ) : (() => {
+              const filteredCourses = filterAndSortCourses(completedCourses);
+              const instructorName = (course: Course) => typeof course.instructor === 'string' 
+                ? course.instructor 
+                : course.instructor?.fullName || 'Giảng viên';
+              
+              return filteredCourses.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">Không tìm thấy khóa học</h3>
+                  <p className="text-muted-foreground">
+                    Thử tìm kiếm với từ khóa khác
+                  </p>
+                </div>
+              ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredCourses.map((course) => (
+                    <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="aspect-video bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center relative overflow-hidden">
+                        {course.imageUrl ? (
+                          <img 
+                            src={course.imageUrl} 
+                            alt={course.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <CheckCircle2 className="h-16 w-16 text-accent" />
+                        )}
+                        <Badge className="absolute top-4 right-4 bg-accent">
+                          Hoàn thành
+                        </Badge>
+                      </div>
+                      <CardHeader>
+                        <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                        <CardDescription>{instructorName(course)}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">100% hoàn thành</span>
+                          <Badge variant="outline">Chứng chỉ</Badge>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Button asChild className="flex-1" variant="outline">
+                            <Link href={ROUTES.LEARN(course.id.toString())}>
+                              Ôn tập
+                            </Link>
+                          </Button>
+                          <Button asChild className="flex-1">
+                            <Link href={`/student/certificates/${course.id}`}>
+                              Xem chứng chỉ
+                            </Link>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filteredCourses.map((course) => (
+                    <Card key={course.id} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-6">
+                          <div className="w-40 aspect-video bg-gradient-to-br from-accent/20 to-primary/20 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden relative">
+                            {course.imageUrl ? (
+                              <img 
+                                src={course.imageUrl} 
+                                alt={course.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <CheckCircle2 className="h-12 w-12 text-accent" />
+                            )}
+                            <Badge className="absolute top-2 right-2 bg-accent text-xs">
+                              Hoàn thành
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-4 mb-2">
+                              <div>
+                                <h3 className="font-semibold text-lg mb-1">{course.title}</h3>
+                                <p className="text-sm text-muted-foreground">{instructorName(course)}</p>
+                              </div>
+                              <Badge variant="default">Hoàn thành</Badge>
+                            </div>
+                            
+                            <div className="space-y-2 mb-4">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Tiến độ</span>
+                                <span className="font-medium">100%</span>
+                              </div>
+                              <Progress value={100} className="h-2" />
+                              <p className="text-xs text-muted-foreground">Đã hoàn thành khóa học</p>
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline">Chứng chỉ</Badge>
+                              <div className="flex items-center gap-2">
+                                <Button asChild variant="outline">
+                                  <Link href={ROUTES.LEARN(course.id.toString())}>
+                                    Ôn tập
+                                  </Link>
+                                </Button>
+                                <Button asChild>
+                                  <Link href={`/student/certificates/${course.id}`}>
+                                    Xem chứng chỉ
+                                  </Link>
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              );
+            })()}
           </TabsContent>
         </Tabs>
       </div>

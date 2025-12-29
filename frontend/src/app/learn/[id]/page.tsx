@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Loader2,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,6 +34,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMyCertificates } from '@/services/paymentService';
+import { createConversation, getConversations } from '@/services/chatService';
+import { ROUTES } from '@/lib/constants';
 
 // Map backend contentType to frontend type
 const mapContentType = (contentType: string): 'VIDEO' | 'ARTICLE' | 'SLIDE' | 'QUIZ' | 'ASSIGNMENT' => {
@@ -447,6 +450,30 @@ export default function LearningPage() {
               <Progress value={progressPercentage} className="w-32" />
               <span className="text-sm font-medium">{Math.round(progressPercentage)}%</span>
             </div>
+            {course.instructorId && user?.role === 'ROLE_STUDENT' && (
+              <Button 
+                variant="outline" 
+                onClick={async () => {
+                  try {
+                    // Tạo conversation với giảng viên của khóa học này
+                    const conversation = await createConversation({
+                      userId: course.instructorId!,
+                      courseId: course.id,
+                    });
+                    // Chuyển đến trang messages và chọn conversation này
+                    router.push(`${ROUTES.STUDENT.MESSAGES}?conversation=${conversation.id}`);
+                  } catch (error: any) {
+                    addToast({
+                      type: 'error',
+                      description: error.response?.data?.message || 'Không thể tạo cuộc trò chuyện',
+                    });
+                  }
+                }}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Nhắn tin giảng viên
+              </Button>
+            )}
             <Button variant="outline" onClick={() => router.push(`/courses/${course.id}`)}>
               Thoát
             </Button>

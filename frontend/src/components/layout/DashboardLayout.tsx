@@ -18,6 +18,7 @@ import {
   Search,
   CreditCard,
   Star,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -57,6 +58,11 @@ const STUDENT_NAV: NavItem[] = [
     icon: <BookOpen className="h-5 w-5" />,
   },
   {
+    title: 'Tin nhắn',
+    href: ROUTES.STUDENT.MESSAGES,
+    icon: <MessageSquare className="h-5 w-5" />,
+  },
+  {
     title: 'Lịch sử giao dịch',
     href: ROUTES.STUDENT.TRANSACTIONS,
     icon: <CreditCard className="h-5 w-5" />,
@@ -79,6 +85,11 @@ const INSTRUCTOR_NAV: NavItem[] = [
     title: 'Học viên',
     href: ROUTES.INSTRUCTOR.STUDENTS,
     icon: <GraduationCap className="h-5 w-5" />,
+  },
+  {
+    title: 'Tin nhắn',
+    href: ROUTES.INSTRUCTOR.MESSAGES,
+    icon: <MessageSquare className="h-5 w-5" />,
   },
   {
     title: 'Doanh thu',
@@ -419,7 +430,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
       
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Top Bar - Mobile */}
         <header className="lg:hidden h-16 border-b bg-card flex items-center justify-between px-4">
           <Button
@@ -533,7 +544,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </header>
         
         {/* Main Content Area - Add padding for proper spacing from sidebar */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-hidden relative h-full">
           {children}
         </main>
       </div>

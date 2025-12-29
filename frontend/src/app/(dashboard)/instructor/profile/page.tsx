@@ -51,8 +51,10 @@ const passwordSchema = z.object({
   currentPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
   newPassword: z.string()
     .min(6, 'Mật khẩu mới phải có ít nhất 6 ký tự')
+    .max(40, 'Mật khẩu không được vượt quá 40 ký tự')
     .regex(/[a-zA-Z]/, 'Mật khẩu phải chứa ít nhất một chữ cái')
-    .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất một số'),
+    .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất một số')
+    .regex(/[@$!%*#?&]/, 'Mật khẩu phải chứa ít nhất một ký tự đặc biệt (@$!%*#?&)'),
   confirmPassword: z.string(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: 'Mật khẩu xác nhận không khớp',
@@ -630,6 +632,9 @@ export default function InstructorProfilePage() {
                       })}
                       className={changePassError ? 'border-red-500' : ''}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ cái, số và ký tự đặc biệt (@$!%*#?&)
+                    </p>
                     {passwordErrors.newPassword && (
                       <p className="text-sm text-destructive">{passwordErrors.newPassword.message}</p>
                     )}

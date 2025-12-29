@@ -140,6 +140,7 @@ export const ROUTES = {
     CERTIFICATES: '/student/certificates',
     TRANSACTIONS: '/student/transactions',
     PROFILE: '/student/profile',
+    MESSAGES: '/student/messages',
   },
   
   // Instructor Routes - Organized to prevent cross-linking
@@ -152,6 +153,7 @@ export const ROUTES = {
     STUDENTS: '/instructor/students',
     EARNINGS: '/instructor/earnings',
     PROFILE: '/instructor/profile',
+    MESSAGES: '/instructor/messages',
   },
   
   // Admin Routes

@@ -16,7 +16,6 @@ import { Footer } from '@/components/layout/Footer';
 import { CourseGrid } from '@/components/course/CourseGrid';
 import { useCourses } from '@/hooks/useCourses';
 import { SearchFilters } from '@/types';
-import { COURSE_LEVELS, COURSE_LEVEL_LABELS } from '@/lib/constants';
 
 function CoursesContent() {
   const searchParams = useSearchParams();
@@ -32,14 +31,6 @@ function CoursesContent() {
     setFilters(prev => ({ ...prev, sortBy: value as any, page: 0 })); // Reset to first page on sort change
   };
   
-  const handleLevelFilter = (level: string) => {
-    setFilters(prev => ({ 
-      ...prev, 
-      level: prev.level === level ? undefined : level,
-      page: 0 // Reset to first page on filter change
-    }));
-  };
-
   const handlePriceFilter = (filterType: 'free' | 'paid' | null) => {
     setFilters(prev => {
       const newFilters = { ...prev, page: 0 }; // Reset to first page
@@ -57,11 +48,51 @@ function CoursesContent() {
     });
   };
 
+  const handleRatingFilter = (rating: number | 'no-rating' | null) => {
+    setFilters(prev => {
+      const newFilters = { ...prev, page: 0 };
+      if (rating === 'no-rating') {
+        newFilters.hasNoRating = prev.hasNoRating ? undefined : true;
+        newFilters.rating = undefined;
+      } else if (rating !== null) {
+        newFilters.rating = prev.rating === rating ? undefined : rating;
+        newFilters.hasNoRating = undefined;
+      } else {
+        newFilters.rating = undefined;
+        newFilters.hasNoRating = undefined;
+      }
+      return newFilters;
+    });
+  };
+
   const handlePageChange = (newPage: number) => {
     setFilters(prev => ({ ...prev, page: newPage }));
     // Scroll to top when page changes
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  
+  // Filter courses by rating on frontend
+  const filteredCourses = React.useMemo(() => {
+    if (!courses) return [];
+    let result = [...courses];
+    
+    // Filter by rating
+    if (filters.rating !== undefined) {
+      result = result.filter(course => {
+        const courseRating = Math.round(course.rating || 0);
+        return courseRating === filters.rating;
+      });
+    }
+    
+    // Filter by "no rating"
+    if (filters.hasNoRating) {
+      result = result.filter(course => {
+        return !course.rating || course.rating === 0 || (course.reviewCount || 0) === 0;
+      });
+    }
+    
+    return result;
+  }, [courses, filters.rating, filters.hasNoRating]);
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -90,26 +121,8 @@ function CoursesContent() {
                   <h2 className="font-semibold">Bộ lọc</h2>
                 </div>
                 
-                {/* Level Filter */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium">Cấp độ</h3>
-                  <div className="space-y-2">
-                    {Object.entries(COURSE_LEVEL_LABELS).map(([key, label]) => (
-                      <label key={key} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={filters.level === key}
-                          onChange={() => handleLevelFilter(key)}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-sm">{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                
                 {/* Price Filter */}
-                <div className="mt-6 space-y-3">
+                <div className="space-y-3">
                   <h3 className="text-sm font-medium">Giá</h3>
                   <div className="space-y-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -137,12 +150,26 @@ function CoursesContent() {
                 <div className="mt-6 space-y-3">
                   <h3 className="text-sm font-medium">Đánh giá</h3>
                   <div className="space-y-2">
-                    {[5, 4, 3].map((rating) => (
+                    {[5, 4, 3, 2, 1].map((rating) => (
                       <label key={rating} className="flex items-center space-x-2 cursor-pointer">
-                        <input type="checkbox" className="rounded border-gray-300" />
-                        <span className="text-sm">{rating} sao trở lên</span>
+                        <input
+                          type="checkbox"
+                          checked={filters.rating === rating}
+                          onChange={() => handleRatingFilter(rating)}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm">{rating} sao</span>
                       </label>
                     ))}
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filters.hasNoRating === true}
+                        onChange={() => handleRatingFilter('no-rating')}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm">Chưa có đánh giá</span>
+                    </label>
                   </div>
                 </div>
                 
@@ -150,7 +177,11 @@ function CoursesContent() {
                 <Button 
                   variant="outline" 
                   className="w-full mt-6"
-                  onClick={() => setFilters({ sortBy: 'popular', page: 0 })}
+                  onClick={() => setFilters({ 
+                    keyword: searchParams.get('keyword') || '',
+                    sortBy: 'popular', 
+                    page: 0 
+                  })}
                 >
                   Xóa bộ lọc
                 </Button>
@@ -163,7 +194,7 @@ function CoursesContent() {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-muted-foreground">
-                    Hiển thị {courses.length} khóa học
+                    Hiển thị {(filters.rating !== undefined || filters.hasNoRating ? filteredCourses : courses).length} khóa học
                   </span>
                 </div>
                 
@@ -185,10 +216,16 @@ function CoursesContent() {
               </div>
               
               {/* Course Grid */}
-              <CourseGrid courses={courses} isLoading={isLoading} />
+              <CourseGrid 
+                courses={filters.rating !== undefined || filters.hasNoRating ? filteredCourses : courses} 
+                isLoading={isLoading} 
+              />
               
-              {/* Pagination */}
-              {!isLoading && courses.length > 0 && totalPages > 1 && (
+              {/* Pagination - Hide when filtering by rating (frontend filter) */}
+              {!isLoading && 
+               (filters.rating === undefined && !filters.hasNoRating) && 
+               courses.length > 0 && 
+               totalPages > 1 && (
                 <div className="flex items-center justify-center mt-8 gap-2">
                   <Button
                     variant="outline"

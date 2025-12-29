@@ -1,96 +1,136 @@
 /**
- * Chat Store - Quản lý lịch sử chat theo từng user/session
- * Mỗi user (hoặc guest) có lịch sử chat riêng
+ * Chat Store - Quản lý trạng thái chat
  */
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date | string; // String khi lưu, Date khi sử dụng
-}
+import { Conversation, Message } from '@/services/chatService';
 
 interface ChatState {
-  // Lưu messages theo user ID hoặc 'guest'
-  messagesByUser: Record<string, ChatMessage[]>;
+  conversations: Conversation[];
+  currentConversationId: number | null;
+  messages: Record<number, Message[]>; // conversationId -> messages
+  typingUsers: Record<number, Set<number>>; // conversationId -> Set<userId>
+  onlineUsers: Set<number>;
+  isLoading: boolean;
+  isConnected: boolean;
   
   // Actions
-  getMessages: (userId: string | null) => ChatMessage[];
-  addMessage: (userId: string | null, message: ChatMessage) => void;
-  setMessages: (userId: string | null, messages: ChatMessage[]) => void;
-  clearMessages: (userId: string | null) => void;
-  clearAllMessages: () => void;
+  setConversations: (conversations: Conversation[]) => void;
+  addConversation: (conversation: Conversation) => void;
+  updateConversation: (conversation: Conversation) => void;
+  setCurrentConversation: (conversationId: number | null) => void;
+  setMessages: (conversationId: number, messages: Message[]) => void;
+  addMessage: (conversationId: number, message: Message) => void;
+  updateMessage: (conversationId: number, messageId: number, updates: Partial<Message>) => void;
+  deleteMessage: (conversationId: number, messageId: number) => void;
+  setTyping: (conversationId: number, userId: number, isTyping: boolean) => void;
+  setOnline: (userId: number, isOnline: boolean) => void;
+  setLoading: (loading: boolean) => void;
+  setConnected: (connected: boolean) => void;
+  clearMessages: (userId?: string) => void;
 }
 
-// Helper: Lấy key cho user (null = guest)
-const getUserKey = (userId: string | null): string => {
-  return userId ? `user_${userId}` : 'guest';
-};
-
-export const useChatStore = create<ChatState>()(
-  persist(
-    (set, get) => ({
-      messagesByUser: {},
-      
-      getMessages: (userId) => {
-        const key = getUserKey(userId);
-        const messages = get().messagesByUser[key] || [];
-        // Convert timestamp strings back to Date objects
-        return messages.map(msg => ({
-          ...msg,
-          timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp,
-        }));
-      },
-      
-      addMessage: (userId, message) => {
-        const key = getUserKey(userId);
-        // Convert Date to string for storage
-        const messageToStore = {
-          ...message,
-          timestamp: message.timestamp instanceof Date ? message.timestamp.toISOString() : message.timestamp,
-        };
-        set((state) => ({
-          messagesByUser: {
-            ...state.messagesByUser,
-            [key]: [...(state.messagesByUser[key] || []), messageToStore],
-          },
-        }));
-      },
-      
-      setMessages: (userId, messages) => {
-        const key = getUserKey(userId);
-        // Convert Date to string for storage
-        const messagesToStore = messages.map(msg => ({
-          ...msg,
-          timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp,
-        }));
-        set((state) => ({
-          messagesByUser: {
-            ...state.messagesByUser,
-            [key]: messagesToStore,
-          },
-        }));
-      },
-      
-      clearMessages: (userId) => {
-        const key = getUserKey(userId);
-        set((state) => {
-          const newMessages = { ...state.messagesByUser };
-          delete newMessages[key];
-          return { messagesByUser: newMessages };
-        });
-      },
-      
-      clearAllMessages: () => {
-        set({ messagesByUser: {} });
-      },
-    }),
-    {
-      name: 'chat-storage',
-      // Chỉ persist messages, không persist state khác
+export const useChatStore = create<ChatState>((set, get) => ({
+  conversations: [],
+  currentConversationId: null,
+  messages: {},
+  typingUsers: {},
+  onlineUsers: new Set(),
+  isLoading: false,
+  isConnected: false,
+  
+  setConversations: (conversations) => set({ conversations }),
+  
+  addConversation: (conversation) => set((state) => ({
+    conversations: [conversation, ...state.conversations.filter(c => c.id !== conversation.id)]
+  })),
+  
+  updateConversation: (conversation) => set((state) => ({
+    conversations: state.conversations.map(c => 
+      c.id === conversation.id ? conversation : c
+    )
+  })),
+  
+  setCurrentConversation: (conversationId) => set({ currentConversationId: conversationId }),
+  
+  setMessages: (conversationId, messages) => set((state) => ({
+    messages: {
+      ...state.messages,
+      [conversationId]: messages
     }
-  )
-);
-
+  })),
+  
+  addMessage: (conversationId, message) => set((state) => {
+    const existingMessages = state.messages[conversationId] || [];
+    // Check if message already exists
+    if (existingMessages.some(m => m.id === message.id)) {
+      return state;
+    }
+    return {
+      messages: {
+        ...state.messages,
+        [conversationId]: [...existingMessages, message]
+      }
+    };
+  }),
+  
+  updateMessage: (conversationId, messageId, updates) => set((state) => {
+    const messages = state.messages[conversationId] || [];
+    return {
+      messages: {
+        ...state.messages,
+        [conversationId]: messages.map(m => 
+          m.id === messageId ? { ...m, ...updates } : m
+        )
+      }
+    };
+  }),
+  
+  deleteMessage: (conversationId, messageId) => set((state) => {
+    const messages = state.messages[conversationId] || [];
+    return {
+      messages: {
+        ...state.messages,
+        [conversationId]: messages.map(m => 
+          m.id === messageId ? { ...m, isDeleted: true, content: 'Tin nhắn đã bị xóa' } : m
+        )
+      }
+    };
+  }),
+  
+  setTyping: (conversationId, userId, isTyping) => set((state) => {
+    const typingUsers = { ...state.typingUsers };
+    if (!typingUsers[conversationId]) {
+      typingUsers[conversationId] = new Set();
+    }
+    const users = new Set(typingUsers[conversationId]);
+    if (isTyping) {
+      users.add(userId);
+    } else {
+      users.delete(userId);
+    }
+    typingUsers[conversationId] = users;
+    return { typingUsers };
+  }),
+  
+  setOnline: (userId, isOnline) => set((state) => {
+    const onlineUsers = new Set(state.onlineUsers);
+    if (isOnline) {
+      onlineUsers.add(userId);
+    } else {
+      onlineUsers.delete(userId);
+    }
+    return { onlineUsers };
+  }),
+  
+  setLoading: (loading) => set({ isLoading: loading }),
+  
+  setConnected: (connected) => set({ isConnected: connected }),
+  
+  clearMessages: () => set({ 
+    conversations: [], 
+    messages: {}, 
+    currentConversationId: null,
+    typingUsers: {},
+    onlineUsers: new Set()
+  }),
+}));

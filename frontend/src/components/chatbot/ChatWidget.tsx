@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
-import { useChatStore, type ChatMessage } from '@/stores/chatStore';
+import { useChatbotStore, type ChatMessage } from '@/stores/chatbotStore';
 
 const quickReplies = [
   'Tôi muốn tìm khóa học về lập trình',
@@ -31,7 +31,7 @@ const getInitialMessage = (): ChatMessage => ({
 
 export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
   const { user, isAuthenticated } = useAuthStore();
-  const { addMessage, setMessages, clearMessages } = useChatStore();
+  const { addMessage, setMessages, clearMessages } = useChatbotStore();
   
   const [isOpen, setIsOpen] = React.useState(false);
   const [isMinimized, setIsMinimized] = React.useState(false);
@@ -49,11 +49,11 @@ export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
   
   // Subscribe vào toàn bộ messagesByUser để tránh warning "getServerSnapshot should be cached"
   // Filter messages cho user hiện tại trong useMemo
-  const messagesByUser = useChatStore((state) => state.messagesByUser);
+  const messagesByUser = useChatbotStore((state) => state.messagesByUser);
   
   // Filter messages cho user hiện tại
   const rawMessages = React.useMemo(() => {
-    return messagesByUser[userKey] || [];
+    return messagesByUser?.[userKey] || [];
   }, [messagesByUser, userKey]);
   
   // Convert messages và thêm initial message nếu cần
@@ -75,9 +75,9 @@ export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
   React.useEffect(() => {
     if (rawMessages.length === 0) {
       // Nếu chưa có messages cho user này, khởi tạo với welcome message
-      setMessages(currentUserId, [getInitialMessage()]);
+      setMessages(userKey, [getInitialMessage()]);
     }
-  }, [currentUserId, rawMessages.length, setMessages]);
+  }, [userKey, rawMessages.length, setMessages]);
   
   // Đóng chat khi user logout (chuyển từ authenticated sang guest)
   // Nhưng không chặn guest users mở chat
@@ -113,7 +113,7 @@ export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
     };
     
     // Add user message to store
-    addMessage(currentUserId, userMessage);
+    addMessage(userKey, userMessage);
     const currentInput = inputValue;
     setInputValue('');
     setIsTyping(true);
@@ -133,7 +133,7 @@ export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
       };
       
       // Add bot response to store
-      addMessage(currentUserId, botMessage);
+      addMessage(userKey, botMessage);
     } catch (error) {
       console.error('Chatbot error:', error);
       
@@ -146,7 +146,7 @@ export function ChatWidget({ courseId }: ChatWidgetProps = {}) {
       };
       
       // Add error message to store
-      addMessage(currentUserId, botMessage);
+      addMessage(userKey, botMessage);
     } finally {
       setIsTyping(false);
     }

@@ -760,6 +760,97 @@ LOCK TABLES `newsletter_subscriptions` WRITE;
 /*!40000 ALTER TABLE `newsletter_subscriptions` ENABLE KEYS */;
 UNLOCK TABLES;
 
+--
+-- Table structure for table `conversations`
+--
+
+DROP TABLE IF EXISTS `conversations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `conversations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `type` enum('DIRECT','GROUP') NOT NULL DEFAULT 'DIRECT',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `last_message_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_updated_at` (`updated_at`),
+  KEY `idx_last_message_at` (`last_message_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `conversation_participants`
+--
+
+DROP TABLE IF EXISTS `conversation_participants`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `conversation_participants` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `conversation_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `role` enum('STUDENT','INSTRUCTOR') NOT NULL,
+  `joined_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `last_read_at` datetime DEFAULT NULL,
+  `is_muted` tinyint(1) DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_participant` (`conversation_id`,`user_id`),
+  KEY `idx_user_conversation` (`user_id`,`conversation_id`),
+  CONSTRAINT `conversation_participants_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `conversation_participants_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `messages`
+--
+
+DROP TABLE IF EXISTS `messages`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `messages` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `conversation_id` bigint NOT NULL,
+  `sender_id` bigint NOT NULL,
+  `content` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `message_type` enum('TEXT','IMAGE','FILE','SYSTEM') DEFAULT 'TEXT',
+  `file_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `file_size` bigint DEFAULT NULL,
+  `is_edited` tinyint(1) DEFAULT '0',
+  `edited_at` datetime DEFAULT NULL,
+  `is_deleted` tinyint(1) DEFAULT '0',
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_conversation_created` (`conversation_id`,`created_at`),
+  KEY `idx_sender` (`sender_id`),
+  CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `messages_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `message_reads`
+--
+
+DROP TABLE IF EXISTS `message_reads`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `message_reads` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `message_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `read_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_read` (`message_id`,`user_id`),
+  KEY `idx_user_read` (`user_id`,`read_at`),
+  CONSTRAINT `message_reads_ibfk_1` FOREIGN KEY (`message_id`) REFERENCES `messages` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `message_reads_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

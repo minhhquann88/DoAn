@@ -91,6 +91,8 @@ public class WebSecurityConfig {
                         .requestMatchers("/api/files/lessons/**").permitAll()
                         .requestMatchers("/api/files/courses/**").permitAll()
                         .requestMatchers("/api/files/avatars/**").permitAll()
+                        // Allow WebSocket endpoint (authentication handled in WebSocket interceptor)
+                        .requestMatchers("/ws/**").permitAll()
                         // Allow enrollments endpoints for authenticated users (ADMIN, LECTURER, STUDENT)
                         .requestMatchers("/api/v1/enrollments/**").hasAnyRole("ADMIN", "LECTURER", "STUDENT")
                         // All other requests are permitted (method-level security will handle authorization)

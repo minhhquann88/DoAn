@@ -1,407 +1,320 @@
 package com.coursemgmt.service;
 
+import com.coursemgmt.dto.*;
+import com.coursemgmt.dto.ChatMessageResponse;
 import com.coursemgmt.model.*;
 import com.coursemgmt.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
-import java.util.*;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
-/**
- * UC-CHAT-01: Chatbot Service với Google Gemini API và RAG (Retrieval Augmented Generation)
- * Lấy context từ khóa học để trả lời câu hỏi của học viên
- */
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class ChatService {
 
-    @Value("${gemini.api.key}")
-    private String geminiApiKey;
-
-    @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta}")
-    private String geminiApiUrl;
-
-    @Value("${gemini.api.model:gemini-2.5-flash}")
-    private String geminiModel;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private CourseRepository courseRepository;
-
-    @Autowired
-    private EnrollmentRepository enrollmentRepository;
-
-    @Autowired
-    private ChapterRepository chapterRepository;
-
-    // LessonRepository not used in current implementation, but may be needed for future enhancements
-
-    private final WebClient webClient;
-
-    public ChatService() {
-        this.webClient = WebClient.builder()
-                .baseUrl("https://generativelanguage.googleapis.com/v1beta")
-                .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                .build();
-    }
-
-    /**
-     * UC-CHAT-01: Xử lý câu hỏi với RAG
-     * Hỗ trợ cả người dùng đã đăng nhập và khách (guest)
-     * 
-     * @param question Câu hỏi của người dùng
-     * @param courseId Optional: ID khóa học để lấy context cụ thể
-     * @return Câu trả lời từ Gemini API với context từ khóa học
-     */
-    public String chat(String question, Long courseId) {
-        try {
-            // 1. Lấy user hiện tại (có thể null nếu là guest)
-            Long userId = getCurrentUserId();
-            User user = userId != null ? userRepository.findById(userId).orElse(null) : null;
-            
-            System.out.println("========================================");
-            System.out.println("ChatService.chat - User ID: " + userId);
-            System.out.println("Is Guest: " + (userId == null));
-            if (user != null) {
-                System.out.println("User: " + user.getFullName());
-                System.out.println("Roles: " + user.getRoles());
-            }
-            System.out.println("========================================");
-
-            // 2. RAG: Lấy context từ khóa học (khác nhau cho guest và authenticated user)
-            String courseContext = buildCourseContext(userId, courseId, user);
-            
-            // 3. Xây dựng prompt với context
-            String prompt = buildPrompt(question, courseContext, userId, user);
-            
-            // 4. Gọi Gemini API
-            String response = callGeminiAPI(prompt);
-            
-            return response;
-        } catch (Exception e) {
-            System.err.println("ChatService error: " + e.getMessage());
-            e.printStackTrace();
-            return "Xin lỗi, tôi đang gặp sự cố. Vui lòng thử lại sau.";
-        }
-    }
-
-    /**
-     * RAG: Xây dựng context từ khóa học
-     * - Guest: chỉ lấy thông tin khóa học công khai (published)
-     * - Authenticated: lấy thông tin user + khóa học đã đăng ký/giảng dạy
-     */
-    private String buildCourseContext(Long userId, Long courseId, User user) {
-        StringBuilder context = new StringBuilder();
+    private final ConversationRepository conversationRepository;
+    private final ConversationParticipantRepository participantRepository;
+    private final MessageRepository messageRepository;
+    private final MessageReadRepository messageReadRepository;
+    private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final CourseRepository courseRepository;
+    
+    @Transactional
+    public ConversationResponse createConversation(Long currentUserId, CreateConversationRequest request) {
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
         
-        try {
-            // Nếu là guest (user == null), chỉ lấy thông tin khóa học công khai
-            if (user == null) {
-                context.append("Người dùng: Khách (chưa đăng nhập)\n");
-                context.append("Lưu ý: Chỉ có thể truy cập thông tin khóa học công khai.\n");
-            } else {
-                // Authenticated user: lấy thông tin đầy đủ
-                String userRole = getUserRoleLabel(user);
-                context.append(userRole).append(": ").append(user.getFullName()).append("\n");
+        User otherUser = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Validate enrollment: If student wants to chat with instructor, check enrollment
+        boolean isCurrentUserStudent = currentUser.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_STUDENT"));
+        boolean isOtherUserInstructor = otherUser.getRoles().stream()
+                .anyMatch(r -> r.getName().equals("ROLE_LECTURER"));
+        
+        if (isCurrentUserStudent && isOtherUserInstructor) {
+            // Student chatting with instructor - must be enrolled in at least one course
+            if (request.getCourseId() != null) {
+                // Validate specific course enrollment
+                boolean isEnrolled = enrollmentRepository.existsByUserIdAndCourseId(currentUserId, request.getCourseId());
+                if (!isEnrolled) {
+                    throw new RuntimeException("Bạn phải đăng ký khóa học này để nhắn tin với giảng viên");
+                }
                 
-                // Log role để debug
-                System.out.println("ChatService.buildCourseContext: User " + user.getFullName() + 
-                                 " has role: " + userRole);
-            }
-
-            // Nếu có courseId cụ thể, lấy context của khóa học đó
-            if (courseId != null) {
-                Course course = courseRepository.findById(courseId).orElse(null);
-                if (course != null) {
-                    // Guest chỉ xem được khóa học đã published
-                    if (user == null && course.getStatus() != ECourseStatus.PUBLISHED) {
-                        context.append("\n=== THÔNG BÁO ===\n");
-                        context.append("Khóa học này chưa được công khai hoặc bạn cần đăng nhập để xem.\n");
-                    } else {
-                        context.append("\n=== THÔNG TIN KHÓA HỌC ===\n");
-                        context.append("Tên khóa học: ").append(course.getTitle()).append("\n");
-                        context.append("Mô tả: ").append(course.getDescription()).append("\n");
-                        if (course.getStatus() != null) {
-                            context.append("Trạng thái: ").append(course.getStatus().name()).append("\n");
-                        }
-                        
-                        // Lấy chapters và lessons (chỉ preview cho guest)
-                        List<Chapter> chapters = chapterRepository.findByCourseIdWithLessons(courseId);
-                        if (chapters != null && !chapters.isEmpty()) {
-                            context.append("\n=== NỘI DUNG KHÓA HỌC ===\n");
-                            for (Chapter chapter : chapters) {
-                                context.append("\nChương ").append(chapter.getPosition()).append(": ")
-                                       .append(chapter.getTitle()).append("\n");
-                                
-                                if (chapter.getLessons() != null) {
-                                    for (Lesson lesson : chapter.getLessons()) {
-                                        context.append("  - Bài ").append(lesson.getPosition()).append(": ")
-                                               .append(lesson.getTitle()).append("\n");
-                                        // Guest chỉ xem preview, authenticated user xem đầy đủ
-                                        if (user != null && lesson.getContent() != null && !lesson.getContent().isEmpty()) {
-                                            // Lấy một phần nội dung (tránh quá dài)
-                                            String content = lesson.getContent().length() > 200 
-                                                ? lesson.getContent().substring(0, 200) + "..."
-                                                : lesson.getContent();
-                                            context.append("    Nội dung: ").append(content).append("\n");
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                // Verify the course belongs to the instructor
+                Course course = courseRepository.findById(request.getCourseId())
+                        .orElseThrow(() -> new RuntimeException("Course not found"));
+                if (!course.getInstructor().getId().equals(request.getUserId())) {
+                    throw new RuntimeException("Khóa học này không thuộc về giảng viên này");
                 }
             } else {
-                // Không có courseId cụ thể
-                if (user == null) {
-                    // Guest: Lấy danh sách khóa học công khai (featured hoặc published)
-                    List<Course> publishedCourses = courseRepository.findFeaturedCourses();
-                    if (publishedCourses == null || publishedCourses.isEmpty()) {
-                        // Fallback: lấy top courses published
-                        publishedCourses = courseRepository.findAll().stream()
-                                .filter(c -> c.getStatus() == ECourseStatus.PUBLISHED)
-                                .limit(10)
-                                .collect(java.util.stream.Collectors.toList());
-                    }
-                    if (publishedCourses != null && !publishedCourses.isEmpty()) {
-                        context.append("\n=== CÁC KHÓA HỌC CÔNG KHAI ===\n");
-                        for (Course course : publishedCourses) {
-                            context.append("- ").append(course.getTitle());
-                            if (course.getPrice() != null) {
-                                context.append(" (Giá: ").append(course.getPrice()).append(" VND)");
-                            }
-                            context.append("\n");
-                        }
-                    }
-                } else {
-                    // Authenticated user: Lấy context dựa trên role
-                    boolean isLecturer = user.getRoles().stream()
-                            .anyMatch(role -> role.getName() == ERole.ROLE_LECTURER || role.getName() == ERole.ROLE_ADMIN);
-                    
-                    if (isLecturer) {
-                        // Giảng viên: Lấy các khóa học mà họ dạy
-                        if (user.getCoursesInstructed() != null && !user.getCoursesInstructed().isEmpty()) {
-                            context.append("\n=== CÁC KHÓA HỌC ĐANG GIẢNG DẠY ===\n");
-                            for (Course course : user.getCoursesInstructed()) {
-                                context.append("- ").append(course.getTitle());
-                                if (course.getStatus() != null) {
-                                    context.append(" (Trạng thái: ").append(course.getStatus().name()).append(")");
-                                }
-                                context.append("\n");
-                            }
-                        }
-                    } else {
-                        // Học viên: Lấy các khóa học đã đăng ký
-                        List<Enrollment> enrollments = enrollmentRepository.findByUserIdWithCourse(userId);
-                        if (enrollments != null && !enrollments.isEmpty()) {
-                            context.append("\n=== CÁC KHÓA HỌC ĐÃ ĐĂNG KÝ ===\n");
-                            for (Enrollment enrollment : enrollments) {
-                                if (enrollment.getCourse() != null) {
-                                    Course course = enrollment.getCourse();
-                                    context.append("- ").append(course.getTitle());
-                                    if (enrollment.getProgress() != null) {
-                                        context.append(" (Tiến độ: ").append(String.format("%.1f", enrollment.getProgress()))
-                                               .append("%)");
-                                    }
-                                    context.append("\n");
-                                }
-                            }
-                        }
-                    }
+                // Check if student is enrolled in any course by this instructor
+                List<Course> instructorCourses = courseRepository.findByInstructorId(request.getUserId());
+                boolean hasEnrollment = instructorCourses.stream()
+                        .anyMatch(course -> enrollmentRepository.existsByUserIdAndCourseId(currentUserId, course.getId()));
+                
+                if (!hasEnrollment) {
+                    throw new RuntimeException("Bạn phải đăng ký ít nhất một khóa học của giảng viên này để nhắn tin");
                 }
             }
-        } catch (Exception e) {
-            System.err.println("Error building course context: " + e.getMessage());
         }
         
-        return context.toString();
+        // Check if direct conversation already exists
+        Conversation existingConversation = conversationRepository
+                .findDirectConversationBetweenUsers(currentUserId, request.getUserId())
+                .orElse(null);
+        
+        if (existingConversation != null) {
+            return getConversationResponse(existingConversation, currentUserId);
+        }
+        
+        // Create new conversation
+        Conversation conversation = new Conversation();
+        conversation.setType(Conversation.ConversationType.DIRECT);
+        conversation = conversationRepository.save(conversation);
+        
+        // Add participants
+        ConversationParticipant participant1 = new ConversationParticipant();
+        participant1.setConversation(conversation);
+        participant1.setUser(currentUser);
+        participant1.setRole(getUserRole(currentUser));
+        
+        ConversationParticipant participant2 = new ConversationParticipant();
+        participant2.setConversation(conversation);
+        participant2.setUser(otherUser);
+        participant2.setRole(getUserRole(otherUser));
+        
+        participantRepository.save(participant1);
+        participantRepository.save(participant2);
+        
+        return getConversationResponse(conversation, currentUserId);
     }
-
-    /**
-     * Xây dựng prompt cho Gemini API
-     */
-    private String buildPrompt(String question, String courseContext, Long userId, User user) {
-        StringBuilder prompt = new StringBuilder();
+    
+    @Transactional(readOnly = true)
+    public List<ConversationResponse> getUserConversations(Long userId) {
+        List<Conversation> conversations = conversationRepository
+                .findByUserIdOrderByLastMessageAtDesc(userId);
         
-        // Xác định role và trạng thái đăng nhập
-        String userRole = user != null ? getUserRoleLabel(user) : "Khách";
-        boolean isGuest = user == null;
-        boolean isLecturer = user != null && user.getRoles().stream()
-                .anyMatch(role -> role.getName() == ERole.ROLE_LECTURER || role.getName() == ERole.ROLE_ADMIN);
+        return conversations.stream()
+                .map(conv -> getConversationResponse(conv, userId))
+                .collect(Collectors.toList());
+    }
+    
+    @Transactional(readOnly = true)
+    public ConversationResponse getConversation(Long conversationId, Long userId) {
+        Conversation conversation = conversationRepository
+                .findByIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found"));
         
-        prompt.append("Bạn là trợ lý AI thông minh của một nền tảng học trực tuyến (E-Learning). ");
+        return getConversationResponse(conversation, userId);
+    }
+    
+    @Transactional
+    public ChatMessageResponse sendMessage(Long senderId, SendMessageRequest request) {
+        Conversation conversation = conversationRepository.findById(request.getConversationId())
+                .orElseThrow(() -> new RuntimeException("Conversation not found"));
         
-        if (isGuest) {
-            prompt.append("Bạn đang trò chuyện với một khách (chưa đăng nhập). ");
-            prompt.append("Nhiệm vụ của bạn là trả lời câu hỏi về các khóa học công khai và giúp họ tìm hiểu về nền tảng.\n\n");
-        } else if (isLecturer && user != null) {
-            prompt.append("Bạn đang trò chuyện với một ").append(userRole.toLowerCase())
-                  .append(" (").append(user.getFullName()).append("). ");
-            prompt.append("Nhiệm vụ của bạn là trả lời câu hỏi về quản lý khóa học, học viên, và các vấn đề liên quan đến giảng dạy.\n\n");
-        } else if (user != null) {
-            prompt.append("Bạn đang trò chuyện với một ").append(userRole.toLowerCase())
-                  .append(" (").append(user.getFullName()).append("). ");
-            prompt.append("Nhiệm vụ của bạn là trả lời câu hỏi về các khóa học và nội dung học tập.\n\n");
+        // Verify sender is participant
+        participantRepository.findByConversationIdAndUserId(conversation.getId(), senderId)
+                .orElseThrow(() -> new RuntimeException("User is not a participant"));
+        
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        
+        Message message = new Message();
+        message.setConversation(conversation);
+        message.setSender(sender);
+        message.setContent(request.getContent());
+        message.setMessageType(request.getMessageType());
+        message.setFileUrl(request.getFileUrl());
+        message.setFileName(request.getFileName());
+        message.setFileSize(request.getFileSize());
+        
+        message = messageRepository.save(message);
+        
+        // Update conversation last message time
+        conversation.setLastMessageAt(LocalDateTime.now());
+        conversationRepository.save(conversation);
+        
+        return ChatMessageResponse.fromEntity(message, false, null);
+    }
+    
+    @Transactional(readOnly = true)
+    public Page<ChatMessageResponse> getMessages(Long conversationId, Long userId, int page, int size) {
+        // Verify user is participant
+        participantRepository.findByConversationIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new RuntimeException("User is not a participant"));
+        
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Message> messages = messageRepository.findByConversationIdOrderByCreatedAtDesc(conversationId, pageable);
+        
+        // Get read status for each message
+        List<MessageRead> reads = messageReadRepository.findByConversationIdAndUserId(conversationId, userId);
+        
+        return messages.map(msg -> {
+            MessageRead read = reads.stream()
+                    .filter(r -> r.getMessage().getId().equals(msg.getId()))
+                    .findFirst()
+                    .orElse(null);
+            
+            return ChatMessageResponse.fromEntity(
+                    msg,
+                    read != null,
+                    read != null ? read.getReadAt() : null
+            );
+        });
+    }
+    
+    @Transactional
+    public ChatMessageResponse updateMessage(Long messageId, Long userId, UpdateMessageRequest request) {
+        Message message = messageRepository.findByIdAndSenderId(messageId, userId)
+                .orElseThrow(() -> new RuntimeException("Message not found or unauthorized"));
+        
+        message.setContent(request.getContent());
+        message.setIsEdited(true);
+        message.setEditedAt(LocalDateTime.now());
+        
+        message = messageRepository.save(message);
+        
+        MessageRead read = messageReadRepository.findByMessageIdAndUserId(messageId, userId).orElse(null);
+        return ChatMessageResponse.fromEntity(message, read != null, read != null ? read.getReadAt() : null);
+    }
+    
+    @Transactional
+    public void deleteMessage(Long messageId, Long userId) {
+        Message message = messageRepository.findByIdAndSenderId(messageId, userId)
+                .orElseThrow(() -> new RuntimeException("Message not found or unauthorized"));
+        
+        message.setIsDeleted(true);
+        message.setDeletedAt(LocalDateTime.now());
+        messageRepository.save(message);
+    }
+    
+    @Transactional
+    public void markAsRead(Long conversationId, Long userId) {
+        ConversationParticipant participant = participantRepository
+                .findByConversationIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new RuntimeException("Participant not found"));
+        
+        participant.setLastReadAt(LocalDateTime.now());
+        participantRepository.save(participant);
+        
+        // Mark all unread messages as read
+        List<Message> allMessages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+        List<Message> unreadMessages = allMessages.stream()
+                .filter(msg -> {
+                    // Check if message is from other users
+                    try {
+                        Long senderId = msg.getSender().getId();
+                        if (senderId.equals(userId)) {
+                            return false; // Skip own messages
+                        }
+                    } catch (Exception e) {
+                        log.warn("Error getting sender ID: {}", e.getMessage());
+                        return false;
+                    }
+                    
+                    // Check if already read
+                    MessageRead existingRead = messageReadRepository
+                            .findByMessageIdAndUserId(msg.getId(), userId)
+                            .orElse(null);
+                    return existingRead == null;
+                })
+                .collect(Collectors.toList());
+        
+        for (Message msg : unreadMessages) {
+            MessageRead read = new MessageRead();
+            read.setMessage(msg);
+            read.setUser(participant.getUser());
+            messageReadRepository.save(read);
         }
-        
-        if (!courseContext.isEmpty()) {
-            prompt.append("=== THÔNG TIN NGỮ CẢNH ===\n");
-            prompt.append(courseContext).append("\n\n");
-        }
-        
-        prompt.append("=== CÂU HỎI CỦA ").append(userRole.toUpperCase()).append(" ===\n");
-        prompt.append(question).append("\n\n");
-        
-        prompt.append("=== HƯỚNG DẪN ===\n");
-        prompt.append("- Trả lời câu hỏi dựa trên thông tin ngữ cảnh được cung cấp.\n");
-        prompt.append("- Nếu câu hỏi liên quan đến khóa học cụ thể, hãy tham khảo thông tin trong phần ngữ cảnh.\n");
-        prompt.append("- Trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu.\n");
-        if (isGuest) {
-            prompt.append("- Người dùng là khách, chỉ có thể truy cập thông tin khóa học công khai. ");
-            prompt.append("Nếu câu hỏi cần thông tin cá nhân hoặc khóa học chưa công khai, hãy đề xuất họ đăng nhập.\n");
-        } else if (isLecturer) {
-            prompt.append("- Người dùng là ").append(userRole.toLowerCase())
-                  .append(", hãy điều chỉnh cách trả lời phù hợp với vai trò này.\n");
-        }
-        prompt.append("- Nếu không có thông tin trong ngữ cảnh, hãy trả lời chung chung hoặc đề xuất liên hệ hỗ trợ.\n");
-        prompt.append("- Luôn thân thiện và hỗ trợ.\n");
-        
-        return prompt.toString();
+    }
+    
+    @Transactional(readOnly = true)
+    public Long getUnreadCount(Long conversationId, Long userId) {
+        return messageRepository.countUnreadMessages(conversationId, userId, LocalDateTime.MIN);
     }
     
     /**
-     * Helper: Lấy label role của user
+     * Lấy danh sách giảng viên từ các khóa học đã đăng ký của student
      */
-    private String getUserRoleLabel(User user) {
-        if (user == null || user.getRoles() == null || user.getRoles().isEmpty()) {
-            return "Người dùng";
+    @Transactional(readOnly = true)
+    public List<InstructorInfoDTO> getEnrolledInstructors(Long studentId) {
+        // Get all enrollments for this student
+        List<Enrollment> enrollments = enrollmentRepository.findByUserIdWithCourse(studentId);
+        
+        // Extract unique instructors with course info
+        return enrollments.stream()
+                .filter(e -> e.getCourse() != null && e.getCourse().getInstructor() != null)
+                .map(e -> {
+                    User instructor = e.getCourse().getInstructor();
+                    return InstructorInfoDTO.builder()
+                            .id(instructor.getId())
+                            .fullName(instructor.getFullName())
+                            .username(instructor.getUsername())
+                            .email(instructor.getEmail())
+                            .avatarUrl(instructor.getAvatarUrl())
+                            .courseId(e.getCourse().getId())
+                            .courseTitle(e.getCourse().getTitle())
+                            .build();
+                })
+                .distinct() // Remove duplicates if student enrolled in multiple courses by same instructor
+                .collect(Collectors.toList());
+    }
+    
+    private ConversationResponse getConversationResponse(Conversation conversation, Long currentUserId) {
+        // Get other participant
+        List<ConversationParticipant> otherParticipants = participantRepository
+                .findOtherParticipants(conversation.getId(), currentUserId);
+        
+        ConversationResponse.UserInfo otherParticipant = null;
+        if (!otherParticipants.isEmpty()) {
+            User otherUser = otherParticipants.get(0).getUser();
+            otherParticipant = ConversationResponse.UserInfo.builder()
+                    .id(otherUser.getId())
+                    .fullName(otherUser.getFullName())
+                    .avatar(otherUser.getAvatarUrl())
+                    .role(otherParticipants.get(0).getRole().name())
+                    .build();
         }
         
-        // Kiểm tra role theo thứ tự ưu tiên: ADMIN > LECTURER > STUDENT
-        for (Role role : user.getRoles()) {
-            if (role.getName() == ERole.ROLE_ADMIN) {
-                return "Quản trị viên";
-            }
-        }
-        for (Role role : user.getRoles()) {
-            if (role.getName() == ERole.ROLE_LECTURER) {
-                return "Giảng viên";
-            }
-        }
-        for (Role role : user.getRoles()) {
-            if (role.getName() == ERole.ROLE_STUDENT) {
-                return "Học viên";
-            }
+        // Get last message - query separately to avoid LAZY loading issues
+        ChatMessageResponse lastMessage = null;
+        List<Message> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
+        if (!messages.isEmpty()) {
+            Message lastMsg = messages.get(messages.size() - 1); // Last message (most recent)
+            MessageRead read = messageReadRepository
+                    .findByMessageIdAndUserId(lastMsg.getId(), currentUserId)
+                    .orElse(null);
+            lastMessage = ChatMessageResponse.fromEntity(
+                    lastMsg,
+                    read != null,
+                    read != null ? read.getReadAt() : null
+            );
         }
         
-        return "Người dùng";
+        // Get unread count
+        Long unreadCount = getUnreadCount(conversation.getId(), currentUserId);
+        
+        return ConversationResponse.fromEntity(conversation, otherParticipant, lastMessage, unreadCount);
     }
-
-    /**
-     * Gọi Google Gemini API
-     */
-    private String callGeminiAPI(String prompt) {
-        try {
-            String url = String.format("%s/models/%s:generateContent?key=%s", 
-                geminiApiUrl, geminiModel, geminiApiKey);
-            
-            Map<String, Object> requestBody = new HashMap<>();
-            Map<String, Object> content = new HashMap<>();
-            Map<String, Object> part = new HashMap<>();
-            part.put("text", prompt);
-            
-            List<Map<String, Object>> parts = new ArrayList<>();
-            parts.add(part);
-            content.put("parts", parts);
-            
-            List<Map<String, Object>> contents = new ArrayList<>();
-            contents.add(content);
-            requestBody.put("contents", contents);
-            
-            // Safety settings (optional)
-            Map<String, String> safetySettings = new HashMap<>();
-            safetySettings.put("category", "HARM_CATEGORY_HARASSMENT");
-            safetySettings.put("threshold", "BLOCK_MEDIUM_AND_ABOVE");
-            
-            System.out.println("========================================");
-            System.out.println("Calling Gemini API");
-            System.out.println("URL: " + url);
-            System.out.println("Model: " + geminiModel);
-            System.out.println("Prompt length: " + prompt.length());
-            System.out.println("========================================");
-            
-            Map<String, Object> response = webClient.post()
-                    .uri(url)
-                    .bodyValue(requestBody)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .timeout(Duration.ofSeconds(30))
-                    .block();
-            
-            if (response == null) {
-                throw new RuntimeException("Empty response from Gemini API");
-            }
-            
-            // Parse response
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
-            if (candidates == null || candidates.isEmpty()) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> promptFeedback = (Map<String, Object>) response.get("promptFeedback");
-                if (promptFeedback != null) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> blockReason = (Map<String, Object>) promptFeedback.get("blockReason");
-                    if (blockReason != null) {
-                        return "Xin lỗi, câu hỏi của bạn không phù hợp với chính sách của hệ thống.";
-                    }
-                }
-                throw new RuntimeException("No candidates in response");
-            }
-            
-            @SuppressWarnings("unchecked")
-            Map<String, Object> candidate = candidates.get(0);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> contentResponse = (Map<String, Object>) candidate.get("content");
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> partsResponse = (List<Map<String, Object>>) contentResponse.get("parts");
-            @SuppressWarnings("unchecked")
-            String text = (String) partsResponse.get(0).get("text");
-            
-            System.out.println("Gemini API Response received: " + (text != null ? text.length() : 0) + " characters");
-            
-            return text != null ? text : "Xin lỗi, không thể tạo phản hồi.";
-            
-        } catch (Exception e) {
-            System.err.println("Error calling Gemini API: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Failed to call Gemini API: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Helper: Lấy user ID hiện tại
-     */
-    private Long getCurrentUserId() {
-        try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
-                return null;
-            }
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String username = userDetails.getUsername();
-            User user = userRepository.findByUsername(username).orElse(null);
-            return user != null ? user.getId() : null;
-        } catch (Exception e) {
-            System.err.println("Error getting current user ID: " + e.getMessage());
-            return null;
-        }
+    
+    private ConversationParticipant.ParticipantRole getUserRole(User user) {
+        return user.getRoles().stream()
+                .anyMatch(role -> role.getName().equals("ROLE_LECTURER")) 
+                ? ConversationParticipant.ParticipantRole.INSTRUCTOR
+                : ConversationParticipant.ParticipantRole.STUDENT;
     }
 }
-
