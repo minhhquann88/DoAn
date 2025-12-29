@@ -107,9 +107,9 @@ export default function InstructorDashboard() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-full space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
@@ -125,7 +125,7 @@ export default function InstructorDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tổng khóa học</CardTitle>
@@ -206,7 +206,7 @@ export default function InstructorDashboard() {
       </div>
 
       {/* Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 mb-6">
         <Card>
           <CardHeader>
             <CardTitle>Doanh thu 6 tháng gần nhất</CardTitle>

@@ -544,7 +544,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </header>
         
         {/* Main Content Area - Add padding for proper spacing from sidebar */}
-        <main className="flex-1 overflow-hidden relative h-full">
+        <main className="flex-1 overflow-y-auto relative h-full">
           {children}
         </main>
       </div>
