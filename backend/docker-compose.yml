@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  mysql-db:
+    # Sử dụng image MySQL phiên bản 8
+    image: mysql:8.0
+
+    # Tên của container
+    container_name: mysql_course_db
+
+    # Khởi động lại container nếu nó bị tắt
+    restart: unless-stopped
+
+    # Cấu hình các biến môi trường cho MySQL
+    environment:
+      MYSQL_ROOT_PASSWORD: root  # <-- Đổi 'matkhaucuaban' thành mật khẩu root
+      MYSQL_DATABASE: db_course_management # <-- Tên CSDL sẽ được tạo tự động
+
+    # Ánh xạ cổng (port)
+    # Cổng 3306 của máy bạn (host) sẽ trỏ vào cổng 3306 bên trong container
+    ports:
+      - "3306:3306"
+
+    # (Tùy chọn) Lưu trữ dữ liệu để không bị mất khi xóa container
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+# Định nghĩa volume (nơi lưu trữ dữ liệu)
+volumes:
+  mysql_data:

@@ -1,0 +1,117 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+my_config.env
+
+# Application properties with sensitive data
+backend/src/main/resources/application.properties
+backend/src/main/resources/application-*.properties
+!backend/src/main/resources/application.properties.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build outputs
+dist/
+build/
+frontend/.next/
+frontend/out/
+frontend/dist/
+
+# Java/Maven
+target/
+backend/target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/wrapper/maven-wrapper.jar
+
+# Frontend
+.vite/
+*.local
+
+# Logs
+logs/
+backend/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database
+chroma_db/
+*.db
+*.sqlite
+*.sqlite3
+
+# Certificates & Keys
+*.pem
+*.key
+*.cert
+
+# Python
+venv/
+env/
+ENV/
+.venv
+src/__pycache__/
+src/**/__pycache__/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Debug and test files
+*debug*.py
+*debug*.json
+*test*.sql
+*_test*.ts
+test-api-integration.ts
+
+# Data files (crawled/test data)
+f8_*.json
+*_final.json
+*_raw*.json
+
+# SQL scripts (test/import)
+import_*.sql
+update_*.sql
+
+# Package check files
+backend_package_check.txt
+
+# HTTP test files
+*.http
+test_all_modules.http
+
+# Upload directories
+backend/uploads/
+frontend/public/uploads/
+
+# Video files (large)
+*.mp4
+*.avi
+*.mov
+frontend/public/videos/
+
