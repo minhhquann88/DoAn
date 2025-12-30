@@ -1,0 +1,12 @@
+target/
+.git/
+.gitignore
+.idea/
+*.iml
+*.log
+logs/
+certificates/
+uploads/
+node_modules/
+.DS_Store
+
