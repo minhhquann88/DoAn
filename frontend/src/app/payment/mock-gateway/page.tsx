@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { ROUTES } from '@/lib/constants';
 import { useUIStore } from '@/stores/uiStore';
 import { useCartStore } from '@/stores/cartStore';
 
-export default function MockGatewayPage() {
+function MockGatewayPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { addToast } = useUIStore();
@@ -29,7 +29,7 @@ export default function MockGatewayPage() {
     if (!txnCode || !amount) {
       addToast({
         type: 'error',
-        message: 'Thiếu thông tin giao dịch. Vui lòng thử lại.',
+        description: 'Thiếu thông tin giao dịch. Vui lòng thử lại.',
       });
       router.push(ROUTES.COURSES);
     }
@@ -56,7 +56,7 @@ export default function MockGatewayPage() {
       setStatus('success');
       addToast({
         type: 'success',
-        message: 'Thanh toán thành công! Đang chuyển hướng...',
+        description: 'Thanh toán thành công! Đang chuyển hướng...',
       });
       
       // Redirect to My Courses after 1.5 seconds
@@ -67,7 +67,7 @@ export default function MockGatewayPage() {
       console.error('Payment processing failed:', error);
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể xử lý thanh toán. Vui lòng thử lại.',
+        description: error.response?.data?.error || 'Không thể xử lý thanh toán. Vui lòng thử lại.',
       });
       setIsProcessing(false);
     }
@@ -83,7 +83,7 @@ export default function MockGatewayPage() {
       setStatus('failed');
       addToast({
         type: 'info',
-        message: 'Giao dịch đã bị hủy.',
+        description: 'Giao dịch đã bị hủy.',
       });
       
       // Redirect back to course detail or courses list
@@ -98,7 +98,7 @@ export default function MockGatewayPage() {
       console.error('Payment cancellation failed:', error);
       addToast({
         type: 'error',
-        message: 'Không thể hủy giao dịch. Vui lòng thử lại.',
+        description: 'Không thể hủy giao dịch. Vui lòng thử lại.',
       });
       setIsProcessing(false);
     }
@@ -203,6 +203,18 @@ export default function MockGatewayPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function MockGatewayPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    }>
+      <MockGatewayPageContent />
+    </Suspense>
   );
 }
 

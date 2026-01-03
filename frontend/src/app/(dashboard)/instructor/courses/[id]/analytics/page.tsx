@@ -192,7 +192,7 @@ export default function CourseAnalyticsPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `${value.toLocaleString('vi-VN')} đ`} />
+                    <Tooltip formatter={(value: number | undefined) => `${(value ?? 0).toLocaleString('vi-VN')} đ`} />
                     <Legend />
                     <Line 
                       type="monotone" 

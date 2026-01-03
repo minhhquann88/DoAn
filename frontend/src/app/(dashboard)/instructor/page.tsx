@@ -138,7 +138,7 @@ export default function InstructorDashboard() {
               <>
                 <div className="text-2xl font-bold">{stats?.totalCourses || 0}</div>
                 <p className="text-xs text-muted-foreground">
-                  {(stats?.totalCourses || 0) > 0 ? `${stats.totalCourses} khóa học đã tạo` : 'Chưa có khóa học'}
+                  {(stats?.totalCourses || 0) > 0 ? `${stats?.totalCourses || 0} khóa học đã tạo` : 'Chưa có khóa học'}
                 </p>
               </>
             )}
@@ -157,7 +157,7 @@ export default function InstructorDashboard() {
               <>
                 <div className="text-2xl font-bold">{stats?.totalStudents || 0}</div>
                 <p className="text-xs text-muted-foreground">
-                  {(stats?.totalStudents || 0) > 0 ? `${stats.totalStudents} học viên đã đăng ký` : 'Chưa có học viên'}
+                  {(stats?.totalStudents || 0) > 0 ? `${stats?.totalStudents || 0} học viên đã đăng ký` : 'Chưa có học viên'}
                 </p>
               </>
             )}
@@ -225,7 +225,7 @@ export default function InstructorDashboard() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value) => `${Number(value).toLocaleString('vi-VN')} ₫`} />
+                  <Tooltip formatter={(value: number | undefined) => `${Number(value ?? 0).toLocaleString('vi-VN')} ₫`} />
                   <Bar dataKey="revenue" fill="#8884d8" />
                 </BarChart>
               </ResponsiveContainer>

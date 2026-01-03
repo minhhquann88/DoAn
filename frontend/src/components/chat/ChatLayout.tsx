@@ -29,7 +29,7 @@ export function ChatLayout() {
   } = useChat();
 
   const currentConversation = conversations.find(c => c.id === currentConversationId) || null;
-  const typingUserIds = currentConversationId ? typingUsers : new Set<number>();
+  const typingUserIds = currentConversationId ? (typingUsers as Set<number>) : new Set<number>();
 
   // Auto-select conversation from URL query
   React.useEffect(() => {

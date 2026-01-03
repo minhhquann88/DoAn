@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { ROUTES } from '@/lib/constants';
 import { useUIStore } from '@/stores/uiStore';
 import { useCartStore } from '@/stores/cartStore';
 
-export default function VNPayReturnPage() {
+function VNPayReturnPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { addToast } = useUIStore();
@@ -51,13 +51,13 @@ export default function VNPayReturnPage() {
           
           addToast({
             type: 'success',
-            message: 'Thanh toán thành công!',
+            title: 'Thanh toán thành công!',
             description: 'Khóa học đã được thêm vào tài khoản của bạn.',
           });
         } else {
           addToast({
             type: 'error',
-            message: 'Thanh toán thất bại',
+            title: 'Thanh toán thất bại',
             description: data.message || 'Vui lòng thử lại.',
           });
         }
@@ -69,7 +69,7 @@ export default function VNPayReturnPage() {
         });
         addToast({
           type: 'error',
-          message: 'Lỗi xử lý thanh toán',
+          title: 'Lỗi xử lý thanh toán',
           description: error.message || 'Vui lòng thử lại sau.',
         });
       } finally {
@@ -174,6 +174,18 @@ export default function VNPayReturnPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function VNPayReturnPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    }>
+      <VNPayReturnPageContent />
+    </Suspense>
   );
 }
 

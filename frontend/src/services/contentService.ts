@@ -306,7 +306,7 @@ export const downloadExportFile = (blob: Blob, courseId: number) => {
 export const calculateCourseDuration = (chapters: ChapterResponse[]): number => {
   return chapters.reduce((total, chapter) => {
     const chapterDuration = chapter.lessons.reduce((sum, lesson) => {
-      return sum + (lesson.duration || 0);
+      return sum + ((lesson as any).duration || 0);
     }, 0);
     return total + chapterDuration;
   }, 0);

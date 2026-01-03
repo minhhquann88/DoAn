@@ -57,7 +57,7 @@ export default function AdminCategoriesPage() {
       reset();
       addToast({
         type: 'success',
-        message: 'Tạo danh mục thành công',
+        description: 'Tạo danh mục thành công',
       });
     },
     onError: (error: any) => {
@@ -75,7 +75,7 @@ export default function AdminCategoriesPage() {
       
       addToast({
         type: 'error',
-        message: errorMessage,
+        description: errorMessage,
       });
     },
   });
@@ -90,13 +90,13 @@ export default function AdminCategoriesPage() {
       reset();
       addToast({
         type: 'success',
-        message: 'Cập nhật danh mục thành công',
+        description: 'Cập nhật danh mục thành công',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.message || 'Có lỗi xảy ra',
+        description: error.response?.data?.message || 'Có lỗi xảy ra',
       });
     },
   });
@@ -109,13 +109,13 @@ export default function AdminCategoriesPage() {
       setDeletingCategory(null);
       addToast({
         type: 'success',
-        message: 'Xóa danh mục thành công',
+        description: 'Xóa danh mục thành công',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.message || 'Có lỗi xảy ra',
+        description: error.response?.data?.message || 'Có lỗi xảy ra',
       });
       setDeletingCategory(null);
     },

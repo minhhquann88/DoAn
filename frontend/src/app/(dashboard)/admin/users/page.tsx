@@ -72,13 +72,13 @@ export default function AdminUsersPage() {
       setLockReason('');
       addToast({
         type: 'success',
-        message: 'Cập nhật trạng thái thành công',
+        description: 'Cập nhật trạng thái thành công',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.message || 'Có lỗi xảy ra',
+        description: error.response?.data?.message || 'Có lỗi xảy ra',
       });
     },
   });

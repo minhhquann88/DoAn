@@ -79,10 +79,11 @@ export default function MyCoursesPage() {
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => 
-        c.title.toLowerCase().includes(query) ||
-        (typeof c.instructor === 'string' ? c.instructor.toLowerCase().includes(query) : c.instructor?.fullName?.toLowerCase().includes(query))
-      );
+      filtered = filtered.filter(c => {
+        const titleMatch = c.title.toLowerCase().includes(query);
+        const instructorMatch = c.instructor?.fullName?.toLowerCase().includes(query) || false;
+        return titleMatch || instructorMatch;
+      });
     }
     
     // Apply sort
@@ -95,16 +96,16 @@ export default function MyCoursesPage() {
         break;
       case 'enrolled':
         filtered = [...filtered].sort((a, b) => {
-          const dateA = new Date(a.lastAccessed || 0).getTime();
-          const dateB = new Date(b.lastAccessed || 0).getTime();
+          const dateA = new Date((a as any).lastAccessed || a.createdAt || 0).getTime();
+          const dateB = new Date((b as any).lastAccessed || b.createdAt || 0).getTime();
           return dateB - dateA;
         });
         break;
       case 'recent':
       default:
         filtered = [...filtered].sort((a, b) => {
-          const dateA = new Date(a.lastAccessed || 0).getTime();
-          const dateB = new Date(b.lastAccessed || 0).getTime();
+          const dateA = new Date((a as any).lastAccessed || a.createdAt || 0).getTime();
+          const dateB = new Date((b as any).lastAccessed || b.createdAt || 0).getTime();
           return dateB - dateA;
         });
         break;
@@ -217,7 +218,7 @@ export default function MyCoursesPage() {
                 
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-muted-foreground">
-                    {course.lastAccessed ? `Truy cập: ${new Date(course.lastAccessed).toLocaleDateString('vi-VN')}` : ''}
+                    {(course as any).lastAccessed ? `Truy cập: ${new Date((course as any).lastAccessed).toLocaleDateString('vi-VN')}` : ''}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button asChild>
