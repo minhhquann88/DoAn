@@ -441,10 +441,12 @@ function PreviewLessonDialog({
       case 'VIDEO':
         if (!lesson.videoUrl) return <p className="text-muted-foreground">Chưa có video</p>;
         if (isYouTubeUrl(lesson.videoUrl)) {
+          const embedUrl = getYouTubeEmbedUrl(lesson.videoUrl);
+          if (!embedUrl) return <p className="text-muted-foreground">Không thể tải video</p>;
           return (
             <div className="aspect-video w-full">
               <iframe
-                src={getYouTubeEmbedUrl(lesson.videoUrl)}
+                src={embedUrl}
                 className="w-full h-full rounded-lg"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen

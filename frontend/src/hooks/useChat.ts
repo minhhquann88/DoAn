@@ -455,8 +455,8 @@ export const useChat = () => {
     if (stompClient && stompClient.connected) {
       // Get current subscriptions
       const subscribedIds = new Set<number>();
-      if (stompClient.subscriptions) {
-        Object.keys(stompClient.subscriptions).forEach((key) => {
+      if ((stompClient as any).subscriptions) {
+        Object.keys((stompClient as any).subscriptions).forEach((key) => {
           const match = key.match(/\/topic\/conversation\/(\d+)/);
           if (match) {
             subscribedIds.add(parseInt(match[1], 10));
@@ -517,7 +517,7 @@ export const useChat = () => {
           const onlineTopic = `/topic/conversation/${conv.id}/online`;
           const offlineTopic = `/topic/conversation/${conv.id}/offline`;
           
-          if (!subscribedIds.has(conv.id) || !stompClient.subscriptions?.[onlineTopic]) {
+          if (!subscribedIds.has(conv.id) || !(stompClient as any)?.subscriptions?.[onlineTopic]) {
             stompClient?.subscribe(onlineTopic, (message: IMessage) => {
               try {
                 const data = JSON.parse(message.body);
@@ -529,7 +529,7 @@ export const useChat = () => {
             });
           }
           
-          if (!subscribedIds.has(conv.id) || !stompClient.subscriptions?.[offlineTopic]) {
+          if (!subscribedIds.has(conv.id) || !(stompClient as any)?.subscriptions?.[offlineTopic]) {
             stompClient?.subscribe(offlineTopic, (message: IMessage) => {
               try {
                 const data = JSON.parse(message.body);
@@ -574,7 +574,7 @@ export const useChat = () => {
           conversationId: request.conversationId,
           senderId: user!.id!,
           senderName: user!.fullName || user!.username,
-          senderAvatar: user!.avatarUrl || null,
+          senderAvatar: user!.avatar || null,
           content: request.content,
           messageType: request.messageType || 'TEXT',
           fileUrl: request.fileUrl || null,

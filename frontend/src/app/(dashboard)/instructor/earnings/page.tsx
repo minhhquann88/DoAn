@@ -188,7 +188,7 @@ export default function InstructorEarningsPage() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number) => `${Number(value).toLocaleString('vi-VN')} đ`}
+                      formatter={(value: number | undefined) => `${Number(value ?? 0).toLocaleString('vi-VN')} đ`}
                     />
                     <Legend />
                     <Bar dataKey="revenue" fill="#8884d8" name="Doanh thu" />

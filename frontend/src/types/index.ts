@@ -69,6 +69,7 @@ export interface Course {
   reviewCount?: number;
   enrollmentCount: number; // Số lượng học viên đã đăng ký (từ Backend CourseResponse)
   duration?: string;
+  totalDurationInHours?: number; // Tổng thời lượng khóa học (tính bằng giờ)
   lastUpdated?: string;
   whatYouLearn?: string[];
   requirements?: string[];

@@ -7,7 +7,18 @@
 export * from './authService';
 
 // Module 2: Course Management
-export * from './courseService';
+export {
+  getCourses,
+  getCourseById,
+  createCourse,
+  updateCourse,
+  deleteCourse,
+  approveCourse,
+  uploadCourseImage,
+  getFeaturedCourses,
+  publishCourse,
+  unpublishCourse,
+} from './courseService';
 
 // Module 3: Content Management
 export * from './contentService';

@@ -131,7 +131,7 @@ export default function AdminDashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value: number | undefined) => formatCurrency(value ?? 0)} />
                 <Legend />
                 <Line 
                   type="monotone" 
