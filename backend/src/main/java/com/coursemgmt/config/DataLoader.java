@@ -1,7 +1,10 @@
 package com.coursemgmt.config;
 
 import com.coursemgmt.model.Category;
+import com.coursemgmt.model.ERole;
+import com.coursemgmt.model.Role;
 import com.coursemgmt.repository.CategoryRepository;
+import com.coursemgmt.repository.RoleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -12,8 +15,41 @@ public class DataLoader implements CommandLineRunner {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private RoleRepository roleRepository;
+
     @Override
     public void run(String... args) throws Exception {
+        // Initialize Roles
+        initializeRoles();
+        
+        // Initialize Categories
+        initializeCategories();
+    }
+
+    private void initializeRoles() {
+        if (roleRepository.count() == 0) {
+            System.out.println("Initializing roles...");
+
+            Role adminRole = new Role();
+            adminRole.setName(ERole.ROLE_ADMIN);
+            roleRepository.save(adminRole);
+
+            Role lecturerRole = new Role();
+            lecturerRole.setName(ERole.ROLE_LECTURER);
+            roleRepository.save(lecturerRole);
+
+            Role studentRole = new Role();
+            studentRole.setName(ERole.ROLE_STUDENT);
+            roleRepository.save(studentRole);
+
+            System.out.println("Roles initialized successfully!");
+        } else {
+            System.out.println("Roles already exist. Skipping initialization.");
+        }
+    }
+
+    private void initializeCategories() {
         if (categoryRepository.count() == 0) {
             System.out.println("Initializing categories...");
 
