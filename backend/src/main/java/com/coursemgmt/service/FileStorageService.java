@@ -38,9 +38,9 @@ public class FileStorageService {
     private final SlideConversionService slideConversionService;
 
     public FileStorageService(@Value("${avatar.storage.path:./uploads/avatars}") String avatarStoragePath,
-                              @Value("${avatar.base-url:http://localhost:8080/api/files/avatars}") String avatarBaseUrl,
+                              @Value("${AVATAR_BASE_URL:${avatar.base-url:http://localhost:8080/api/files/avatars}}") String avatarBaseUrl,
                               @Value("${course.image.storage.path:./uploads/courses}") String courseImageStoragePath,
-                              @Value("${course.image.base-url:http://localhost:8080/api/files/courses}") String courseImageBaseUrl,
+                              @Value("${COURSE_IMAGE_BASE_URL:${course.image.base-url:http://localhost:8080/api/files/courses}}") String courseImageBaseUrl,
                               @Value("${lesson.video.storage.path:./uploads/lessons/videos}") String lessonVideoStoragePath,
                               @Value("${lesson.video.base-url:http://localhost:8080/api/files/lessons/videos}") String lessonVideoBaseUrl,
                               @Value("${lesson.document.storage.path:./uploads/lessons/documents}") String lessonDocumentStoragePath,

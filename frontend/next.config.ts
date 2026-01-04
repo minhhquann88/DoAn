@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
         hostname: 'files.fullstack.edu.vn', // Dự phòng
       },
       {
+        protocol: 'https',
+        hostname: '*.onrender.com', // Render backend URLs
+        pathname: '/api/files/**',
+      },
+      {
         protocol: 'http',
         hostname: 'localhost',
         port: '8080',
