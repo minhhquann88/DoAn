@@ -6,10 +6,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 @Component
 public class DataLoader implements CommandLineRunner {
@@ -29,6 +33,16 @@ public class DataLoader implements CommandLineRunner {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    // Danh sách các khóa học featured từ F8 (dựa vào SQL dump)
+    private static final List<String> FEATURED_COURSE_TITLES = Arrays.asList(
+            "Kiến Thức Nhập Môn IT",
+            "Lập trình C++ cơ bản, nâng cao",
+            "HTML CSS từ Zero đến Hero",
+            "Responsive Với Grid System"
+    );
+
     @Override
     public void run(String... args) throws Exception {
         // Initialize Roles
@@ -37,8 +51,8 @@ public class DataLoader implements CommandLineRunner {
         // Initialize Categories
         initializeCategories();
         
-        // Initialize Sample Instructors and Featured Courses
-        initializeSampleData();
+        // Initialize F8 Featured Courses from API
+        initializeF8FeaturedCourses();
     }
 
     private void initializeRoles() {
@@ -123,111 +137,187 @@ public class DataLoader implements CommandLineRunner {
         }
     }
 
-    private void initializeSampleData() {
-        // Chỉ tạo dữ liệu mẫu nếu chưa có courses nào
-        if (courseRepository.count() == 0) {
-            System.out.println("Initializing sample instructors and featured courses...");
+    private void initializeF8FeaturedCourses() {
+        // Chỉ tạo dữ liệu nếu chưa có courses nào
+        if (courseRepository.count() > 0) {
+            System.out.println("Courses already exist. Skipping F8 data initialization.");
+            return;
+        }
 
-            // Lấy roles
-            Role lecturerRole = roleRepository.findByName(ERole.ROLE_LECTURER)
-                    .orElseThrow(() -> new RuntimeException("ROLE_LECTURER not found"));
-
-            // Lấy categories
-            List<Category> categories = categoryRepository.findAll();
-            if (categories.isEmpty()) {
-                System.out.println("No categories found. Skipping sample data initialization.");
+        System.out.println("Fetching F8 courses data...");
+        
+        try {
+            // Fetch data from F8 API
+            List<Map<String, Object>> f8Courses = fetchF8Courses();
+            
+            if (f8Courses.isEmpty()) {
+                System.out.println("No F8 courses found. Skipping initialization.");
                 return;
             }
 
-            // Tạo instructors
-            User instructor1 = createInstructor(
-                    "instructor1",
-                    "instructor1@example.com",
-                    "Nguyễn Văn A",
-                    "Giảng viên chuyên về Java và Spring Boot với hơn 10 năm kinh nghiệm",
-                    "Java, Spring Boot, Microservices",
-                    passwordEncoder.encode("123456")
-            );
-            instructor1.getRoles().add(lecturerRole);
-            instructor1 = userRepository.save(instructor1);
+            // Lấy roles và categories
+            Role lecturerRole = roleRepository.findByName(ERole.ROLE_LECTURER)
+                    .orElseThrow(() -> new RuntimeException("ROLE_LECTURER not found"));
 
-            User instructor2 = createInstructor(
-                    "instructor2",
-                    "instructor2@example.com",
-                    "Trần Thị B",
-                    "Chuyên gia phát triển web với React.js và Node.js",
-                    "React.js, Node.js, JavaScript",
-                    passwordEncoder.encode("123456")
-            );
-            instructor2.getRoles().add(lecturerRole);
-            instructor2 = userRepository.save(instructor2);
+            List<Category> categories = categoryRepository.findAll();
+            if (categories.isEmpty()) {
+                System.out.println("No categories found. Skipping F8 data initialization.");
+                return;
+            }
 
-            User instructor3 = createInstructor(
-                    "instructor3",
-                    "instructor3@example.com",
-                    "Lê Văn C",
-                    "Giảng viên về Python và Data Science",
-                    "Python, Data Science, Machine Learning",
-                    passwordEncoder.encode("123456")
-            );
-            instructor3.getRoles().add(lecturerRole);
-            instructor3 = userRepository.save(instructor3);
+            // Tạo default instructor nếu chưa có
+            User defaultInstructor = userRepository.findByUsername("f8_instructor")
+                    .orElseGet(() -> {
+                        User instructor = createInstructor(
+                                "f8_instructor",
+                                "f8@example.com",
+                                "F8 Instructor",
+                                "Giảng viên từ F8 Education",
+                                "Web Development, Programming",
+                                passwordEncoder.encode("123456")
+                        );
+                        instructor.getRoles().add(lecturerRole);
+                        return userRepository.save(instructor);
+                    });
 
-            // Tạo featured courses
-            createFeaturedCourse(
-                    "Java Spring Boot Cơ bản",
-                    "Khóa học toàn diện về Spring Boot framework cho Java. Học từ cơ bản đến nâng cao, xây dựng ứng dụng web thực tế với Spring Boot, Spring Data JPA, Spring Security và nhiều công nghệ khác.",
-                    500000.0,
-                    "https://files.f8.edu.vn/f8-prod/courses/7.png",
-                    40,
-                    instructor1,
-                    categories.stream().filter(c -> c.getName().equals("Lập trình")).findFirst().orElse(categories.get(0))
-            );
+            // Lọc và import các khóa học featured
+            int importedCount = 0;
+            for (Map<String, Object> courseData : f8Courses) {
+                String title = (String) courseData.get("title");
+                
+                // Chỉ import các khóa học trong danh sách featured
+                if (FEATURED_COURSE_TITLES.contains(title)) {
+                    importF8Course(courseData, defaultInstructor, categories);
+                    importedCount++;
+                }
+            }
 
-            createFeaturedCourse(
-                    "React.js từ Zero đến Hero",
-                    "Học React.js từ cơ bản đến nâng cao. Xây dựng ứng dụng web hiện đại với React Hooks, Redux, Next.js và các công nghệ frontend mới nhất.",
-                    600000.0,
-                    "https://files.f8.edu.vn/f8-prod/courses/7.png",
-                    50,
-                    instructor2,
-                    categories.stream().filter(c -> c.getName().equals("Front-end")).findFirst().orElse(categories.get(0))
-            );
-
-            createFeaturedCourse(
-                    "Node.js Backend Development",
-                    "Xây dựng backend mạnh mẽ với Node.js và Express. Học cách tạo RESTful API, WebSocket, authentication, và deploy ứng dụng lên production.",
-                    550000.0,
-                    "https://files.f8.edu.vn/f8-prod/courses/7.png",
-                    45,
-                    instructor2,
-                    categories.stream().filter(c -> c.getName().equals("Back-end")).findFirst().orElse(categories.get(0))
-            );
-
-            createFeaturedCourse(
-                    "Python cho Data Science",
-                    "Khóa học Python chuyên sâu về Data Science. Học cách phân tích dữ liệu với Pandas, NumPy, Matplotlib và xây dựng mô hình Machine Learning.",
-                    650000.0,
-                    "https://files.f8.edu.vn/f8-prod/courses/7.png",
-                    60,
-                    instructor3,
-                    categories.stream().filter(c -> c.getName().equals("Data Science")).findFirst().orElse(categories.get(0))
-            );
-
-            createFeaturedCourse(
-                    "Full Stack Web Development",
-                    "Khóa học toàn diện về phát triển web full stack. Học cả frontend (React) và backend (Node.js), database (MongoDB, PostgreSQL), và deploy ứng dụng.",
-                    800000.0,
-                    "https://files.f8.edu.vn/f8-prod/courses/7.png",
-                    80,
-                    instructor2,
-                    categories.stream().filter(c -> c.getName().equals("Web Development")).findFirst().orElse(categories.get(0))
-            );
-
-            System.out.println("Sample instructors and featured courses initialized successfully!");
-        } else {
-            System.out.println("Courses already exist. Skipping sample data initialization.");
+            System.out.println("F8 featured courses initialized successfully! Imported: " + importedCount + " courses.");
+        } catch (Exception e) {
+            System.err.println("Error initializing F8 courses: " + e.getMessage());
+            e.printStackTrace();
+            // Không throw exception để app vẫn có thể start được
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchF8Courses() {
+        try {
+            String apiUrl = "https://api-gateway.f8.edu.vn/api/combined-courses";
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            headers.set("Referer", "https://f8.edu.vn/");
+            headers.set("Origin", "https://f8.edu.vn");
+            headers.set("Accept", "application/json, text/plain, */*");
+            
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            @SuppressWarnings("unchecked")
+            ResponseEntity<Map> response = restTemplate.exchange(apiUrl, HttpMethod.GET, entity, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> responseBody = response.getBody();
+                List<Map<String, Object>> allCourses = new ArrayList<>();
+                
+                // Process free_courses and pro_courses
+                for (Map.Entry<String, Object> entry : responseBody.entrySet()) {
+                    if (entry.getValue() instanceof Map) {
+                        Map<String, Object> categoryData = (Map<String, Object>) entry.getValue();
+                        if (categoryData.containsKey("data") && categoryData.get("data") instanceof List) {
+                            List<Map<String, Object>> courses = (List<Map<String, Object>>) categoryData.get("data");
+                            allCourses.addAll(courses);
+                        }
+                    }
+                }
+                
+                return allCourses;
+            }
+        } catch (Exception e) {
+            System.err.println("Error fetching F8 API: " + e.getMessage());
+        }
+        
+        return Collections.emptyList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void importF8Course(Map<String, Object> courseData, User instructor, List<Category> categories) {
+        try {
+            String title = (String) courseData.get("title");
+            String description = (String) courseData.getOrDefault("description", "");
+            Object priceObj = courseData.getOrDefault("price", 0);
+            Double price = priceObj instanceof Number ? ((Number) priceObj).doubleValue() : 0.0;
+            String imageUrl = (String) courseData.getOrDefault("image_url", "");
+            
+            // Parse duration from duration_text (e.g., "10 hours" -> 10)
+            Integer totalDurationInHours = parseDuration(courseData.getOrDefault("duration_text", "").toString());
+            
+            // Map category based on course title/keywords
+            Category category = mapCategory(title, categories);
+            
+            Course course = new Course();
+            course.setTitle(title);
+            course.setDescription(description.isEmpty() ? "Khóa học từ F8 Education" : description);
+            course.setPrice(price);
+            course.setImageUrl(imageUrl.isEmpty() ? "https://files.f8.edu.vn/f8-prod/courses/7.png" : imageUrl);
+            course.setTotalDurationInHours(totalDurationInHours != null ? totalDurationInHours : 10);
+            course.setStatus(ECourseStatus.PUBLISHED);
+            course.setIsFeatured(true);
+            course.setIsPublished(true);
+            course.setInstructor(instructor);
+            course.setCategory(category);
+            course.setCreatedAt(LocalDateTime.now());
+            course.setUpdatedAt(LocalDateTime.now());
+            
+            courseRepository.save(course);
+            System.out.println("Imported featured course: " + title);
+        } catch (Exception e) {
+            System.err.println("Error importing course: " + e.getMessage());
+        }
+    }
+
+    private Integer parseDuration(String durationText) {
+        if (durationText == null || durationText.isEmpty()) {
+            return 10; // Default
+        }
+        
+        try {
+            // Extract number from text like "10 hours", "3 giờ", etc.
+            String[] parts = durationText.split("\\s+");
+            for (String part : parts) {
+                try {
+                    return Integer.parseInt(part);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+        
+        return 10; // Default
+    }
+
+    private Category mapCategory(String title, List<Category> categories) {
+        String titleLower = title.toLowerCase();
+        
+        // Map based on keywords
+        if (titleLower.contains("html") || titleLower.contains("css") || titleLower.contains("responsive")) {
+            return categories.stream()
+                    .filter(c -> c.getName().equals("Front-end") || c.getName().equals("Web Development"))
+                    .findFirst()
+                    .orElse(categories.get(0));
+        } else if (titleLower.contains("javascript") || titleLower.contains("react") || titleLower.contains("node")) {
+            return categories.stream()
+                    .filter(c -> c.getName().equals("Web Development") || c.getName().equals("Front-end"))
+                    .findFirst()
+                    .orElse(categories.get(0));
+        } else if (titleLower.contains("c++") || titleLower.contains("lập trình")) {
+            return categories.stream()
+                    .filter(c -> c.getName().equals("Lập trình"))
+                    .findFirst()
+                    .orElse(categories.get(0));
+        }
+        
+        return categories.get(0); // Default
     }
 
     private User createInstructor(String username, String email, String fullName, 
@@ -245,23 +335,5 @@ public class DataLoader implements CommandLineRunner {
         return instructor;
     }
 
-    private void createFeaturedCourse(String title, String description, Double price,
-                                      String imageUrl, Integer totalDurationInHours,
-                                      User instructor, Category category) {
-        Course course = new Course();
-        course.setTitle(title);
-        course.setDescription(description);
-        course.setPrice(price);
-        course.setImageUrl(imageUrl);
-        course.setTotalDurationInHours(totalDurationInHours);
-        course.setStatus(ECourseStatus.PUBLISHED);
-        course.setIsFeatured(true);
-        course.setIsPublished(true);
-        course.setInstructor(instructor);
-        course.setCategory(category);
-        course.setCreatedAt(LocalDateTime.now());
-        course.setUpdatedAt(LocalDateTime.now());
-        courseRepository.save(course);
-    }
 }
 
