@@ -180,19 +180,24 @@ public class DataLoader implements CommandLineRunner {
                         return userRepository.save(instructor);
                     });
 
-            // Lọc và import các khóa học featured
+            // Import tất cả các khóa học từ F8
             int importedCount = 0;
+            int featuredCount = 0;
             for (Map<String, Object> courseData : f8Courses) {
                 String title = (String) courseData.get("title");
                 
-                // Chỉ import các khóa học trong danh sách featured
-                if (FEATURED_COURSE_TITLES.contains(title)) {
-                    importF8Course(courseData, defaultInstructor, categories);
-                    importedCount++;
+                // Kiểm tra xem có phải khóa học featured không
+                boolean isFeatured = FEATURED_COURSE_TITLES.contains(title);
+                if (isFeatured) {
+                    featuredCount++;
                 }
+                
+                // Import tất cả các khóa học
+                importF8Course(courseData, defaultInstructor, categories, isFeatured);
+                importedCount++;
             }
 
-            System.out.println("F8 featured courses initialized successfully! Imported: " + importedCount + " courses.");
+            System.out.println("F8 courses initialized successfully! Imported: " + importedCount + " courses (Featured: " + featuredCount + ").");
         } catch (Exception e) {
             System.err.println("Error initializing F8 courses: " + e.getMessage());
             e.printStackTrace();
@@ -240,9 +245,16 @@ public class DataLoader implements CommandLineRunner {
     }
 
     @SuppressWarnings("unchecked")
-    private void importF8Course(Map<String, Object> courseData, User instructor, List<Category> categories) {
+    private void importF8Course(Map<String, Object> courseData, User instructor, List<Category> categories, boolean isFeatured) {
         try {
             String title = (String) courseData.get("title");
+            
+            // Kiểm tra xem khóa học đã tồn tại chưa (tránh duplicate)
+            if (courseRepository.findByTitle(title).isPresent()) {
+                System.out.println("Course already exists, skipping: " + title);
+                return;
+            }
+            
             String description = (String) courseData.getOrDefault("description", "");
             Object priceObj = courseData.getOrDefault("price", 0);
             Double price = priceObj instanceof Number ? ((Number) priceObj).doubleValue() : 0.0;
@@ -261,7 +273,7 @@ public class DataLoader implements CommandLineRunner {
             course.setImageUrl(imageUrl.isEmpty() ? "https://files.f8.edu.vn/f8-prod/courses/7.png" : imageUrl);
             course.setTotalDurationInHours(totalDurationInHours != null ? totalDurationInHours : 10);
             course.setStatus(ECourseStatus.PUBLISHED);
-            course.setIsFeatured(true);
+            course.setIsFeatured(isFeatured); // Chỉ đánh dấu featured cho các khóa học trong danh sách
             course.setIsPublished(true);
             course.setInstructor(instructor);
             course.setCategory(category);
@@ -269,9 +281,11 @@ public class DataLoader implements CommandLineRunner {
             course.setUpdatedAt(LocalDateTime.now());
             
             courseRepository.save(course);
-            System.out.println("Imported featured course: " + title);
+            String featuredLabel = isFeatured ? " [FEATURED]" : "";
+            System.out.println("Imported course: " + title + featuredLabel);
         } catch (Exception e) {
             System.err.println("Error importing course: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
