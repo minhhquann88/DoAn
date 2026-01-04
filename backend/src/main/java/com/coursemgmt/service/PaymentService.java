@@ -94,7 +94,8 @@ public class PaymentService {
         
         // Generate VNPay payment URL with QR code support
         try {
-            String returnUrl = "http://localhost:3000/payment/vnpay-return";
+            // Sử dụng return URL từ biến môi trường (VNPayService)
+            String returnUrl = vnPayService.getDefaultReturnUrl();
             // Sử dụng transactionCode làm vnp_TxnRef cho VNPay
             String paymentUrl = vnPayService.createPaymentUrl(
                 transactionCode, // VNPay sẽ dùng transactionCode này làm vnp_TxnRef

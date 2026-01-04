@@ -205,7 +205,8 @@ public class CartService {
                 orderInfo += " va " + (cart.getItems().size() - 3) + " khoa hoc khac";
             }
             
-            String returnUrl = "http://localhost:3000/payment/vnpay-return";
+            // Sử dụng return URL từ biến môi trường (VNPayService)
+            String returnUrl = vnPayService.getDefaultReturnUrl();
             String paymentUrl = vnPayService.createPaymentUrl(
                 transactionCode, // Use transactionCode as vnp_TxnRef
                 totalAmount, // Total amount for all courses

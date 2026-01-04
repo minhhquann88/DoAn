@@ -21,7 +21,7 @@ public class VNPayService {
     @Value("${vnpay.url:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")
     private String vnpUrl;
     
-    @Value("${vnpay.return-url:http://localhost:3000/payment/callback}")
+    @Value("${VNPAY_RETURN_URL:${vnpay.return-url:http://localhost:3000/payment/vnpay-return}}")
     private String vnpReturnUrl;
     
     @Value("${vnpay.tmn-code:YOUR_TMN_CODE}")
@@ -29,6 +29,13 @@ public class VNPayService {
     
     @Value("${vnpay.hash-secret:YOUR_HASH_SECRET}")
     private String vnpHashSecret;
+
+    /**
+     * Get default return URL
+     */
+    public String getDefaultReturnUrl() {
+        return vnpReturnUrl;
+    }
 
     /**
      * Tạo URL thanh toán VNPay
@@ -73,8 +80,8 @@ public class VNPayService {
         String vnpCreateDate = formatter.format(cld.getTime());
         vnpParams.put("vnp_CreateDate", vnpCreateDate);
         
-        // Expire date (15 minutes)
-        cld.add(Calendar.MINUTE, 15);
+        // Expire date (30 minutes - tăng thời gian để tránh timeout)
+        cld.add(Calendar.MINUTE, 30);
         String vnpExpireDate = formatter.format(cld.getTime());
         vnpParams.put("vnp_ExpireDate", vnpExpireDate);
         
