@@ -152,13 +152,23 @@ public class ChapterController {
     }
 
     // 8. Upload video file cho lesson
-    @PostMapping("/{chapterId}/lessons/{lessonId}/upload-video")
-    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
+    @PostMapping(value = "/{chapterId}/lessons/{lessonId}/upload-video", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> uploadLessonVideo(@PathVariable Long courseId,
                                                @PathVariable Long chapterId,
                                                @PathVariable Long lessonId,
                                                @RequestParam("file") MultipartFile file) {
         try {
+            System.out.println("========================================");
+            System.out.println("Upload Lesson Video Request");
+            System.out.println("Course ID: " + courseId);
+            System.out.println("Chapter ID: " + chapterId);
+            System.out.println("Lesson ID: " + lessonId);
+            System.out.println("File name: " + file.getOriginalFilename());
+            System.out.println("File size: " + file.getSize() + " bytes");
+            System.out.println("Content type: " + file.getContentType());
+            System.out.println("========================================");
+            
             String videoUrl = fileStorageService.storeLessonVideo(file, lessonId);
             
             // Update lesson with video URL
@@ -178,8 +188,12 @@ public class ChapterController {
             response.put("message", "Video uploaded successfully");
             response.put("videoUrl", videoUrl);
             response.put("lesson", LessonResponse.fromEntity(updatedLesson, false));
+            System.out.println("Video uploaded successfully: " + videoUrl);
+            System.out.println("========================================");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            System.err.println("ERROR uploading video: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.badRequest().body(new MessageResponse("Error uploading video: " + e.getMessage()));
         }
     }

@@ -16,7 +16,7 @@ import java.util.Optional;
 public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecificationExecutor<Course> {
 
     Optional<Course> findByTitle(String title);
-    
+
     List<Course> findByInstructorId(Long instructorId);
     
     Long countByStatus(ECourseStatus status);
