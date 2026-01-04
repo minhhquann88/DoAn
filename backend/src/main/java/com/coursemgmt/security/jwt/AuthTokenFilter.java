@@ -29,9 +29,10 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
-        // Only skip filter for public endpoints (auth endpoints)
-        // DO NOT skip for /api/v1/ endpoints as they need authentication
-        return path.startsWith("/api/auth/");
+        // Skip filter for public endpoints:
+        // - Auth endpoints (login, register, etc.)
+        // - VNPay callbacks (IPN and return URLs - VNPay doesn't send JWT tokens)
+        return path.startsWith("/api/auth/") || path.startsWith("/api/v1/vnpay/");
     }
 
     @Override
