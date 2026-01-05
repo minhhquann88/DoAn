@@ -18,7 +18,8 @@ public class InstructorCourseDTO {
     private String description;
     private Double price;
     private String imageUrl;
-    private Long studentsCount; // Số lượng học viên đã đăng ký
+    private Long studentsCount; // Số lượng học viên đã đăng ký (deprecated, use enrollmentCount)
+    private Long enrollmentCount; // Số lượng học viên đã đăng ký (alias for studentsCount for consistency)
     private Boolean isPublished;
     private String status; // PUBLISHED, DRAFT, PENDING_APPROVAL
     private LocalDateTime createdAt;

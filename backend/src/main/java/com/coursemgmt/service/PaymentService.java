@@ -11,9 +11,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class PaymentService {
@@ -206,7 +209,7 @@ public class PaymentService {
     /**
      * Tự động tạo enrollment sau khi thanh toán thành công
      * @param transactions List các transactions đã thanh toán thành công (có thể là nhiều courses)
-     * @param cartId Cart ID nếu thanh toán từ giỏ hàng (null nếu thanh toán đơn lẻ)
+     * @param cartId Cart ID nếu thanh toán từ giỏ hàng (null nếu thanh toán đơn lẻ - sẽ tự động tìm cart)
      */
     private void createEnrollmentsAfterPayment(java.util.List<Transaction> transactions, String cartId) {
         if (transactions.isEmpty()) return;
@@ -222,27 +225,63 @@ public class PaymentService {
             createSingleEnrollment(userId, course, transaction);
         }
         
-        // Clear cart if cartId is provided
-        if (cartId != null && !cartId.isEmpty()) {
-            try {
-                Long cartIdLong = Long.parseLong(cartId);
-                Optional<Cart> cartOpt = cartRepository.findByIdWithItems(cartIdLong);
-                
-                if (cartOpt.isPresent()) {
-                    Cart cart = cartOpt.get();
-                    if (cart.getItems() != null && !cart.getItems().isEmpty()) {
-                        int itemCount = cart.getItems().size();
-                        System.out.println(">>> Clearing " + itemCount + " items from cart ID: " + cart.getId());
-                        
-                        cart.getItems().clear();
-                        cartRepository.save(cart);
-                        
-                        System.out.println(">>> Cart cleared successfully after payment");
+        // Remove purchased courses from cart
+        // Try to use provided cartId first, otherwise find cart by userId
+        try {
+            Cart cart = null;
+            
+            if (cartId != null && !cartId.isEmpty()) {
+                // Use provided cartId
+                try {
+                    Long cartIdLong = Long.parseLong(cartId);
+                    Optional<Cart> cartOpt = cartRepository.findByIdWithItems(cartIdLong);
+                    if (cartOpt.isPresent()) {
+                        cart = cartOpt.get();
+                        System.out.println(">>> Using provided cart ID: " + cartId);
                     }
+                } catch (NumberFormatException e) {
+                    System.err.println(">>> ERROR: Invalid cartId format: " + cartId);
                 }
-            } catch (NumberFormatException e) {
-                System.err.println(">>> ERROR: Invalid cartId format: " + cartId);
             }
+            
+            // If cart not found by cartId, find by userId
+            if (cart == null) {
+                Optional<Cart> cartOpt = cartRepository.findByUserIdWithItems(userId);
+                if (cartOpt.isPresent()) {
+                    cart = cartOpt.get();
+                    System.out.println(">>> Found cart by userId: " + userId);
+                }
+            }
+            
+            // Remove purchased courses from cart
+            if (cart != null && cart.getItems() != null && !cart.getItems().isEmpty()) {
+                // Get list of purchased course IDs
+                Set<Long> purchasedCourseIds = transactions.stream()
+                        .map(t -> t.getCourse().getId())
+                        .collect(Collectors.toSet());
+                
+                System.out.println(">>> Removing " + purchasedCourseIds.size() + " purchased course(s) from cart");
+                
+                // Remove cart items for purchased courses
+                List<CartItem> itemsToRemove = cart.getItems().stream()
+                        .filter(item -> purchasedCourseIds.contains(item.getCourse().getId()))
+                        .collect(Collectors.toList());
+                
+                if (!itemsToRemove.isEmpty()) {
+                    System.out.println(">>> Removing " + itemsToRemove.size() + " item(s) from cart");
+                    cart.getItems().removeAll(itemsToRemove);
+                    cartRepository.save(cart);
+                    System.out.println(">>> Cart updated successfully - removed purchased courses");
+                } else {
+                    System.out.println(">>> No matching items found in cart to remove");
+                }
+            } else {
+                System.out.println(">>> Cart not found or empty - skipping cart update");
+            }
+        } catch (Exception e) {
+            System.err.println(">>> ERROR: Failed to update cart after payment: " + e.getMessage());
+            e.printStackTrace();
+            // Don't throw exception - enrollment already created, cart update failure is not critical
         }
     }
     

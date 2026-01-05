@@ -25,9 +25,6 @@ public class MeetingParticipantService {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private EnrollmentRepository enrollmentRepository;
-
     /**
      * Join meeting
      */
@@ -54,19 +51,7 @@ public class MeetingParticipantService {
             return MeetingParticipantResponse.fromEntity(existing);
         }
         
-        // Check enrollment if meeting is for a course
-        if (meeting.getCourse() != null) {
-            boolean isInstructor = meeting.getInstructor().getId().equals(userDetails.getId());
-            boolean isEnrolled = enrollmentRepository.existsByUserIdAndCourseId(
-                userDetails.getId(), 
-                meeting.getCourse().getId()
-            );
-            
-            if (!isInstructor && !isEnrolled) {
-                throw new RuntimeException("You must enroll in the course to join this meeting");
-            }
-        }
-        
+        // Simplified: No enrollment check - anyone authenticated can join
         // Check max participants
         Long currentCount = participantRepository.countActiveParticipantsByMeetingId(meetingId);
         if (meeting.getMaxParticipants() != null && currentCount >= meeting.getMaxParticipants()) {

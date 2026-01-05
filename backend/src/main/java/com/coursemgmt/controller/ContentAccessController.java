@@ -65,4 +65,15 @@ public class ContentAccessController {
         contentService.updateLessonWatchTime(lessonId, request.getWatchedTime(), request.getTotalDuration(), userDetails);
         return ResponseEntity.ok(new MessageResponse("Progress updated successfully!"));
     }
+
+    // API public để lấy preview lesson đầu tiên của khóa học (cho trang chi tiết)
+    // Không cần authentication - cho phép mọi người xem preview
+    @GetMapping("/courses/{courseId}/preview")
+    public ResponseEntity<com.coursemgmt.dto.LessonResponse> getPreviewLesson(@PathVariable Long courseId) {
+        com.coursemgmt.dto.LessonResponse previewLesson = contentService.getPreviewLesson(courseId);
+        if (previewLesson == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(previewLesson);
+    }
 }

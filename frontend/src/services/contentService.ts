@@ -47,7 +47,7 @@ export interface ChapterResponse {
 export interface LessonResponse {
   id: number;
   title: string;
-  contentType: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
+  contentType: 'VIDEO' | 'YOUTUBE' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
   videoUrl?: string;
   documentUrl?: string;
   slideUrl?: string;
@@ -94,6 +94,25 @@ export const getCourseContent = async (courseId: number): Promise<ChapterRespons
   // Use /api/content endpoint for students (allows enrolled users or instructors)
   const response = await apiClient.get<ChapterResponse[]>(`/content/courses/${courseId}`);
   return response.data;
+};
+
+/**
+ * Get preview lesson (first lesson) of a paid course
+ * Public API - no authentication required
+ * Returns null if course is free or has no preview lesson
+ */
+export const getPreviewLesson = async (courseId: number): Promise<LessonResponse | null> => {
+  try {
+    const response = await apiClient.get<LessonResponse>(`/content/courses/${courseId}/preview`);
+    return response.data;
+  } catch (error: any) {
+    // Return null if not found (404) or any error
+    if (error.response?.status === 404) {
+      return null;
+    }
+    console.error('Error fetching preview lesson:', error);
+    return null;
+  }
 };
 
 /**
@@ -187,16 +206,82 @@ export const previewLesson = async (lessonId: number): Promise<LessonResponse> =
 /**
  * Upload video file for a lesson
  * Note: Longer timeout for large video files
+ * @param durationInSeconds Optional duration in seconds (will be extracted from video if not provided)
  */
-export const uploadLessonVideo = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {
+export const uploadLessonVideo = async (
+  courseId: number, 
+  chapterId: number, 
+  lessonId: number, 
+  file: File,
+  durationInSeconds?: number
+): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file);
+  if (durationInSeconds !== undefined && durationInSeconds > 0) {
+    formData.append('durationInSeconds', durationInSeconds.toString());
+  }
   const response = await apiClient.post<{ videoUrl: string }>(
     `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-video`, 
     formData,
     { timeout: 600000 } // 10 minutes timeout for large videos
   );
   return response.data.videoUrl;
+};
+
+/**
+ * Extract duration from video file
+ */
+export const extractVideoDuration = (file: File): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src);
+      resolve(Math.floor(video.duration));
+    };
+    
+    video.onerror = () => {
+      window.URL.revokeObjectURL(video.src);
+      reject(new Error('Failed to load video metadata'));
+    };
+    
+    video.src = URL.createObjectURL(file);
+  });
+};
+
+/**
+ * Round duration in seconds to minutes
+ * Rules: >= 30 seconds round up, < 30 seconds round down
+ * Example: 378s (6:18) → 6 minutes, 349s (5:49) → 6 minutes
+ */
+export const roundDurationToMinutes = (durationInSeconds: number): number => {
+  if (durationInSeconds <= 0) return 0;
+  const minutes = durationInSeconds / 60;
+  return Math.round(minutes);
+};
+
+/**
+ * Extract duration from YouTube URL using backend API
+ * Backend will use YouTube Data API v3 if API key is available
+ */
+/**
+ * Extract duration từ YouTube URL (gọi backend API)
+ * @param courseId ID của course (cần cho endpoint)
+ * @param youtubeUrl URL của YouTube video
+ * @returns Số phút (đã làm tròn), hoặc null nếu không thể extract
+ */
+export const extractYouTubeDuration = async (courseId: number, youtubeUrl: string): Promise<number | null> => {
+  try {
+    // baseURL đã có /api rồi, nên không cần thêm /api ở đây
+    const response = await apiClient.get(`/v1/courses/${courseId}/chapters/extract-youtube-duration`, {
+      params: { url: youtubeUrl }
+    });
+    return response.data.durationInMinutes || null;
+  } catch (error: any) {
+    console.warn('Failed to extract YouTube duration:', error);
+    return null;
+  }
 };
 
 /**
@@ -338,20 +423,6 @@ export const calculateCompletionPercentage = (chapters: ChapterResponse[]): numb
 // These map old API calls to new structure
 // =====================
 
-/**
- * @deprecated Use getCourseContent instead
- */
-export const getCourseContents = async (courseId: number) => {
-  return getCourseContent(courseId);
-};
-
-/**
- * @deprecated Use markLessonAsCompleted instead
- */
-export const markContentCompleted = async (contentId: number) => {
-  return markLessonAsCompleted(contentId);
-};
-
 // =====================
 // EXPORTS
 // =====================
@@ -380,8 +451,4 @@ export default {
   calculateCourseDuration,
   countTotalLessons,
   calculateCompletionPercentage,
-
-  // Legacy
-  getCourseContents,
-  markContentCompleted,
 };

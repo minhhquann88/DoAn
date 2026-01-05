@@ -11,6 +11,7 @@ import com.coursemgmt.security.services.CourseSecurityService;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.ContentService;
 import com.coursemgmt.service.FileStorageService;
+import com.coursemgmt.service.VideoDurationService;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -37,6 +37,9 @@ public class ChapterController {
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private VideoDurationService videoDurationService;
 
     // 1. Lấy danh sách chapters của một course (cho instructor - không cần enrollment)
     @GetMapping
@@ -78,7 +81,7 @@ public class ChapterController {
             List<Lesson> lessons = contentService.getChapterLessons(chapterId);
             List<LessonResponse> lessonResponses = lessons.stream()
                     .map(lesson -> LessonResponse.fromEntity(lesson, false))
-                    .collect(java.util.stream.Collectors.toList());
+                    .toList();
             ChapterResponse chapterResponse = ChapterResponse.fromEntity(chapter, lessonResponses);
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Chapter updated successfully");
@@ -157,7 +160,8 @@ public class ChapterController {
     public ResponseEntity<?> uploadLessonVideo(@PathVariable Long courseId,
                                                @PathVariable Long chapterId,
                                                @PathVariable Long lessonId,
-                                               @RequestParam("file") MultipartFile file) {
+                                               @RequestParam("file") MultipartFile file,
+                                               @RequestParam(value = "durationInSeconds", required = false) Integer durationInSeconds) {
         try {
             String videoUrl = fileStorageService.storeLessonVideo(file, lessonId);
             
@@ -170,7 +174,14 @@ public class ChapterController {
             updateRequest.setDocumentUrl(lesson.getDocumentUrl());
             updateRequest.setContent(lesson.getContent());
             updateRequest.setPosition(lesson.getPosition());
-            updateRequest.setDurationInMinutes(lesson.getDurationInMinutes());
+            
+            // Tự động tính duration nếu frontend gửi durationInSeconds
+            if (durationInSeconds != null && durationInSeconds > 0) {
+                Integer roundedDuration = videoDurationService.roundDurationToMinutes(durationInSeconds);
+                updateRequest.setDurationInMinutes(roundedDuration);
+            } else {
+                updateRequest.setDurationInMinutes(lesson.getDurationInMinutes());
+            }
             
             Lesson updatedLesson = contentService.updateLesson(lessonId, updateRequest);
             
@@ -184,7 +195,40 @@ public class ChapterController {
         }
     }
 
-    // 9. Upload document file cho lesson
+    // 9. Extract duration từ YouTube URL
+    @GetMapping("/extract-youtube-duration")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> extractYouTubeDuration(@RequestParam("url") String youtubeUrl) {
+        try {
+            if (youtubeUrl == null || youtubeUrl.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("URL không được để trống"));
+            }
+            
+            Integer durationInMinutes = videoDurationService.getYouTubeDurationInMinutes(youtubeUrl.trim());
+            if (durationInMinutes == null || durationInMinutes <= 0) {
+                // Trả về 200 với duration = null thay vì 400 để frontend có thể xử lý gracefully
+                Map<String, Object> response = new HashMap<>();
+                response.put("durationInMinutes", null);
+                response.put("message", "Không thể lấy thời lượng từ YouTube URL. Vui lòng kiểm tra URL hoặc API key.");
+                return ResponseEntity.ok(response);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("durationInMinutes", durationInMinutes);
+            response.put("message", "Đã lấy thời lượng thành công");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error extracting YouTube duration: " + e.getMessage());
+            e.printStackTrace();
+            // Trả về 200 với duration = null thay vì 500 để frontend có thể xử lý gracefully
+            Map<String, Object> response = new HashMap<>();
+            response.put("durationInMinutes", null);
+            response.put("message", "Lỗi khi lấy thời lượng: " + e.getMessage());
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    // 10. Upload document file cho lesson
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-document")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonDocument(@PathVariable Long courseId,

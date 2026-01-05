@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -92,22 +93,32 @@ public class MeetingService {
         // Generate meeting code
         meeting.setMeetingCode(generateMeetingCode());
         
-        // Set time
-        meeting.setStartTime(request.getStartTime());
+        // Set time - if startImmediately is true or startTime is null, start now
+        LocalDateTime startTime;
+        if (request.getStartImmediately() != null && request.getStartImmediately()) {
+            startTime = LocalDateTime.now();
+            meeting.setStatus(EMeetingStatus.ONGOING);
+        } else if (request.getStartTime() != null) {
+            startTime = request.getStartTime();
+            // Determine status based on start time
+            if (startTime.isBefore(LocalDateTime.now()) || startTime.isEqual(LocalDateTime.now())) {
+                meeting.setStatus(EMeetingStatus.ONGOING);
+            } else {
+                meeting.setStatus(EMeetingStatus.SCHEDULED);
+            }
+        } else {
+            // Default: start immediately if no startTime provided
+            startTime = LocalDateTime.now();
+            meeting.setStatus(EMeetingStatus.ONGOING);
+        }
+        
+        meeting.setStartTime(startTime);
         if (request.getDurationMinutes() != null) {
             meeting.setDurationMinutes(request.getDurationMinutes());
-            meeting.setEndTime(request.getStartTime().plusMinutes(request.getDurationMinutes()));
+            meeting.setEndTime(startTime.plusMinutes(request.getDurationMinutes()));
         }
         
         meeting.setMaxParticipants(request.getMaxParticipants() != null ? request.getMaxParticipants() : 50);
-        
-        // Determine status
-        if (request.getStartTime().isBefore(LocalDateTime.now()) || 
-            request.getStartTime().isEqual(LocalDateTime.now())) {
-            meeting.setStatus(EMeetingStatus.ONGOING);
-        } else {
-            meeting.setStatus(EMeetingStatus.SCHEDULED);
-        }
         
         // Parse settings
         if (request.getSettings() != null) {
@@ -121,13 +132,18 @@ public class MeetingService {
         
         Meeting saved = meetingRepository.save(meeting);
         
-        // Auto-join instructor as HOST
-        MeetingParticipant host = new MeetingParticipant();
-        host.setMeeting(saved);
-        host.setUser(instructor);
-        host.setRole(EMeetingParticipantRole.HOST);
-        host.setJoinedAt(LocalDateTime.now());
-        participantRepository.save(host);
+        // Auto-join instructor as HOST (only if not already a participant)
+        Optional<MeetingParticipant> existingParticipant = participantRepository
+            .findByMeetingIdAndUserId(saved.getId(), instructor.getId());
+        
+        if (existingParticipant.isEmpty()) {
+            MeetingParticipant host = new MeetingParticipant();
+            host.setMeeting(saved);
+            host.setUser(instructor);
+            host.setRole(EMeetingParticipantRole.HOST);
+            host.setJoinedAt(LocalDateTime.now());
+            participantRepository.save(host);
+        }
         
         return MeetingResponse.fromEntity(saved);
     }

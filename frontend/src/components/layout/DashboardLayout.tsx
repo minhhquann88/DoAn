@@ -19,6 +19,7 @@ import {
   CreditCard,
   Star,
   MessageSquare,
+  Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -58,6 +59,11 @@ const STUDENT_NAV: NavItem[] = [
     icon: <BookOpen className="h-5 w-5" />,
   },
   {
+    title: 'Phòng họp',
+    href: ROUTES.STUDENT.MEETINGS,
+    icon: <Video className="h-5 w-5" />,
+  },
+  {
     title: 'Tin nhắn',
     href: ROUTES.STUDENT.MESSAGES,
     icon: <MessageSquare className="h-5 w-5" />,
@@ -80,6 +86,11 @@ const INSTRUCTOR_NAV: NavItem[] = [
     title: 'Khóa học',
     href: ROUTES.INSTRUCTOR.COURSES,
     icon: <BookOpen className="h-5 w-5" />,
+  },
+  {
+    title: 'Phòng họp',
+    href: ROUTES.INSTRUCTOR.MEETINGS,
+    icon: <Video className="h-5 w-5" />,
   },
   {
     title: 'Học viên',

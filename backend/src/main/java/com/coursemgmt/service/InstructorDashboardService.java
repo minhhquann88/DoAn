@@ -96,9 +96,20 @@ public class InstructorDashboardService {
             dto.setCreatedAt(course.getCreatedAt());
             dto.setUpdatedAt(course.getUpdatedAt());
             
-            // Tính số lượng học viên
+            // Tính số lượng học viên - đếm tất cả enrollments của course này
             Long studentsCount = enrollmentRepository.countByCourseId(course.getId());
-            dto.setStudentsCount(studentsCount != null ? studentsCount : 0L);
+            
+            // Đảm bảo không null (countByCourseId có thể trả về null nếu không có enrollment)
+            if (studentsCount == null) {
+                studentsCount = 0L;
+            }
+            
+            dto.setStudentsCount(studentsCount);
+            dto.setEnrollmentCount(studentsCount); // Set enrollmentCount for consistency with CourseResponse
+            
+            // Debug log để kiểm tra
+            System.out.println(">>> Course ID: " + course.getId() + ", Title: " + course.getTitle() + 
+                ", Enrollment Count: " + studentsCount);
             
             return dto;
         }).collect(Collectors.toList());
