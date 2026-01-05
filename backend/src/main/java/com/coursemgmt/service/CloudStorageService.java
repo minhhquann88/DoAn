@@ -98,9 +98,8 @@ public class CloudStorageService {
             params.put("chunk_size", 6000000); // 6MB chunks
             params.put("timeout", 300000); // 300 seconds timeout (5 phút) cho video lớn
             
-            // Sử dụng eager_async cho video lớn để xử lý bất đồng bộ
-            // Video sẽ được xử lý trong background, không block request
-            params.put("eager_async", true);
+            // Không dùng eager_async vì nó có thể khiến secure_url không có ngay
+            // Video sẽ được upload và xử lý đồng bộ, secure_url sẽ có ngay trong response
             
             if (publicId != null && !publicId.isEmpty()) {
                 params.put("public_id", publicId);
@@ -175,15 +174,48 @@ public class CloudStorageService {
                 params.put("public_id", publicId);
             }
             
+            logger.info("Starting Cloudinary document upload: folder={}, publicId={}, size={} bytes", folder, publicId, file.getSize());
+            
             // Upload từ InputStream để tránh đọc toàn bộ file vào memory
             Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getInputStream(), params);
+            
+            if (uploadResult == null) {
+                logger.error("Cloudinary document upload returned null result");
+                throw new IOException("Cloudinary upload failed: null response");
+            }
+            
+            logger.info("Cloudinary document upload response keys: {}", uploadResult.keySet());
+            
+            if (!uploadResult.containsKey("secure_url")) {
+                logger.error("Cloudinary document upload returned missing secure_url. Response: {}", uploadResult);
+                throw new IOException("Cloudinary upload failed: no secure_url in response");
+            }
+            
             String secureUrl = (String) uploadResult.get("secure_url");
             
-            logger.info("Document uploaded to Cloudinary: {} (size: {} bytes)", secureUrl, file.getSize());
+            if (secureUrl == null || secureUrl.isEmpty()) {
+                logger.error("Cloudinary document upload returned empty secure_url. Response: {}", uploadResult);
+                throw new IOException("Cloudinary upload failed: empty secure_url");
+            }
+            
+            // Kiểm tra URL có chứa cloudinary.com không
+            if (!secureUrl.contains("cloudinary.com")) {
+                logger.error("Cloudinary returned invalid URL (not a Cloudinary URL): {}", secureUrl);
+                throw new IOException("Cloudinary upload returned invalid URL: " + secureUrl);
+            }
+            
+            logger.info("Document uploaded successfully to Cloudinary: {} (size: {} bytes)", secureUrl, file.getSize());
             return secureUrl;
             
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("Error uploading document to Cloudinary: {}", e.getMessage(), e);
+            // Log full stack trace
+            if (e.getCause() != null) {
+                logger.error("Caused by: {}", e.getCause().getMessage(), e.getCause());
+            }
+            // Log thêm thông tin về file
+            logger.error("File details - name: {}, size: {} bytes, contentType: {}", 
+                file.getOriginalFilename(), file.getSize(), file.getContentType());
             throw new IOException("Failed to upload document to Cloudinary: " + e.getMessage(), e);
         }
     }
