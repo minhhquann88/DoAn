@@ -65,5 +65,8 @@ export * from './paymentService';
 // Chatbot
 export * from './chatbotService';
 
+// Meetings
+export * from './meetingService';
+
 
 

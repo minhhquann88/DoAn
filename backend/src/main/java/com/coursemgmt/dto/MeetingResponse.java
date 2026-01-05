@@ -10,6 +10,7 @@ public class MeetingResponse {
     private String title;
     private String description;
     private Long courseId;
+    private String courseTitle;
     private Long instructorId;
     private String instructorName;
     private String instructorAvatar;
@@ -43,6 +44,7 @@ public class MeetingResponse {
         
         if (meeting.getCourse() != null) {
             response.setCourseId(meeting.getCourse().getId());
+            response.setCourseTitle(meeting.getCourse().getTitle());
         }
         
         if (meeting.getInstructor() != null) {

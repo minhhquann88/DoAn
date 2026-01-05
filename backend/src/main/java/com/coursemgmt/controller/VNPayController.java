@@ -98,24 +98,32 @@ public class VNPayController {
 
     /**
      * Xử lý IPN URL - VNPay gọi đến đây để thông báo kết quả thanh toán (server-to-server)
-     * GET /api/v1/vnpay/ipn
+     * GET hoặc POST /api/v1/vnpay/ipn
      * 
      * IPN URL được gọi bất kể user có quay lại ReturnURL hay không
      * Đây là nơi QUAN TRỌNG để cập nhật trạng thái thanh toán vào database
+     * 
+     * VNPay có thể gọi bằng GET hoặc POST, nên cần hỗ trợ cả 2
      * 
      * Response format theo VNPay:
      * - RspCode: "00" = Success, "02" = Already updated, "04" = Invalid amount, "97" = Invalid signature, "99" = Unknown error
      * - Message: Mô tả lỗi
      */
-    @GetMapping("/ipn")
+    @RequestMapping(value = "/ipn", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<Map<String, String>> handleIpnUrl(
-            @RequestParam Map<String, String> params,
+            @RequestParam(required = false) Map<String, String> params,
             jakarta.servlet.http.HttpServletRequest request
     ) {
         System.out.println("========================================");
         System.out.println("VNPay IPN Callback Received");
         System.out.println("Request Method: " + request.getMethod());
         System.out.println("Query String: " + request.getQueryString());
+        
+        // Handle null params (POST request without params)
+        if (params == null) {
+            params = new HashMap<>();
+        }
+        
         System.out.println("Params Map: " + params);
         System.out.println("Params Size: " + params.size());
         
@@ -130,7 +138,7 @@ public class VNPayController {
         
         try {
             // Handle empty params (test call from VNPay Dashboard)
-            if (params.isEmpty() || params.size() == 0) {
+            if (params == null || params.isEmpty() || params.size() == 0) {
                 System.out.println("Empty params detected - likely a test call");
                 // Return success for test calls (VNPay just checks if endpoint is reachable)
                 return ResponseEntity.ok(Map.of(

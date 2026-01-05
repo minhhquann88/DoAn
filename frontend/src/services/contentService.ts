@@ -97,6 +97,25 @@ export const getCourseContent = async (courseId: number): Promise<ChapterRespons
 };
 
 /**
+ * Get preview lesson (first lesson) of a paid course
+ * Public API - no authentication required
+ * Returns null if course is free or has no preview lesson
+ */
+export const getPreviewLesson = async (courseId: number): Promise<LessonResponse | null> => {
+  try {
+    const response = await apiClient.get<LessonResponse>(`/content/courses/${courseId}/preview`);
+    return response.data;
+  } catch (error: any) {
+    // Return null if not found (404) or any error
+    if (error.response?.status === 404) {
+      return null;
+    }
+    console.error('Error fetching preview lesson:', error);
+    return null;
+  }
+};
+
+/**
  * Mark lesson as completed (Student only)
  */
 export const markLessonAsCompleted = async (lessonId: number): Promise<{ message: string }> => {

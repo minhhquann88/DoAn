@@ -1,7 +1,6 @@
 package com.coursemgmt.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Max;
 import lombok.Data;
@@ -17,8 +16,11 @@ public class MeetingRequest {
     
     private Long courseId;
     
-    @NotNull(message = "Start time is required")
+    // Start time is optional - if null, meeting starts immediately
     private LocalDateTime startTime;
+    
+    // If true, meeting starts immediately regardless of startTime
+    private Boolean startImmediately = false;
     
     @Min(value = 15, message = "Duration must be at least 15 minutes")
     @Max(value = 480, message = "Duration must not exceed 480 minutes (8 hours)")

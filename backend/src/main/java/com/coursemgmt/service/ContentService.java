@@ -130,6 +130,64 @@ public class ContentService {
                 .orElseThrow(() -> new RuntimeException("Lesson not found!"));
     }
 
+    /**
+     * Lấy preview lesson đầu tiên của khóa học (public, không cần authentication)
+     * Dùng cho trang chi tiết khóa học để học viên có thể xem trước
+     * @param courseId ID của khóa học
+     * @return LessonResponse của lesson đầu tiên, hoặc null nếu không có
+     */
+    public LessonResponse getPreviewLesson(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
+        
+        // Chỉ cho phép preview với khóa học trả phí (price > 0)
+        if (course.getPrice() == null || course.getPrice() <= 0) {
+            return null; // Khóa học miễn phí không cần preview
+        }
+        
+        // Lấy chapters với lessons (sắp xếp theo position)
+        List<Chapter> chapters = chapterRepository.findByCourseIdWithLessons(courseId);
+        
+        if (chapters == null || chapters.isEmpty()) {
+            return null; // Không có chapter nào
+        }
+        
+        // Tìm chapter đầu tiên
+        Chapter firstChapter = chapters.stream()
+                .min((c1, c2) -> {
+                    int pos1 = c1.getPosition() != null ? c1.getPosition() : Integer.MAX_VALUE;
+                    int pos2 = c2.getPosition() != null ? c2.getPosition() : Integer.MAX_VALUE;
+                    return Integer.compare(pos1, pos2);
+                })
+                .orElse(null);
+        
+        if (firstChapter == null || firstChapter.getLessons() == null || firstChapter.getLessons().isEmpty()) {
+            return null; // Không có lesson nào trong chapter đầu tiên
+        }
+        
+        // Tìm lesson đầu tiên trong chapter đầu tiên (sắp xếp theo position)
+        Lesson firstLesson = firstChapter.getLessons().stream()
+                .min((l1, l2) -> {
+                    int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
+                    int pos2 = l2.getPosition() != null ? l2.getPosition() : Integer.MAX_VALUE;
+                    return Integer.compare(pos1, pos2);
+                })
+                .orElse(null);
+        
+        if (firstLesson == null) {
+            return null;
+        }
+        
+        // Chỉ trả về lesson có video (VIDEO content type) để preview
+        if (firstLesson.getContentType() != EContentType.VIDEO || 
+            firstLesson.getVideoUrl() == null || firstLesson.getVideoUrl().isEmpty()) {
+            return null; // Không có video để preview
+        }
+        
+        // Trả về LessonResponse (không cần isCompleted vì đây là preview)
+        return LessonResponse.fromEntity(firstLesson, false);
+    }
+
     // Reorder chapters
     @Transactional
     public void reorderChapters(Long courseId, Map<Long, Integer> chapterPositions) {

@@ -950,7 +950,7 @@ function LessonDialog({
                   <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Chọn chương" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[10000]" position="popper">
                     {chapters.map((chapter) => (
                       <SelectItem key={chapter.id} value={chapter.id.toString()}>
                         {chapter.title}
@@ -977,7 +977,7 @@ function LessonDialog({
                 <SelectTrigger id="lesson-type" className="mt-2">
                   <SelectValue placeholder="Chọn loại nội dung" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[10000]" position="popper">
                   <SelectItem value="VIDEO">Video bài giảng</SelectItem>
                   <SelectItem value="TEXT">Bài đọc</SelectItem>
                   <SelectItem value="DOCUMENT">Tài liệu PDF</SelectItem>

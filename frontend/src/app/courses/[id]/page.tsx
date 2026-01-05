@@ -36,12 +36,13 @@ import { useAuthStore } from '@/stores/authStore';
 import { ROUTES, COURSE_LEVEL_LABELS } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReviewSection } from '@/components/course/ReviewSection';
-import { getCourseContent, type ChapterResponse, type LessonResponse } from '@/services/contentService';
+import { getCourseContent, getPreviewLesson, type ChapterResponse, type LessonResponse } from '@/services/contentService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api';
 import { useCartStore } from '@/stores/cartStore';
 import { useUIStore } from '@/stores/uiStore';
 import { enrollCourse } from '@/services/enrollmentService';
+import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/utils';
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -64,6 +65,19 @@ export default function CourseDetailPage() {
       return [];
     },
     enabled: !!params.id && !!course && isAuthenticated && course?.isEnrolled === true,
+  });
+
+  // Fetch preview lesson for paid courses (public, no auth required)
+  const { data: previewLesson, isLoading: isLoadingPreview } = useQuery<LessonResponse | null>({
+    queryKey: ['preview-lesson', params.id],
+    queryFn: async () => {
+      // Only fetch preview for paid courses that user hasn't enrolled
+      if (course && course.price > 0 && !course.isEnrolled) {
+        return await getPreviewLesson(Number(params.id));
+      }
+      return null;
+    },
+    enabled: !!params.id && !!course && course.price > 0 && !course.isEnrolled,
   });
   
   if (isLoading) {
@@ -247,13 +261,72 @@ export default function CourseDetailPage() {
                     <p className="font-semibold">{course.instructor.fullName}</p>
                   </div>
                 </div>
+
+                {/* Preview Video - Mobile Only */}
+                <div className="lg:hidden">
+                  {isLoadingPreview ? (
+                    <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                    </div>
+                  ) : previewLesson && previewLesson.videoUrl ? (
+                    <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted">
+                      <div className="absolute top-2 left-2 z-10">
+                        <Badge className="bg-accent">Preview</Badge>
+                      </div>
+                      {isYouTubeUrl(previewLesson.videoUrl) ? (
+                        <iframe
+                          src={getYouTubeEmbedUrl(previewLesson.videoUrl) || ''}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title={previewLesson.title}
+                        />
+                      ) : (
+                        <video
+                          src={previewLesson.videoUrl}
+                          controls
+                          className="w-full h-full"
+                          title={previewLesson.title}
+                        />
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               </div>
               
-              {/* Hero Image & Enrollment Card - Desktop */}
+              {/* Hero Image/Video & Enrollment Card - Desktop */}
               <div className="hidden lg:block space-y-4">
-                {/* Hero Image (Static - No Video Interaction) */}
+                {/* Preview Video or Hero Image */}
                 <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted">
-                  {course.imageUrl || course.thumbnail ? (
+                  {isLoadingPreview ? (
+                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                    </div>
+                  ) : previewLesson && previewLesson.videoUrl ? (
+                    // Show preview video for paid courses
+                    <div className="relative w-full h-full">
+                      <div className="absolute top-2 left-2 z-10">
+                        <Badge className="bg-accent">Preview</Badge>
+                      </div>
+                      {isYouTubeUrl(previewLesson.videoUrl) ? (
+                        <iframe
+                          src={getYouTubeEmbedUrl(previewLesson.videoUrl) || ''}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title={previewLesson.title}
+                        />
+                      ) : (
+                        <video
+                          src={previewLesson.videoUrl}
+                          controls
+                          className="w-full h-full"
+                          title={previewLesson.title}
+                        />
+                      )}
+                    </div>
+                  ) : course.imageUrl || course.thumbnail ? (
+                    // Fallback to image if no preview video
                     <Image
                       src={course.imageUrl || course.thumbnail || ''}
                       alt={course.title}
