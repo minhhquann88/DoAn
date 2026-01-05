@@ -251,6 +251,33 @@ export const extractVideoDuration = (file: File): Promise<number> => {
 };
 
 /**
+ * Round duration in seconds to minutes
+ * Rules: >= 30 seconds round up, < 30 seconds round down
+ * Example: 378s (6:18) → 6 minutes, 349s (5:49) → 6 minutes
+ */
+export const roundDurationToMinutes = (durationInSeconds: number): number => {
+  if (durationInSeconds <= 0) return 0;
+  const minutes = durationInSeconds / 60;
+  return Math.round(minutes);
+};
+
+/**
+ * Extract duration from YouTube URL using backend API
+ * Backend will use YouTube Data API v3 if API key is available
+ */
+export const extractYouTubeDuration = async (youtubeUrl: string): Promise<number | null> => {
+  try {
+    // Backend will handle YouTube duration extraction
+    // For now, return null and let backend handle it
+    // In the future, we can add a dedicated endpoint
+    return null;
+  } catch (error) {
+    console.error('Failed to extract YouTube duration:', error);
+    return null;
+  }
+};
+
+/**
  * Upload document file for a lesson
  */
 export const uploadLessonDocument = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {

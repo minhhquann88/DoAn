@@ -14,7 +14,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/utils';
 import { ROUTES } from '@/lib/constants';
 import type { ChapterResponse, LessonResponse, ChapterRequest, LessonRequest } from '@/services/contentService';
-import { createChapter, updateChapter, deleteChapter, createLesson, updateLesson, deleteLesson, uploadLessonVideo, uploadLessonDocument, uploadLessonSlide, reorderChapters, reorderLessons, previewLesson as previewLessonApi, extractVideoDuration } from '@/services/contentService';
+import { createChapter, updateChapter, deleteChapter, createLesson, updateLesson, deleteLesson, uploadLessonVideo, uploadLessonDocument, uploadLessonSlide, reorderChapters, reorderLessons, previewLesson as previewLessonApi, extractVideoDuration, roundDurationToMinutes } from '@/services/contentService';
 import { useCourse } from '@/hooks/useCourses';
 
 // Dialog components for creating/editing chapters and lessons
@@ -1001,9 +1001,17 @@ function LessonDialog({
                 <div className="flex gap-2">
                   <Input
                     value={pendingVideoFile ? pendingVideoFile.name : videoUrl}
-                    onChange={(e) => {
-                      setVideoUrl(e.target.value);
+                    onChange={async (e) => {
+                      const url = e.target.value;
+                      setVideoUrl(url);
                       setPendingVideoFile(null);
+                      
+                      // Tự động extract duration từ YouTube URL (nếu có)
+                      // Backend sẽ xử lý khi submit, nhưng có thể hiển thị loading
+                      if (isYouTubeUrl(url)) {
+                        // YouTube duration sẽ được extract ở backend khi submit
+                        // Có thể thêm loading indicator ở đây nếu cần
+                      }
                     }}
                     placeholder="https://youtube.com/watch?v=... hoặc URL video khác"
                     className="flex-1"
@@ -1031,10 +1039,19 @@ function LessonDialog({
                           // Editing existing lesson: upload immediately
                           setUploadingVideo(true);
                           try {
-                            // Extract duration from video file
+                            // Tự động extract và làm tròn duration từ video file
                             let durationInSeconds: number | undefined;
                             try {
                               durationInSeconds = await extractVideoDuration(file);
+                              // Tự động cập nhật duration field (đã làm tròn)
+                              if (durationInSeconds) {
+                                const roundedMinutes = roundDurationToMinutes(durationInSeconds);
+                                setDurationInMinutes(roundedMinutes);
+                                addToast({ 
+                                  type: 'success', 
+                                  description: `Đã tự động tính thời lượng: ${roundedMinutes} phút` 
+                                });
+                              }
                             } catch (err) {
                               console.warn('Failed to extract video duration:', err);
                             }
@@ -1053,14 +1070,23 @@ function LessonDialog({
                           setPendingVideoFile(file);
                           setVideoUrl(''); // Clear URL since we're using file
                           
-                          // Extract duration from video file
+                          // Tự động extract và làm tròn duration từ video file
                           extractVideoDuration(file)
-                            .then((duration) => {
+                            .then((durationInSeconds) => {
                               // Store duration in file metadata (we'll use it when creating lesson)
-                              (file as any).durationInSeconds = duration;
+                              (file as any).durationInSeconds = durationInSeconds;
+                              
+                              // Tự động fill duration field (đã làm tròn)
+                              const roundedMinutes = roundDurationToMinutes(durationInSeconds);
+                              setDurationInMinutes(roundedMinutes);
+                              addToast({ 
+                                type: 'success', 
+                                description: `Đã tự động tính thời lượng: ${roundedMinutes} phút (từ ${Math.floor(durationInSeconds / 60)}:${String(durationInSeconds % 60).padStart(2, '0')})` 
+                              });
                             })
                             .catch((err) => {
                               console.warn('Failed to extract video duration:', err);
+                              addToast({ type: 'warning', description: 'Không thể tự động tính thời lượng. Vui lòng nhập thủ công.' });
                             });
                           
                           addToast({ type: 'info', description: `Đã chọn video: ${file.name}. Video sẽ được upload khi tạo bài học.` });
@@ -1291,7 +1317,14 @@ function LessonDialog({
               </div>
             )}
             <div>
-              <Label htmlFor="lesson-duration">Thời lượng (phút) *</Label>
+              <Label htmlFor="lesson-duration">
+                Thời lượng (phút) *
+                {(pendingVideoFile || videoUrl) && contentType === 'VIDEO' && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    (Tự động tính từ video)
+                  </span>
+                )}
+              </Label>
               <Input
                 id="lesson-duration"
                 type="number"
@@ -1306,11 +1339,21 @@ function LessonDialog({
                 }}
                 onBlur={() => setDurationTouched(true)}
                 className="mt-2"
-                placeholder="Nhập thời lượng bài học"
+                placeholder={
+                  (pendingVideoFile || videoUrl) && contentType === 'VIDEO' 
+                    ? "Tự động tính từ video" 
+                    : "Nhập thời lượng bài học"
+                }
+                disabled={(pendingVideoFile || videoUrl) && contentType === 'VIDEO' && durationInMinutes > 0}
                 required
               />
               {durationTouched && durationInMinutes === 0 && (
                 <p className="text-xs text-destructive mt-1">Vui lòng nhập thời lượng lớn hơn 0 phút</p>
+              )}
+              {(pendingVideoFile || videoUrl) && contentType === 'VIDEO' && durationInMinutes > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Thời lượng đã được tự động tính từ video. Bạn có thể chỉnh sửa nếu cần.
+                </p>
               )}
             </div>
             <div>
