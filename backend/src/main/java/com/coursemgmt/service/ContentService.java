@@ -74,6 +74,9 @@ public class ContentService {
 
     // --- Quản lý Lesson ---
 
+    @Autowired
+    private VideoDurationService videoDurationService;
+
     @Transactional
     public Lesson createLesson(Long chapterId, LessonRequest request) {
         Chapter chapter = chapterRepository.findById(chapterId)
@@ -87,7 +90,11 @@ public class ContentService {
         lesson.setSlideUrl(request.getSlideUrl());
         lesson.setContent(request.getContent());
         lesson.setPosition(request.getPosition());
-        lesson.setDurationInMinutes(request.getDurationInMinutes());
+        
+        // Tự động tính duration nếu có video URL
+        Integer duration = calculateDuration(request);
+        lesson.setDurationInMinutes(duration != null ? duration : request.getDurationInMinutes());
+        
         lesson.setIsPreview(request.getIsPreview() != null ? request.getIsPreview() : false);
         lesson.setChapter(chapter);
 
@@ -106,10 +113,48 @@ public class ContentService {
         lesson.setSlideUrl(request.getSlideUrl());
         lesson.setContent(request.getContent());
         lesson.setPosition(request.getPosition());
-        lesson.setDurationInMinutes(request.getDurationInMinutes());
+        
+        // Tự động tính duration nếu có video URL (và video URL thay đổi)
+        if (request.getVideoUrl() != null && !request.getVideoUrl().equals(lesson.getVideoUrl())) {
+            Integer duration = calculateDuration(request);
+            lesson.setDurationInMinutes(duration != null ? duration : request.getDurationInMinutes());
+        } else {
+            lesson.setDurationInMinutes(request.getDurationInMinutes());
+        }
+        
         lesson.setIsPreview(request.getIsPreview() != null ? request.getIsPreview() : false);
 
         return lessonRepository.save(lesson);
+    }
+
+    /**
+     * Tính duration tự động từ video URL
+     * Hỗ trợ cả video upload và YouTube links
+     */
+    private Integer calculateDuration(LessonRequest request) {
+        if (request.getVideoUrl() == null || request.getVideoUrl().isEmpty()) {
+            return null;
+        }
+
+        // Nếu là YouTube URL, extract duration từ YouTube API
+        if (videoDurationService.isYouTubeUrl(request.getVideoUrl())) {
+            // Thử extract từ YouTube API (nếu có API key)
+            String youtubeApiKey = System.getenv("YOUTUBE_API_KEY");
+            if (youtubeApiKey != null && !youtubeApiKey.isEmpty()) {
+                Integer durationInSeconds = videoDurationService.extractDurationFromYouTubeUrlWithAPI(
+                    request.getVideoUrl(), youtubeApiKey
+                );
+                if (durationInSeconds != null) {
+                    return videoDurationService.roundDurationToMinutes(durationInSeconds);
+                }
+            }
+            // Nếu không có API key, return null (frontend có thể gửi duration)
+            return null;
+        }
+
+        // Với video upload, frontend sẽ gửi duration
+        // Hoặc có thể extract từ file metadata (cần implement)
+        return null;
     }
 
     @Transactional

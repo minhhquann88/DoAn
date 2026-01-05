@@ -11,6 +11,7 @@ import com.coursemgmt.security.services.CourseSecurityService;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.ContentService;
 import com.coursemgmt.service.FileStorageService;
+import com.coursemgmt.service.VideoDurationService;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ public class ChapterController {
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private VideoDurationService videoDurationService;
 
     // 1. Lấy danh sách chapters của một course (cho instructor - không cần enrollment)
     @GetMapping
@@ -157,7 +161,8 @@ public class ChapterController {
     public ResponseEntity<?> uploadLessonVideo(@PathVariable Long courseId,
                                                @PathVariable Long chapterId,
                                                @PathVariable Long lessonId,
-                                               @RequestParam("file") MultipartFile file) {
+                                               @RequestParam("file") MultipartFile file,
+                                               @RequestParam(value = "durationInSeconds", required = false) Integer durationInSeconds) {
         try {
             String videoUrl = fileStorageService.storeLessonVideo(file, lessonId);
             
@@ -170,7 +175,14 @@ public class ChapterController {
             updateRequest.setDocumentUrl(lesson.getDocumentUrl());
             updateRequest.setContent(lesson.getContent());
             updateRequest.setPosition(lesson.getPosition());
-            updateRequest.setDurationInMinutes(lesson.getDurationInMinutes());
+            
+            // Tự động tính duration nếu frontend gửi durationInSeconds
+            if (durationInSeconds != null && durationInSeconds > 0) {
+                Integer roundedDuration = videoDurationService.roundDurationToMinutes(durationInSeconds);
+                updateRequest.setDurationInMinutes(roundedDuration);
+            } else {
+                updateRequest.setDurationInMinutes(lesson.getDurationInMinutes());
+            }
             
             Lesson updatedLesson = contentService.updateLesson(lessonId, updateRequest);
             

@@ -14,7 +14,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/utils';
 import { ROUTES } from '@/lib/constants';
 import type { ChapterResponse, LessonResponse, ChapterRequest, LessonRequest } from '@/services/contentService';
-import { createChapter, updateChapter, deleteChapter, createLesson, updateLesson, deleteLesson, uploadLessonVideo, uploadLessonDocument, uploadLessonSlide, reorderChapters, reorderLessons, previewLesson as previewLessonApi } from '@/services/contentService';
+import { createChapter, updateChapter, deleteChapter, createLesson, updateLesson, deleteLesson, uploadLessonVideo, uploadLessonDocument, uploadLessonSlide, reorderChapters, reorderLessons, previewLesson as previewLessonApi, extractVideoDuration } from '@/services/contentService';
 import { useCourse } from '@/hooks/useCourses';
 
 // Dialog components for creating/editing chapters and lessons
@@ -122,7 +122,17 @@ export default function CourseContentPage() {
       if (videoFile && createdLesson.id) {
         try {
           console.log('Uploading video:', { courseId, chapterId, lessonId: createdLesson.id, fileName: videoFile.name, fileSize: videoFile.size });
-          const videoUrl = await uploadLessonVideo(Number(courseId), chapterId, createdLesson.id, videoFile);
+          
+          // Extract duration from video file
+          let durationInSeconds: number | undefined;
+          try {
+            durationInSeconds = await extractVideoDuration(videoFile);
+            console.log('Extracted video duration:', durationInSeconds, 'seconds');
+          } catch (err) {
+            console.warn('Failed to extract video duration:', err);
+          }
+          
+          const videoUrl = await uploadLessonVideo(Number(courseId), chapterId, createdLesson.id, videoFile, durationInSeconds);
           console.log('Video uploaded successfully:', videoUrl);
           // Step 3: Update lesson with the video URL
           await updateLesson(Number(courseId), chapterId, createdLesson.id, {
@@ -1021,7 +1031,15 @@ function LessonDialog({
                           // Editing existing lesson: upload immediately
                           setUploadingVideo(true);
                           try {
-                            const uploadedUrl = await uploadLessonVideo(Number(courseId), selectedChapterId, lesson.id, file);
+                            // Extract duration from video file
+                            let durationInSeconds: number | undefined;
+                            try {
+                              durationInSeconds = await extractVideoDuration(file);
+                            } catch (err) {
+                              console.warn('Failed to extract video duration:', err);
+                            }
+                            
+                            const uploadedUrl = await uploadLessonVideo(Number(courseId), selectedChapterId, lesson.id, file, durationInSeconds);
                             setVideoUrl(uploadedUrl);
                             addToast({ type: 'success', description: 'Video đã được upload thành công!' });
                           } catch (error: any) {
@@ -1034,6 +1052,17 @@ function LessonDialog({
                           // Creating new lesson: store file for later upload
                           setPendingVideoFile(file);
                           setVideoUrl(''); // Clear URL since we're using file
+                          
+                          // Extract duration from video file
+                          extractVideoDuration(file)
+                            .then((duration) => {
+                              // Store duration in file metadata (we'll use it when creating lesson)
+                              (file as any).durationInSeconds = duration;
+                            })
+                            .catch((err) => {
+                              console.warn('Failed to extract video duration:', err);
+                            });
+                          
                           addToast({ type: 'info', description: `Đã chọn video: ${file.name}. Video sẽ được upload khi tạo bài học.` });
                           e.target.value = '';
                         }

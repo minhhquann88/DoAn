@@ -206,16 +206,48 @@ export const previewLesson = async (lessonId: number): Promise<LessonResponse> =
 /**
  * Upload video file for a lesson
  * Note: Longer timeout for large video files
+ * @param durationInSeconds Optional duration in seconds (will be extracted from video if not provided)
  */
-export const uploadLessonVideo = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {
+export const uploadLessonVideo = async (
+  courseId: number, 
+  chapterId: number, 
+  lessonId: number, 
+  file: File,
+  durationInSeconds?: number
+): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file);
+  if (durationInSeconds !== undefined && durationInSeconds > 0) {
+    formData.append('durationInSeconds', durationInSeconds.toString());
+  }
   const response = await apiClient.post<{ videoUrl: string }>(
     `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-video`, 
     formData,
     { timeout: 600000 } // 10 minutes timeout for large videos
   );
   return response.data.videoUrl;
+};
+
+/**
+ * Extract duration from video file
+ */
+export const extractVideoDuration = (file: File): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src);
+      resolve(Math.floor(video.duration));
+    };
+    
+    video.onerror = () => {
+      window.URL.revokeObjectURL(video.src);
+      reject(new Error('Failed to load video metadata'));
+    };
+    
+    video.src = URL.createObjectURL(file);
+  });
 };
 
 /**
