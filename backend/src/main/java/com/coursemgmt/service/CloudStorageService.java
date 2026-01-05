@@ -68,21 +68,22 @@ public class CloudStorageService {
                 params.put("public_id", publicId);
             }
             
-            // Upload file
-            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
+            // Upload từ InputStream để tránh đọc toàn bộ file vào memory
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getInputStream(), params);
             String secureUrl = (String) uploadResult.get("secure_url");
             
-            logger.info("File uploaded to Cloudinary: {}", secureUrl);
+            logger.info("File uploaded to Cloudinary: {} (size: {} bytes)", secureUrl, file.getSize());
             return secureUrl;
             
         } catch (IOException e) {
-            logger.error("Error uploading file to Cloudinary: {}", e.getMessage());
+            logger.error("Error uploading file to Cloudinary: {}", e.getMessage(), e);
             throw new IOException("Failed to upload file to Cloudinary: " + e.getMessage(), e);
         }
     }
 
     /**
      * Upload video file lên Cloudinary
+     * Sử dụng InputStream để tránh đọc toàn bộ file vào memory
      */
     public String uploadVideo(MultipartFile file, String folder, String publicId) throws IOException {
         if (!enabled || cloudinary == null) {
@@ -93,19 +94,23 @@ public class CloudStorageService {
             Map<String, Object> params = new HashMap<>();
             params.put("folder", folder);
             params.put("resource_type", "video");
+            // Thêm timeout và chunk size cho video lớn
+            params.put("chunk_size", 6000000); // 6MB chunks
+            params.put("timeout", 60000); // 60 seconds timeout
             
             if (publicId != null && !publicId.isEmpty()) {
                 params.put("public_id", publicId);
             }
             
-            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
+            // Upload từ InputStream thay vì đọc toàn bộ vào memory
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getInputStream(), params);
             String secureUrl = (String) uploadResult.get("secure_url");
             
-            logger.info("Video uploaded to Cloudinary: {}", secureUrl);
+            logger.info("Video uploaded to Cloudinary: {} (size: {} bytes)", secureUrl, file.getSize());
             return secureUrl;
             
         } catch (IOException e) {
-            logger.error("Error uploading video to Cloudinary: {}", e.getMessage());
+            logger.error("Error uploading video to Cloudinary: {}", e.getMessage(), e);
             throw new IOException("Failed to upload video to Cloudinary: " + e.getMessage(), e);
         }
     }
@@ -127,14 +132,15 @@ public class CloudStorageService {
                 params.put("public_id", publicId);
             }
             
-            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
+            // Upload từ InputStream để tránh đọc toàn bộ file vào memory
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getInputStream(), params);
             String secureUrl = (String) uploadResult.get("secure_url");
             
-            logger.info("Document uploaded to Cloudinary: {}", secureUrl);
+            logger.info("Document uploaded to Cloudinary: {} (size: {} bytes)", secureUrl, file.getSize());
             return secureUrl;
             
         } catch (IOException e) {
-            logger.error("Error uploading document to Cloudinary: {}", e.getMessage());
+            logger.error("Error uploading document to Cloudinary: {}", e.getMessage(), e);
             throw new IOException("Failed to upload document to Cloudinary: " + e.getMessage(), e);
         }
     }
