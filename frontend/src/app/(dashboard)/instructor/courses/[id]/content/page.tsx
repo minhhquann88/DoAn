@@ -508,8 +508,15 @@ function PreviewLessonDialog({
           if (url.includes('/api/files/lessons/documents/')) {
             return url.replace('/api/files/lessons/documents/', '/api/files/view/documents/');
           }
+          // If URL is already absolute (starts with http), use as is
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url.replace('/api/files/lessons/documents/', '/api/files/view/documents/');
+          }
+          // Otherwise, construct from API base URL
           const file = url.split('/').pop();
-          return `http://localhost:8080/api/files/view/documents/${file}`;
+          const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+          const baseUrl = apiBaseUrl.endsWith('/api') ? apiBaseUrl.replace('/api', '') : apiBaseUrl.replace(/\/api$/, '');
+          return `${baseUrl}/api/files/view/documents/${file}`;
         };
         const viewUrl = getViewUrl(lesson.documentUrl);
         return (
@@ -523,8 +530,15 @@ function PreviewLessonDialog({
           if (url.includes('/api/files/lessons/slides/')) {
             return url.replace('/api/files/lessons/slides/', '/api/files/view/slides/');
           }
+          // If URL is already absolute (starts with http), use as is
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url.replace('/api/files/lessons/slides/', '/api/files/view/slides/');
+          }
+          // Otherwise, construct from API base URL
           const file = url.split('/').pop();
-          return `http://localhost:8080/api/files/view/slides/${file}`;
+          const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
+          const baseUrl = apiBaseUrl.endsWith('/api') ? apiBaseUrl.replace('/api', '') : apiBaseUrl.replace(/\/api$/, '');
+          return `${baseUrl}/api/files/view/slides/${file}`;
         };
         const slideViewUrl = getSlideViewUrl(lesson.slideUrl);
         return (
@@ -1352,29 +1366,29 @@ function LessonDialog({
               </div>
             )}
             {contentType !== 'YOUTUBE' && (
-              <div>
-                <Label htmlFor="lesson-duration">Thời lượng (phút) *</Label>
-                <Input
-                  id="lesson-duration"
-                  type="number"
-                  min="1"
-                  value={durationInMinutes || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setDurationInMinutes(value === '' ? 0 : Number(value));
-                    if (value !== '') {
-                      setDurationTouched(true);
-                    }
-                  }}
-                  onBlur={() => setDurationTouched(true)}
-                  className="mt-2"
-                  placeholder="Nhập thời lượng bài học"
-                  required
-                />
-                {durationTouched && durationInMinutes === 0 && (
-                  <p className="text-xs text-destructive mt-1">Vui lòng nhập thời lượng lớn hơn 0 phút</p>
-                )}
-              </div>
+            <div>
+              <Label htmlFor="lesson-duration">Thời lượng (phút) *</Label>
+              <Input
+                id="lesson-duration"
+                type="number"
+                min="1"
+                value={durationInMinutes || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDurationInMinutes(value === '' ? 0 : Number(value));
+                  if (value !== '') {
+                    setDurationTouched(true);
+                  }
+                }}
+                onBlur={() => setDurationTouched(true)}
+                className="mt-2"
+                placeholder="Nhập thời lượng bài học"
+                required
+              />
+              {durationTouched && durationInMinutes === 0 && (
+                <p className="text-xs text-destructive mt-1">Vui lòng nhập thời lượng lớn hơn 0 phút</p>
+              )}
+            </div>
             )}
             <div>
               <Label htmlFor="lesson-position">Thứ tự *</Label>

@@ -161,7 +161,7 @@ export const getCourseProgress = async (courseId: number) => {
   try {
     const response = await getEnrollmentsByCourse(courseId, 0, 1);
     const enrollment = response.content.length > 0 ? response.content[0] : null;
-    return enrollment ? { progress: enrollment.progress } : { progress: 0 };
+  return enrollment ? { progress: enrollment.progress } : { progress: 0 };
   } catch (error) {
     return { progress: 0 };
   }
