@@ -90,7 +90,7 @@ export default function InstructorMeetingsPage() {
       setIsCreateDialogOpen(false);
       addToast({
         type: 'success',
-        message: 'Tạo phòng họp thành công!',
+        description: 'Tạo phòng họp thành công!',
       });
       // If meeting is ONGOING, redirect to meeting room
       if (meeting.status === 'ONGOING') {
@@ -100,7 +100,7 @@ export default function InstructorMeetingsPage() {
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể tạo phòng họp',
+        description: error.response?.data?.error || 'Không thể tạo phòng họp',
       });
     },
   });
@@ -115,13 +115,13 @@ export default function InstructorMeetingsPage() {
       setSelectedMeeting(null);
       addToast({
         type: 'success',
-        message: 'Cập nhật phòng họp thành công!',
+        description: 'Cập nhật phòng họp thành công!',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể cập nhật phòng họp',
+        description: error.response?.data?.error || 'Không thể cập nhật phòng họp',
       });
     },
   });
@@ -133,13 +133,13 @@ export default function InstructorMeetingsPage() {
       queryClient.invalidateQueries({ queryKey: ['instructor-meetings'] });
       addToast({
         type: 'success',
-        message: 'Xóa phòng họp thành công!',
+        description: 'Xóa phòng họp thành công!',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể xóa phòng họp',
+        description: error.response?.data?.error || 'Không thể xóa phòng họp',
       });
     },
   });
@@ -154,7 +154,7 @@ export default function InstructorMeetingsPage() {
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể bắt đầu phòng họp',
+        description: error.response?.data?.error || 'Không thể bắt đầu phòng họp',
       });
     },
   });
@@ -166,13 +166,13 @@ export default function InstructorMeetingsPage() {
       queryClient.invalidateQueries({ queryKey: ['instructor-meetings'] });
       addToast({
         type: 'success',
-        message: 'Đã kết thúc phòng họp!',
+        description: 'Đã kết thúc phòng họp!',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể kết thúc phòng họp',
+        description: error.response?.data?.error || 'Không thể kết thúc phòng họp',
       });
     },
   });
@@ -211,7 +211,7 @@ export default function InstructorMeetingsPage() {
     setTimeout(() => setCopiedCode(null), 2000);
     addToast({
       type: 'success',
-      message: 'Đã sao chép mã phòng họp!',
+      description: 'Đã sao chép mã phòng họp!',
     });
   };
 

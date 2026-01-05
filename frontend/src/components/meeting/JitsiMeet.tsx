@@ -93,9 +93,6 @@ export default function JitsiMeet({
             enableLobbyChat: false,
             enableKnockingLobby: false,
             enableInsecureRoomNameWarning: false,
-            // Allow anyone to start the meeting without moderator
-            enableWelcomePage: false,
-            enableClosePage: true,
             // Disable moderator requirement completely
             enableModeratorIndicator: false,
             enableRemoteVideoMenu: true,
@@ -104,8 +101,6 @@ export default function JitsiMeet({
             useStunTurn: true,
             // Set default language
             defaultLanguage: 'vi',
-            // Allow all participants to have moderator-like permissions
-            enableLayerSuspension: true,
             // Disable lobby completely
             enablePrejoinPage: false,
             constraints: {
@@ -196,10 +191,10 @@ export default function JitsiMeet({
 
               // Find button with moderator text
               const buttons = iframeDoc.querySelectorAll('button, [role="button"]');
-              for (const btn of Array.from(buttons)) {
+              for (const btn of Array.from(buttons) as HTMLElement[]) {
                 const text = (btn.textContent || '').toLowerCase();
                 if (text.includes('moderator') || text.includes('quản trị') || text.includes('administrator') || text.includes('mình là')) {
-                  (btn as HTMLElement).click();
+                  btn.click();
                   console.log('✅ Auto-clicked moderator button');
                   return true;
                 }

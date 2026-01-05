@@ -50,7 +50,7 @@ export default function StudentMeetingDetailPage() {
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể tham gia phòng họp',
+        description: error.response?.data?.error || 'Không thể tham gia phòng họp',
       });
     },
   });
@@ -65,7 +65,7 @@ export default function StudentMeetingDetailPage() {
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể rời phòng họp',
+        description: error.response?.data?.error || 'Không thể rời phòng họp',
       });
     },
   });
@@ -81,7 +81,7 @@ export default function StudentMeetingDetailPage() {
     if (meeting?.status !== 'ONGOING' && meeting?.status !== 'SCHEDULED') {
       addToast({
         type: 'error',
-        message: 'Phòng họp không thể tham gia',
+        description: 'Phòng họp không thể tham gia',
       });
       return;
     }

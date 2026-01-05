@@ -67,13 +67,13 @@ export default function StudentMeetingsPage() {
       router.push(ROUTES.STUDENT.MEETING(data.meeting.id.toString()));
       addToast({
         type: 'success',
-        message: 'Đã tham gia phòng họp thành công!',
+        description: 'Đã tham gia phòng họp thành công!',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể tham gia phòng họp. Vui lòng kiểm tra lại mã phòng.',
+        description: error.response?.data?.error || 'Không thể tham gia phòng họp. Vui lòng kiểm tra lại mã phòng.',
       });
     },
   });
@@ -82,7 +82,7 @@ export default function StudentMeetingsPage() {
     if (!joinCode.trim()) {
       addToast({
         type: 'error',
-        message: 'Vui lòng nhập mã phòng họp',
+        description: 'Vui lòng nhập mã phòng họp',
       });
       return;
     }
@@ -93,7 +93,7 @@ export default function StudentMeetingsPage() {
     if (meeting.status !== 'ONGOING' && meeting.status !== 'SCHEDULED') {
       addToast({
         type: 'error',
-        message: 'Phòng họp không thể tham gia',
+        description: 'Phòng họp không thể tham gia',
       });
       return;
     }

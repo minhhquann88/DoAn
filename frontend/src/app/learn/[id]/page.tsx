@@ -41,6 +41,7 @@ import { ROUTES } from '@/lib/constants';
 const mapContentType = (contentType: string): 'VIDEO' | 'ARTICLE' | 'SLIDE' | 'QUIZ' | 'ASSIGNMENT' => {
   switch (contentType) {
     case 'VIDEO':
+    case 'YOUTUBE':
       return 'VIDEO';
     case 'TEXT':
     case 'DOCUMENT':
@@ -65,7 +66,7 @@ interface Lesson {
   contentUrl?: string;
   slideUrl?: string;
   content?: string;
-  originalContentType?: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
+  originalContentType?: 'VIDEO' | 'YOUTUBE' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
 }
 
 interface Section {

@@ -65,12 +65,12 @@ export interface ChapterRequest {
 
 export interface LessonRequest {
   title: string;
-  contentType: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
+  contentType: 'VIDEO' | 'YOUTUBE' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
   videoUrl?: string;
   documentUrl?: string;
   slideUrl?: string;
   content?: string; // For TEXT content type
-  durationInMinutes: number;
+  durationInMinutes?: number; // Optional vì YouTube không cần duration
   position: number;
   isPreview?: boolean; // Cho phép giảng viên preview bài học trước khi publish
 }

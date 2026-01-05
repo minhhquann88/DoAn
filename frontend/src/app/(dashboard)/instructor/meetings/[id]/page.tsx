@@ -50,7 +50,7 @@ export default function InstructorMeetingDetailPage() {
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể tham gia phòng họp',
+        description: error.response?.data?.error || 'Không thể tham gia phòng họp',
       });
     },
   });
@@ -65,7 +65,7 @@ export default function InstructorMeetingDetailPage() {
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể rời phòng họp',
+        description: error.response?.data?.error || 'Không thể rời phòng họp',
       });
     },
   });
@@ -78,13 +78,13 @@ export default function InstructorMeetingDetailPage() {
       router.push(ROUTES.INSTRUCTOR.MEETINGS);
       addToast({
         type: 'success',
-        message: 'Đã kết thúc phòng họp!',
+        description: 'Đã kết thúc phòng họp!',
       });
     },
     onError: (error: any) => {
       addToast({
         type: 'error',
-        message: error.response?.data?.error || 'Không thể kết thúc phòng họp',
+        description: error.response?.data?.error || 'Không thể kết thúc phòng họp',
       });
     },
   });
@@ -100,7 +100,7 @@ export default function InstructorMeetingDetailPage() {
     if (meeting?.status !== 'ONGOING' && meeting?.status !== 'SCHEDULED') {
       addToast({
         type: 'error',
-        message: 'Phòng họp không thể tham gia',
+        description: 'Phòng họp không thể tham gia',
       });
       return;
     }
