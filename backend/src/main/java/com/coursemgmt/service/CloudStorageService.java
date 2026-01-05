@@ -68,8 +68,9 @@ public class CloudStorageService {
                 params.put("public_id", publicId);
             }
             
-            // Upload từ InputStream để tránh đọc toàn bộ file vào memory
-            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getInputStream(), params);
+            // Cloudinary Java SDK không hỗ trợ InputStream trực tiếp, cần dùng byte[]
+            byte[] fileBytes = file.getBytes();
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(fileBytes, params);
             String secureUrl = (String) uploadResult.get("secure_url");
             
             logger.info("File uploaded to Cloudinary: {} (size: {} bytes)", secureUrl, file.getSize());
@@ -112,9 +113,14 @@ public class CloudStorageService {
                 logger.warn("Uploading large video file: {} MB", file.getSize() / (1024 * 1024));
             }
             
-            // Upload từ InputStream thay vì đọc toàn bộ vào memory
-            // Lưu ý: MultipartFile.getInputStream() chỉ đọc được 1 lần
-            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getInputStream(), params);
+            // Cloudinary Java SDK không hỗ trợ InputStream trực tiếp, cần dùng byte[]
+            // Với video lớn, cần kiểm tra memory trước khi đọc
+            if (file.getSize() > 200 * 1024 * 1024) { // > 200MB
+                logger.warn("Very large video file detected: {} MB. Consider using upload_large for files > 200MB", 
+                    file.getSize() / (1024 * 1024));
+            }
+            byte[] fileBytes = file.getBytes();
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(fileBytes, params);
             
             if (uploadResult == null) {
                 logger.error("Cloudinary upload returned null result");
@@ -176,8 +182,10 @@ public class CloudStorageService {
             
             logger.info("Starting Cloudinary document upload: folder={}, publicId={}, size={} bytes", folder, publicId, file.getSize());
             
-            // Upload từ InputStream để tránh đọc toàn bộ file vào memory
-            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getInputStream(), params);
+            // Cloudinary Java SDK không hỗ trợ InputStream trực tiếp, cần dùng byte[]
+            // Với document thường < 50MB nên đọc vào memory là OK
+            byte[] fileBytes = file.getBytes();
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(fileBytes, params);
             
             if (uploadResult == null) {
                 logger.error("Cloudinary document upload returned null result");
