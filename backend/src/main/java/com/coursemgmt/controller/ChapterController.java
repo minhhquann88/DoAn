@@ -81,7 +81,7 @@ public class ChapterController {
             List<Lesson> lessons = contentService.getChapterLessons(chapterId);
             List<LessonResponse> lessonResponses = lessons.stream()
                     .map(lesson -> LessonResponse.fromEntity(lesson, false))
-                    .collect(java.util.stream.Collectors.toList());
+                    .toList();
             ChapterResponse chapterResponse = ChapterResponse.fromEntity(chapter, lessonResponses);
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Chapter updated successfully");
