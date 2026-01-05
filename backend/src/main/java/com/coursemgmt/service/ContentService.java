@@ -91,9 +91,14 @@ public class ContentService {
         lesson.setContent(request.getContent());
         lesson.setPosition(request.getPosition());
         
-        // Tự động tính duration nếu có video URL
-        Integer duration = calculateDuration(request);
-        lesson.setDurationInMinutes(duration != null ? duration : request.getDurationInMinutes());
+        // Tự động tính duration nếu có video URL (không áp dụng cho YOUTUBE)
+        if (request.getContentType() == EContentType.YOUTUBE) {
+            // YouTube không cần duration, set = 0
+            lesson.setDurationInMinutes(0);
+        } else {
+            Integer duration = calculateDuration(request);
+            lesson.setDurationInMinutes(duration != null ? duration : (request.getDurationInMinutes() != null ? request.getDurationInMinutes() : 0));
+        }
         
         lesson.setIsPreview(request.getIsPreview() != null ? request.getIsPreview() : false);
         lesson.setChapter(chapter);
@@ -114,12 +119,15 @@ public class ContentService {
         lesson.setContent(request.getContent());
         lesson.setPosition(request.getPosition());
         
-        // Tự động tính duration nếu có video URL (và video URL thay đổi)
-        if (request.getVideoUrl() != null && !request.getVideoUrl().equals(lesson.getVideoUrl())) {
+        // Tự động tính duration nếu có video URL (không áp dụng cho YOUTUBE)
+        if (request.getContentType() == EContentType.YOUTUBE) {
+            // YouTube không cần duration, set = 0
+            lesson.setDurationInMinutes(0);
+        } else if (request.getVideoUrl() != null && !request.getVideoUrl().equals(lesson.getVideoUrl())) {
             Integer duration = calculateDuration(request);
-            lesson.setDurationInMinutes(duration != null ? duration : request.getDurationInMinutes());
+            lesson.setDurationInMinutes(duration != null ? duration : (request.getDurationInMinutes() != null ? request.getDurationInMinutes() : 0));
         } else {
-            lesson.setDurationInMinutes(request.getDurationInMinutes());
+            lesson.setDurationInMinutes(request.getDurationInMinutes() != null ? request.getDurationInMinutes() : 0);
         }
         
         lesson.setIsPreview(request.getIsPreview() != null ? request.getIsPreview() : false);
@@ -224,7 +232,7 @@ public class ContentService {
         }
         
         // Chỉ trả về lesson có video (VIDEO content type) để preview
-        if (firstLesson.getContentType() != EContentType.VIDEO || 
+        if ((firstLesson.getContentType() != EContentType.VIDEO && firstLesson.getContentType() != EContentType.YOUTUBE) || 
             firstLesson.getVideoUrl() == null || firstLesson.getVideoUrl().isEmpty()) {
             return null; // Không có video để preview
         }

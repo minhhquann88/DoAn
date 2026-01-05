@@ -47,7 +47,7 @@ export interface ChapterResponse {
 export interface LessonResponse {
   id: number;
   title: string;
-  contentType: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
+  contentType: 'VIDEO' | 'YOUTUBE' | 'TEXT' | 'DOCUMENT' | 'SLIDE';
   videoUrl?: string;
   documentUrl?: string;
   slideUrl?: string;
@@ -265,14 +265,21 @@ export const roundDurationToMinutes = (durationInSeconds: number): number => {
  * Extract duration from YouTube URL using backend API
  * Backend will use YouTube Data API v3 if API key is available
  */
-export const extractYouTubeDuration = async (youtubeUrl: string): Promise<number | null> => {
+/**
+ * Extract duration từ YouTube URL (gọi backend API)
+ * @param courseId ID của course (cần cho endpoint)
+ * @param youtubeUrl URL của YouTube video
+ * @returns Số phút (đã làm tròn), hoặc null nếu không thể extract
+ */
+export const extractYouTubeDuration = async (courseId: number, youtubeUrl: string): Promise<number | null> => {
   try {
-    // Backend will handle YouTube duration extraction
-    // For now, return null and let backend handle it
-    // In the future, we can add a dedicated endpoint
-    return null;
-  } catch (error) {
-    console.error('Failed to extract YouTube duration:', error);
+    // baseURL đã có /api rồi, nên không cần thêm /api ở đây
+    const response = await apiClient.get(`/v1/courses/${courseId}/chapters/extract-youtube-duration`, {
+      params: { url: youtubeUrl }
+    });
+    return response.data.durationInMinutes || null;
+  } catch (error: any) {
+    console.warn('Failed to extract YouTube duration:', error);
     return null;
   }
 };

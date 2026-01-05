@@ -21,8 +21,7 @@ public class LessonRequest {
     @NotNull
     private Integer position; // Thứ tự bài học
 
-    @NotNull
-    private Integer durationInMinutes; // Thời lượng
+    private Integer durationInMinutes; // Thời lượng (không bắt buộc cho YOUTUBE)
 
     private Boolean isPreview = false; // Cho phép giảng viên preview bài học trước khi publish
 }

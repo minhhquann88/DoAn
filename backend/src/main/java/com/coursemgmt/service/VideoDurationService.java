@@ -1,5 +1,6 @@
 package com.coursemgmt.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -19,9 +20,12 @@ public class VideoDurationService {
         "(?:youtube\\.com\\/(?:[^\\/]+\\/.+\\/|(?:v|e(?:mbed)?)\\/|.*[?&]v=)|youtu\\.be\\/)([^\"&?\\s]{11})"
     );
     
+    @Value("${YOUTUBE_API_KEY:}")
+    private String youtubeApiKey;
+    
     public VideoDurationService() {
         this.webClient = WebClient.builder()
-            .baseUrl("https://www.youtube.com")
+            .baseUrl("https://www.googleapis.com")
             .build();
     }
 
@@ -208,6 +212,30 @@ public class VideoDurationService {
             return false;
         }
         return url.contains("youtube.com") || url.contains("youtu.be");
+    }
+
+    /**
+     * Extract duration từ YouTube URL và trả về số phút (đã làm tròn)
+     * Sử dụng YouTube Data API v3 với API key từ config
+     * @param youtubeUrl URL của YouTube video
+     * @return Số phút (đã làm tròn), hoặc null nếu không thể extract
+     */
+    public Integer getYouTubeDurationInMinutes(String youtubeUrl) {
+        if (youtubeUrl == null || youtubeUrl.isEmpty()) {
+            return null;
+        }
+        
+        if (youtubeApiKey == null || youtubeApiKey.isEmpty()) {
+            System.err.println("YouTube API Key is not configured. Cannot fetch YouTube video duration.");
+            return null;
+        }
+        
+        Integer durationInSeconds = extractDurationFromYouTubeUrlWithAPI(youtubeUrl, youtubeApiKey);
+        if (durationInSeconds == null || durationInSeconds <= 0) {
+            return null;
+        }
+        
+        return roundDurationToMinutes(durationInSeconds);
     }
 }
 

@@ -14,7 +14,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { isYouTubeUrl, getYouTubeEmbedUrl } from '@/lib/utils';
 import { ROUTES } from '@/lib/constants';
 import type { ChapterResponse, LessonResponse, ChapterRequest, LessonRequest } from '@/services/contentService';
-import { createChapter, updateChapter, deleteChapter, createLesson, updateLesson, deleteLesson, uploadLessonVideo, uploadLessonDocument, uploadLessonSlide, reorderChapters, reorderLessons, previewLesson as previewLessonApi, extractVideoDuration, roundDurationToMinutes } from '@/services/contentService';
+import { createChapter, updateChapter, deleteChapter, createLesson, updateLesson, deleteLesson, uploadLessonVideo, uploadLessonDocument, uploadLessonSlide, reorderChapters, reorderLessons, previewLesson as previewLessonApi, extractVideoDuration, roundDurationToMinutes, extractYouTubeDuration } from '@/services/contentService';
 import { useCourse } from '@/hooks/useCourses';
 
 // Dialog components for creating/editing chapters and lessons
@@ -856,7 +856,7 @@ function LessonDialog({
   isLoading: boolean;
 }) {
   const [title, setTitle] = React.useState('');
-  const [contentType, setContentType] = React.useState<'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE'>('VIDEO');
+  const [contentType, setContentType] = React.useState<'VIDEO' | 'YOUTUBE' | 'TEXT' | 'DOCUMENT' | 'SLIDE'>('VIDEO');
   const [videoUrl, setVideoUrl] = React.useState('');
   const [documentUrl, setDocumentUrl] = React.useState('');
   const [slideUrl, setSlideUrl] = React.useState('');
@@ -875,6 +875,9 @@ function LessonDialog({
   const params = useParams();
   const courseId = params.id as string;
   const { addToast } = useUIStore();
+  
+  // Ref để debounce YouTube duration extraction
+  const youtubeDurationTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   React.useEffect(() => {
     if (lesson) {
@@ -910,6 +913,13 @@ function LessonDialog({
         }
       }
     }
+    
+    // Cleanup timeout khi component unmount hoặc dialog đóng
+    return () => {
+      if (youtubeDurationTimeoutRef.current) {
+        clearTimeout(youtubeDurationTimeoutRef.current);
+      }
+    };
   }, [lesson, chapterId, chapters, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -918,8 +928,8 @@ function LessonDialog({
       return;
     }
 
-    // Validate duration
-    if (!durationInMinutes || durationInMinutes <= 0) {
+    // Validate duration (không cần cho YouTube)
+    if (contentType !== 'YOUTUBE' && (!durationInMinutes || durationInMinutes <= 0)) {
       addToast({ type: 'error', description: 'Vui lòng nhập thời lượng bài học (phải lớn hơn 0)' });
       return;
     }
@@ -928,10 +938,10 @@ function LessonDialog({
       title: title.trim(),
       contentType,
       position,
-      durationInMinutes,
+      durationInMinutes: contentType === 'YOUTUBE' ? 0 : durationInMinutes, // YouTube không cần duration
     };
 
-    if (contentType === 'VIDEO') {
+    if (contentType === 'VIDEO' || contentType === 'YOUTUBE') {
       data.videoUrl = videoUrl;
     } else if (contentType === 'DOCUMENT') {
       data.documentUrl = documentUrl;
@@ -996,12 +1006,24 @@ function LessonDialog({
             </div>
             <div>
               <Label htmlFor="lesson-type">Loại nội dung *</Label>
-              <Select value={contentType} onValueChange={(value: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'SLIDE') => setContentType(value)}>
+              <Select value={contentType} onValueChange={(value: 'VIDEO' | 'YOUTUBE' | 'TEXT' | 'DOCUMENT' | 'SLIDE') => {
+                setContentType(value);
+                // Reset video URL và duration khi đổi loại
+                if (value !== 'VIDEO' && value !== 'YOUTUBE') {
+                  setVideoUrl('');
+                  setPendingVideoFile(null);
+                }
+                if (value === 'YOUTUBE') {
+                  setDurationInMinutes(0); // YouTube không cần duration
+                  setPendingVideoFile(null); // Không cho upload file khi chọn YouTube
+                }
+              }}>
                 <SelectTrigger id="lesson-type" className="mt-2">
                   <SelectValue placeholder="Chọn loại nội dung" />
                 </SelectTrigger>
                 <SelectContent className="z-[10000]" position="popper">
-                  <SelectItem value="VIDEO">Video bài giảng</SelectItem>
+                  <SelectItem value="VIDEO">Video bài giảng (Upload)</SelectItem>
+                  <SelectItem value="YOUTUBE">Video YouTube (Link)</SelectItem>
                   <SelectItem value="TEXT">Bài đọc</SelectItem>
                   <SelectItem value="DOCUMENT">Tài liệu PDF</SelectItem>
                   <SelectItem value="SLIDE">Slide bài giảng</SelectItem>
@@ -1014,19 +1036,12 @@ function LessonDialog({
                 <div className="flex gap-2">
                   <Input
                     value={pendingVideoFile ? pendingVideoFile.name : videoUrl}
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const url = e.target.value;
                       setVideoUrl(url);
                       setPendingVideoFile(null);
-                      
-                      // Tự động extract duration từ YouTube URL (nếu có)
-                      // Backend sẽ xử lý khi submit, nhưng có thể hiển thị loading
-                      if (isYouTubeUrl(url)) {
-                        // YouTube duration sẽ được extract ở backend khi submit
-                        // Có thể thêm loading indicator ở đây nếu cần
-                      }
                     }}
-                    placeholder="https://youtube.com/watch?v=... hoặc URL video khác"
+                    placeholder="URL video (nếu có)"
                     className="flex-1"
                     disabled={!!pendingVideoFile}
                     required={!pendingVideoFile && !videoUrl}
@@ -1052,18 +1067,14 @@ function LessonDialog({
                           // Editing existing lesson: upload immediately
                           setUploadingVideo(true);
                           try {
-                            // Tự động extract và làm tròn duration từ video file
+                            // Tự động extract và làm tròn duration từ video file (im lặng)
                             let durationInSeconds: number | undefined;
                             try {
                               durationInSeconds = await extractVideoDuration(file);
-                              // Tự động cập nhật duration field (đã làm tròn)
+                              // Tự động cập nhật duration field (đã làm tròn) - không thông báo
                               if (durationInSeconds) {
                                 const roundedMinutes = roundDurationToMinutes(durationInSeconds);
                                 setDurationInMinutes(roundedMinutes);
-                                addToast({ 
-                                  type: 'success', 
-                                  description: `Đã tự động tính thời lượng: ${roundedMinutes} phút` 
-                                });
                               }
                             } catch (err) {
                               console.warn('Failed to extract video duration:', err);
@@ -1083,23 +1094,19 @@ function LessonDialog({
                           setPendingVideoFile(file);
                           setVideoUrl(''); // Clear URL since we're using file
                           
-                          // Tự động extract và làm tròn duration từ video file
+                          // Tự động extract và làm tròn duration từ video file (im lặng, không thông báo)
                           extractVideoDuration(file)
                             .then((durationInSeconds) => {
                               // Store duration in file metadata (we'll use it when creating lesson)
                               (file as any).durationInSeconds = durationInSeconds;
                               
-                              // Tự động fill duration field (đã làm tròn)
+                              // Tự động fill duration field (đã làm tròn) - không thông báo
                               const roundedMinutes = roundDurationToMinutes(durationInSeconds);
                               setDurationInMinutes(roundedMinutes);
-                              addToast({ 
-                                type: 'success', 
-                                description: `Đã tự động tính thời lượng: ${roundedMinutes} phút (từ ${Math.floor(durationInSeconds / 60)}:${String(durationInSeconds % 60).padStart(2, '0')})` 
-                              });
                             })
                             .catch((err) => {
                               console.warn('Failed to extract video duration:', err);
-                              addToast({ type: 'warning', description: 'Không thể tự động tính thời lượng. Vui lòng nhập thủ công.' });
+                              // Không hiển thị thông báo lỗi, để user tự nhập nếu cần
                             });
                           
                           addToast({ type: 'info', description: `Đã chọn video: ${file.name}. Video sẽ được upload khi tạo bài học.` });
@@ -1141,6 +1148,21 @@ function LessonDialog({
                     ? `File đã chọn: ${pendingVideoFile.name} (${(pendingVideoFile.size / 1024 / 1024).toFixed(2)} MB) - Sẽ upload khi tạo bài học`
                     : 'Bạn có thể upload file video hoặc nhập URL. File tối đa 500MB.'}
                 </p>
+              </div>
+            )}
+            {contentType === 'YOUTUBE' && (
+              <div className="space-y-2">
+                <Label>Link YouTube *</Label>
+                <Input
+                  value={videoUrl}
+                  onChange={(e) => {
+                    const url = e.target.value;
+                    setVideoUrl(url);
+                  }}
+                  placeholder="https://youtube.com/watch?v=... hoặc https://youtu.be/..."
+                  className="flex-1"
+                  required
+                />
               </div>
             )}
             {contentType === 'DOCUMENT' && (
@@ -1329,46 +1351,31 @@ function LessonDialog({
                 />
               </div>
             )}
-            <div>
-              <Label htmlFor="lesson-duration">
-                Thời lượng (phút) *
-                {(pendingVideoFile || videoUrl) && contentType === 'VIDEO' && (
-                  <span className="text-xs text-muted-foreground ml-2">
-                    (Tự động tính từ video)
-                  </span>
+            {contentType !== 'YOUTUBE' && (
+              <div>
+                <Label htmlFor="lesson-duration">Thời lượng (phút) *</Label>
+                <Input
+                  id="lesson-duration"
+                  type="number"
+                  min="1"
+                  value={durationInMinutes || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setDurationInMinutes(value === '' ? 0 : Number(value));
+                    if (value !== '') {
+                      setDurationTouched(true);
+                    }
+                  }}
+                  onBlur={() => setDurationTouched(true)}
+                  className="mt-2"
+                  placeholder="Nhập thời lượng bài học"
+                  required
+                />
+                {durationTouched && durationInMinutes === 0 && (
+                  <p className="text-xs text-destructive mt-1">Vui lòng nhập thời lượng lớn hơn 0 phút</p>
                 )}
-              </Label>
-              <Input
-                id="lesson-duration"
-                type="number"
-                min="1"
-                value={durationInMinutes || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setDurationInMinutes(value === '' ? 0 : Number(value));
-                  if (value !== '') {
-                    setDurationTouched(true);
-                  }
-                }}
-                onBlur={() => setDurationTouched(true)}
-                className="mt-2"
-                placeholder={
-                  (pendingVideoFile || videoUrl) && contentType === 'VIDEO' 
-                    ? "Tự động tính từ video" 
-                    : "Nhập thời lượng bài học"
-                }
-                disabled={(pendingVideoFile || videoUrl) && contentType === 'VIDEO' && durationInMinutes > 0}
-                required
-              />
-              {durationTouched && durationInMinutes === 0 && (
-                <p className="text-xs text-destructive mt-1">Vui lòng nhập thời lượng lớn hơn 0 phút</p>
-              )}
-              {(pendingVideoFile || videoUrl) && contentType === 'VIDEO' && durationInMinutes > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Thời lượng đã được tự động tính từ video. Bạn có thể chỉnh sửa nếu cần.
-                </p>
-              )}
-            </div>
+              </div>
+            )}
             <div>
               <Label htmlFor="lesson-position">Thứ tự *</Label>
               <Input

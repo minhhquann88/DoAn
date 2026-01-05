@@ -195,7 +195,40 @@ public class ChapterController {
         }
     }
 
-    // 9. Upload document file cho lesson
+    // 9. Extract duration từ YouTube URL
+    @GetMapping("/extract-youtube-duration")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> extractYouTubeDuration(@RequestParam("url") String youtubeUrl) {
+        try {
+            if (youtubeUrl == null || youtubeUrl.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(new MessageResponse("URL không được để trống"));
+            }
+            
+            Integer durationInMinutes = videoDurationService.getYouTubeDurationInMinutes(youtubeUrl.trim());
+            if (durationInMinutes == null || durationInMinutes <= 0) {
+                // Trả về 200 với duration = null thay vì 400 để frontend có thể xử lý gracefully
+                Map<String, Object> response = new HashMap<>();
+                response.put("durationInMinutes", null);
+                response.put("message", "Không thể lấy thời lượng từ YouTube URL. Vui lòng kiểm tra URL hoặc API key.");
+                return ResponseEntity.ok(response);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("durationInMinutes", durationInMinutes);
+            response.put("message", "Đã lấy thời lượng thành công");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error extracting YouTube duration: " + e.getMessage());
+            e.printStackTrace();
+            // Trả về 200 với duration = null thay vì 500 để frontend có thể xử lý gracefully
+            Map<String, Object> response = new HashMap<>();
+            response.put("durationInMinutes", null);
+            response.put("message", "Lỗi khi lấy thời lượng: " + e.getMessage());
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    // 10. Upload document file cho lesson
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-document")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonDocument(@PathVariable Long courseId,
