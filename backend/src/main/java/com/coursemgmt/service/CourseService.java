@@ -174,34 +174,9 @@ public class CourseService {
         course.setInstructor(instructor);
         course.setCreatedAt(LocalDateTime.now());
         course.setUpdatedAt(LocalDateTime.now());
-
-        // Phân quyền: Admin tạo thì PUBLISHED luôn, Giảng viên tạo thì DRAFT
-        // (Marketplace Model)
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> role.equals(ERole.ROLE_ADMIN.name()));
-
-        if (isAdmin) {
-            course.setStatus(ECourseStatus.PUBLISHED);
-        } else {
-            // Giảng viên tạo sẽ ở trạng thái DRAFT để có thể chỉnh sửa trước khi publish
-            course.setStatus(ECourseStatus.DRAFT);
-        }
+        course.setStatus(ECourseStatus.DRAFT);
 
         Course savedCourse = courseRepository.save(course);
-
-        // Gửi email thông báo khóa học mới nếu khóa học được publish ngay (Admin tạo)
-        if (savedCourse.getStatus() == ECourseStatus.PUBLISHED) {
-            try {
-                String courseUrl = "http://localhost:3000/courses/" + savedCourse.getId();
-                newsletterService.sendNewCourseNotification(savedCourse.getTitle(), courseUrl);
-                System.out.println(">>> Email notification sent for new course: " + savedCourse.getTitle());
-            } catch (Exception e) {
-                System.err.println(">>> ERROR: Failed to send email notification for new course: " + e.getMessage());
-                e.printStackTrace();
-                // Không throw exception để không ảnh hưởng đến việc tạo khóa học
-            }
-        }
 
         return savedCourse;
     }
@@ -222,28 +197,6 @@ public class CourseService {
         course.setTotalDurationInHours(request.getTotalDurationInHours());
         course.setCategory(category);
         course.setUpdatedAt(LocalDateTime.now());
-        // Khi cập nhật, có thể reset status về PENDING để admin duyệt lại
-        // course.setStatus(ECourseStatus.PENDING_APPROVAL);
-
-        return courseRepository.save(course);
-    }
-
-    // Chức năng: Gửi yêu cầu phê duyệt (Giảng viên)
-    @Transactional
-    public Course requestApproval(Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found!"));
-
-        // Chỉ cho phép gửi yêu cầu nếu khóa học đang ở trạng thái DRAFT hoặc đã bị từ
-        // chối
-        // Nếu đã PUBLISHED thì không cần gửi lại
-        if (course.getStatus() == ECourseStatus.PUBLISHED) {
-            throw new RuntimeException("Khóa học đã được phê duyệt rồi!");
-        }
-
-        // Đặt trạng thái về PENDING_APPROVAL để chờ Admin duyệt
-        course.setStatus(ECourseStatus.PENDING_APPROVAL);
-        course.setUpdatedAt(LocalDateTime.now());
 
         return courseRepository.save(course);
     }
@@ -253,9 +206,6 @@ public class CourseService {
     public void deleteCourse(Long courseId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found!"));
-
-        // Xóa các bản ghi liên quan trước khi xóa khóa học (để tránh foreign key
-        // constraint violation)
 
         // 1. Xóa reviews
         reviewRepository.deleteByCourseId(courseId);
@@ -299,7 +249,6 @@ public class CourseService {
 
         return courseRepository.save(course);
     }
-
 
     // Chức năng 5: Lấy 1 khóa học
     public CourseResponse getCourseById(Long courseId) {
