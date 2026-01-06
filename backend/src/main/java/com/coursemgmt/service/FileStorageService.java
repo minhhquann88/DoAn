@@ -195,9 +195,9 @@ public class FileStorageService {
             throw new RuntimeException("Invalid file type. Only video files are allowed.");
         }
 
-        // Validate file size (max 500MB for videos)
-        if (file.getSize() > 500 * 1024 * 1024) { // 500 MB
-            throw new RuntimeException("File size exceeds the limit of 500MB.");
+        // Validate file size (max 2GB for videos - local setting)
+        if (file.getSize() > 2L * 1024 * 1024 * 1024) { // 2 GB
+            throw new RuntimeException("File size exceeds the limit of 2GB.");
         }
 
         // Create unique file name: lessonId_timestamp_uuid.extension

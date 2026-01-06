@@ -258,7 +258,8 @@ export const extractVideoDuration = (file: File): Promise<number> => {
 export const roundDurationToMinutes = (durationInSeconds: number): number => {
   if (durationInSeconds <= 0) return 0;
   const minutes = durationInSeconds / 60;
-  return Math.round(minutes);
+  // Đảm bảo video rất ngắn (<30s) vẫn được tính tối thiểu 1 phút để qua validation
+  return Math.max(1, Math.round(minutes));
 };
 
 /**
