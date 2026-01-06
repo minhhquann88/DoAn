@@ -33,19 +33,17 @@ public class ChapterController {
     private ContentService contentService;
 
     @Autowired
-    private CourseSecurityService courseSecurityService;
-
-    @Autowired
     private FileStorageService fileStorageService;
 
     @Autowired
     private VideoDurationService videoDurationService;
 
-    // 1. Lấy danh sách chapters của một course (cho instructor - không cần enrollment)
+    // 1. Lấy danh sách chapters của một course (cho instructor - không cần
+    // enrollment)
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<List<ChapterResponse>> getChapters(@PathVariable Long courseId,
-                                                             @AuthenticationPrincipal UserDetailsImpl userDetails) {
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
         List<ChapterResponse> chapters = contentService.getCourseContent(courseId, userDetails);
         return ResponseEntity.ok(chapters);
     }
@@ -54,8 +52,8 @@ public class ChapterController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<?> createChapter(@PathVariable Long courseId,
-                                          @Valid @RequestBody ChapterRequest request,
-                                          @AuthenticationPrincipal UserDetailsImpl userDetails) {
+            @Valid @RequestBody ChapterRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
         try {
             Chapter chapter = contentService.createChapter(courseId, request);
             // Create empty lessons list for new chapter
@@ -73,8 +71,8 @@ public class ChapterController {
     @PutMapping("/{chapterId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> updateChapter(@PathVariable Long courseId,
-                                          @PathVariable Long chapterId,
-                                          @Valid @RequestBody ChapterRequest request) {
+            @PathVariable Long chapterId,
+            @Valid @RequestBody ChapterRequest request) {
         try {
             Chapter chapter = contentService.updateChapter(chapterId, request);
             // Load lessons for this chapter
@@ -96,7 +94,7 @@ public class ChapterController {
     @DeleteMapping("/{chapterId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> deleteChapter(@PathVariable Long courseId,
-                                           @PathVariable Long chapterId) {
+            @PathVariable Long chapterId) {
         try {
             contentService.deleteChapter(chapterId);
             return ResponseEntity.ok(new MessageResponse("Chapter deleted successfully"));
@@ -109,8 +107,8 @@ public class ChapterController {
     @PostMapping("/{chapterId}/lessons")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> createLesson(@PathVariable Long courseId,
-                                          @PathVariable Long chapterId,
-                                          @Valid @RequestBody LessonRequest request) {
+            @PathVariable Long chapterId,
+            @Valid @RequestBody LessonRequest request) {
         try {
             Lesson lesson = contentService.createLesson(chapterId, request);
             Map<String, Object> response = new HashMap<>();
@@ -126,9 +124,9 @@ public class ChapterController {
     @PutMapping("/{chapterId}/lessons/{lessonId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> updateLesson(@PathVariable Long courseId,
-                                         @PathVariable Long chapterId,
-                                         @PathVariable Long lessonId,
-                                         @Valid @RequestBody LessonRequest request) {
+            @PathVariable Long chapterId,
+            @PathVariable Long lessonId,
+            @Valid @RequestBody LessonRequest request) {
         try {
             Lesson lesson = contentService.updateLesson(lessonId, request);
             Map<String, Object> response = new HashMap<>();
@@ -144,8 +142,8 @@ public class ChapterController {
     @DeleteMapping("/{chapterId}/lessons/{lessonId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> deleteLesson(@PathVariable Long courseId,
-                                          @PathVariable Long chapterId,
-                                          @PathVariable Long lessonId) {
+            @PathVariable Long chapterId,
+            @PathVariable Long lessonId) {
         try {
             contentService.deleteLesson(lessonId);
             return ResponseEntity.ok(new MessageResponse("Lesson deleted successfully"));
@@ -158,13 +156,13 @@ public class ChapterController {
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-video")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonVideo(@PathVariable Long courseId,
-                                               @PathVariable Long chapterId,
-                                               @PathVariable Long lessonId,
-                                               @RequestParam("file") MultipartFile file,
-                                               @RequestParam(value = "durationInSeconds", required = false) Integer durationInSeconds) {
+            @PathVariable Long chapterId,
+            @PathVariable Long lessonId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "durationInSeconds", required = false) Integer durationInSeconds) {
         try {
             String videoUrl = fileStorageService.storeLessonVideo(file, lessonId);
-            
+
             // Update lesson with video URL
             Lesson lesson = contentService.getLessonById(lessonId);
             LessonRequest updateRequest = new LessonRequest();
@@ -174,7 +172,7 @@ public class ChapterController {
             updateRequest.setDocumentUrl(lesson.getDocumentUrl());
             updateRequest.setContent(lesson.getContent());
             updateRequest.setPosition(lesson.getPosition());
-            
+
             // Tự động tính duration nếu frontend gửi durationInSeconds
             if (durationInSeconds != null && durationInSeconds > 0) {
                 Integer roundedDuration = videoDurationService.roundDurationToMinutes(durationInSeconds);
@@ -182,9 +180,9 @@ public class ChapterController {
             } else {
                 updateRequest.setDurationInMinutes(lesson.getDurationInMinutes());
             }
-            
+
             Lesson updatedLesson = contentService.updateLesson(lessonId, updateRequest);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Video uploaded successfully");
             response.put("videoUrl", videoUrl);
@@ -203,16 +201,17 @@ public class ChapterController {
             if (youtubeUrl == null || youtubeUrl.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(new MessageResponse("URL không được để trống"));
             }
-            
+
             Integer durationInMinutes = videoDurationService.getYouTubeDurationInMinutes(youtubeUrl.trim());
             if (durationInMinutes == null || durationInMinutes <= 0) {
-                // Trả về 200 với duration = null thay vì 400 để frontend có thể xử lý gracefully
+                // Trả về 200 với duration = null thay vì 400 để frontend có thể xử lý
+                // gracefully
                 Map<String, Object> response = new HashMap<>();
                 response.put("durationInMinutes", null);
                 response.put("message", "Không thể lấy thời lượng từ YouTube URL. Vui lòng kiểm tra URL hoặc API key.");
                 return ResponseEntity.ok(response);
             }
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("durationInMinutes", durationInMinutes);
             response.put("message", "Đã lấy thời lượng thành công");
@@ -220,7 +219,8 @@ public class ChapterController {
         } catch (Exception e) {
             System.err.println("Error extracting YouTube duration: " + e.getMessage());
             e.printStackTrace();
-            // Trả về 200 với duration = null thay vì 500 để frontend có thể xử lý gracefully
+            // Trả về 200 với duration = null thay vì 500 để frontend có thể xử lý
+            // gracefully
             Map<String, Object> response = new HashMap<>();
             response.put("durationInMinutes", null);
             response.put("message", "Lỗi khi lấy thời lượng: " + e.getMessage());
@@ -232,12 +232,12 @@ public class ChapterController {
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-document")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonDocument(@PathVariable Long courseId,
-                                                  @PathVariable Long chapterId,
-                                                  @PathVariable Long lessonId,
-                                                  @RequestParam("file") MultipartFile file) {
+            @PathVariable Long chapterId,
+            @PathVariable Long lessonId,
+            @RequestParam("file") MultipartFile file) {
         try {
             String documentUrl = fileStorageService.storeLessonDocument(file, lessonId);
-            
+
             // Update lesson with document URL
             Lesson lesson = contentService.getLessonById(lessonId);
             LessonRequest updateRequest = new LessonRequest();
@@ -248,9 +248,9 @@ public class ChapterController {
             updateRequest.setContent(lesson.getContent());
             updateRequest.setPosition(lesson.getPosition());
             updateRequest.setDurationInMinutes(lesson.getDurationInMinutes());
-            
+
             Lesson updatedLesson = contentService.updateLesson(lessonId, updateRequest);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Document uploaded successfully");
             response.put("documentUrl", documentUrl);
@@ -265,12 +265,12 @@ public class ChapterController {
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-slide")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonSlide(@PathVariable Long courseId,
-                                               @PathVariable Long chapterId,
-                                               @PathVariable Long lessonId,
-                                               @RequestParam("file") MultipartFile file) {
+            @PathVariable Long chapterId,
+            @PathVariable Long lessonId,
+            @RequestParam("file") MultipartFile file) {
         try {
             String slideUrl = fileStorageService.storeLessonSlide(file, lessonId);
-            
+
             // Update lesson with slide URL
             Lesson lesson = contentService.getLessonById(lessonId);
             LessonRequest updateRequest = new LessonRequest();
@@ -282,9 +282,9 @@ public class ChapterController {
             updateRequest.setContent(lesson.getContent());
             updateRequest.setPosition(lesson.getPosition());
             updateRequest.setDurationInMinutes(lesson.getDurationInMinutes());
-            
+
             Lesson updatedLesson = contentService.updateLesson(lessonId, updateRequest);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Slide uploaded successfully");
             response.put("slideUrl", slideUrl);
@@ -299,12 +299,13 @@ public class ChapterController {
     @PatchMapping("/reorder")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<?> reorderChapters(@PathVariable Long courseId,
-                                             @RequestBody Map<Long, Integer> chapterPositions) {
+            @RequestBody Map<Long, Integer> chapterPositions) {
         try {
             contentService.reorderChapters(courseId, chapterPositions);
             return ResponseEntity.ok(new MessageResponse("Chapters reordered successfully"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Error reordering chapters: " + e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(new MessageResponse("Error reordering chapters: " + e.getMessage()));
         }
     }
 
@@ -312,8 +313,8 @@ public class ChapterController {
     @PatchMapping("/{chapterId}/lessons/reorder")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> reorderLessons(@PathVariable Long courseId,
-                                           @PathVariable Long chapterId,
-                                           @RequestBody Map<Long, Integer> lessonPositions) {
+            @PathVariable Long chapterId,
+            @RequestBody Map<Long, Integer> lessonPositions) {
         try {
             contentService.reorderLessons(chapterId, lessonPositions);
             return ResponseEntity.ok(new MessageResponse("Lessons reordered successfully"));
@@ -322,4 +323,3 @@ public class ChapterController {
         }
     }
 }
-

@@ -94,41 +94,4 @@ public class ContentManagementController {
                     .body(new MessageResponse("Error previewing lesson: " + e.getMessage()));
         }
     }
-
-    // --- API IMPORT/EXPORT MỚI ---
-
-    /**
-     * API Export nội dung khóa học ra file Excel
-     *
-     */
-    @GetMapping("/courses/{courseId}/export")
-    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
-    public ResponseEntity<Resource> exportLessons(@PathVariable Long courseId) throws IOException {
-        ByteArrayInputStream in = excelService.exportLessons(courseId);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Content-Disposition", "attachment; filename=NoiDungKhoaHoc_" + courseId + ".xlsx");
-
-        return ResponseEntity
-                .ok()
-                .headers(headers)
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(new InputStreamResource(in));
-    }
-
-    /**
-     * API Import nội dung khóa học từ file Excel
-     *
-     */
-    @PostMapping("/courses/{courseId}/import")
-    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
-    public ResponseEntity<MessageResponse> importLessons(@PathVariable Long courseId,
-                                                         @RequestParam("file") MultipartFile file) {
-        try {
-            excelService.importLessons(courseId, file);
-            return ResponseEntity.ok(new MessageResponse("Import nội dung thành công!"));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new MessageResponse("Lỗi khi import: " + e.getMessage()));
-        }
-    }
 }

@@ -31,7 +31,7 @@ public class UserController {
     @Autowired
     FileStorageService fileStorageService;
 
-    // Get current user profile - Fetch fresh data from database
+    // Get current user profile
     @GetMapping("/profile")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getProfile() {
@@ -39,7 +39,6 @@ public class UserController {
             // Get current authenticated user ID
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || authentication.getPrincipal() == null) {
-                System.out.println("GetProfile: Authentication is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
             }
 
@@ -47,16 +46,12 @@ public class UserController {
             Long currentUserId = userDetails.getId();
 
             if (currentUserId == null) {
-                System.out.println("GetProfile: User ID is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
             }
-
-            System.out.println("GetProfile: Fetching fresh profile data for user ID: " + currentUserId);
 
             // CRITICAL: Fetch fresh data from database and map to DTO to avoid Jackson infinite recursion
             ProfileResponse profileResponse = authService.getUserProfile(currentUserId);
 
-            System.out.println("GetProfile: Successfully fetched profile for user ID: " + currentUserId);
             return ResponseEntity.ok(profileResponse);
 
         } catch (Exception e) {
@@ -73,7 +68,6 @@ public class UserController {
             // Get current authenticated user
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || authentication.getPrincipal() == null) {
-                System.out.println("UpdateProfile: Authentication is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
             }
 
@@ -81,15 +75,11 @@ public class UserController {
             Long currentUserId = userDetails.getId();
 
             if (currentUserId == null) {
-                System.out.println("UpdateProfile: User ID is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
             }
 
-            System.out.println("UpdateProfile: Processing request for user ID: " + currentUserId);
-
             // Validate request
             if (request == null) {
-                System.out.println("UpdateProfile: Request body is null");
                 return ResponseEntity.badRequest().body(new MessageResponse("Request không hợp lệ"));
             }
 

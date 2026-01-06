@@ -1,6 +1,5 @@
 package com.coursemgmt.service;
 
-import com.coursemgmt.dto.AddToCartRequest;
 import com.coursemgmt.dto.CartItemResponse;
 import com.coursemgmt.dto.CartResponse;
 import com.coursemgmt.dto.CourseResponse;
@@ -8,9 +7,6 @@ import com.coursemgmt.exception.ResourceNotFoundException;
 import com.coursemgmt.model.*;
 import com.coursemgmt.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,17 +92,18 @@ public class CartService {
 
     /**
      * Lấy giỏ hàng của user
-     * Note: Not read-only because it may need to create a new cart if one doesn't exist
+     * Note: Not read-only because it may need to create a new cart if one doesn't
+     * exist
      */
     @Transactional
     public CartResponse getCart(Long userId) {
         // Use getOrCreateCart to ensure cart exists (handles creation if needed)
         Cart cart = getOrCreateCart(userId);
-        
+
         // Fetch cart with items loaded (JOIN FETCH)
         cart = cartRepository.findByUserIdWithItems(userId)
                 .orElse(cart); // Fallback to the cart we just got/created
-        
+
         return mapToCartResponse(cart);
     }
 
@@ -136,7 +133,7 @@ public class CartService {
     public void clearCart(Long userId) {
         Cart cart = cartRepository.findByUserIdWithItems(userId)
                 .orElse(getOrCreateCart(userId));
-        
+
         if (cart.getItems() != null && !cart.getItems().isEmpty()) {
             cart.getItems().clear();
             cartRepository.save(cart);
@@ -172,14 +169,15 @@ public class CartService {
                 .mapToDouble(item -> item.getCourse().getPrice())
                 .sum();
 
-        // Generate unique transaction code (shared by all transactions in this cart checkout)
+        // Generate unique transaction code (shared by all transactions in this cart
+        // checkout)
         String transactionCode = generateTransactionCode();
-        
+
         // Create a transaction for EACH course in the cart
         // All transactions share the same transactionCode for tracking
         for (CartItem item : cart.getItems()) {
             Course course = item.getCourse();
-            
+
             Transaction transaction = new Transaction();
             transaction.setUser(user);
             transaction.setCourse(course);
@@ -188,39 +186,38 @@ public class CartService {
             transaction.setPaymentGateway(EPaymentGateway.VNPAY);
             transaction.setCreatedAt(LocalDateTime.now());
             transaction.setTransactionCode(transactionCode); // Same code for all
-            
+
             transactionRepository.save(transaction);
         }
 
         // Generate VNPay payment URL with total amount
         try {
             // Build order info from course titles
-            String orderInfo = "Thanh toan gio hang: " + 
-                cart.getItems().stream()
-                    .map(item -> item.getCourse().getTitle())
-                    .limit(3) // Limit to first 3 courses to avoid URL too long
-                    .collect(Collectors.joining(", "));
-            
+            String orderInfo = "Thanh toan gio hang: " +
+                    cart.getItems().stream()
+                            .map(item -> item.getCourse().getTitle())
+                            .limit(3) // Limit to first 3 courses to avoid URL too long
+                            .collect(Collectors.joining(", "));
+
             if (cart.getItems().size() > 3) {
                 orderInfo += " va " + (cart.getItems().size() - 3) + " khoa hoc khac";
             }
-            
+
             // Sử dụng return URL từ biến môi trường (VNPayService)
             String returnUrl = vnPayService.getDefaultReturnUrl();
             String paymentUrl = vnPayService.createPaymentUrl(
-                transactionCode, // Use transactionCode as vnp_TxnRef
-                totalAmount, // Total amount for all courses
-                orderInfo,
-                returnUrl,
-                null // Let user choose payment method on VNPay (QR, ATM, etc.)
+                    transactionCode, // Use transactionCode as vnp_TxnRef
+                    totalAmount, // Total amount for all courses
+                    orderInfo,
+                    returnUrl,
+                    null // Let user choose payment method on VNPay (QR, ATM, etc.)
             );
 
-        return Map.of(
-            "paymentUrl", paymentUrl,
-            "transactionCode", transactionCode,
-            "amount", totalAmount.toString(),
-            "cartId", cart.getId().toString()
-        );
+            return Map.of(
+                    "paymentUrl", paymentUrl,
+                    "transactionCode", transactionCode,
+                    "amount", totalAmount.toString(),
+                    "cartId", cart.getId().toString());
         } catch (Exception e) {
             System.err.println("ERROR: Failed to create VNPay URL: " + e.getMessage());
             e.printStackTrace();
@@ -232,8 +229,8 @@ public class CartService {
      * Generate unique transaction code
      */
     private String generateTransactionCode() {
-        return "TXN_" + System.currentTimeMillis() + 
-               String.format("%04d", new Random().nextInt(10000));
+        return "TXN_" + System.currentTimeMillis() +
+                String.format("%04d", new Random().nextInt(10000));
     }
 
     /**
@@ -252,12 +249,12 @@ public class CartService {
                         CartItemResponse itemResponse = new CartItemResponse();
                         itemResponse.setId(item.getId());
                         itemResponse.setAddedAt(item.getAddedAt());
-                        
+
                         // Map course to CourseResponse
                         Course course = item.getCourse();
                         CourseResponse courseResponse = CourseResponse.fromEntity(course);
                         itemResponse.setCourse(courseResponse);
-                        
+
                         return itemResponse;
                     })
                     .collect(Collectors.toList());
@@ -279,4 +276,3 @@ public class CartService {
         return response;
     }
 }
-
