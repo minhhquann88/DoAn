@@ -11,3 +11,4 @@ if (-not (Test-Path "node_modules")) {
 # Start dev server
 Write-Host "Starting Next.js dev server..." -ForegroundColor Yellow
 npm run dev
+

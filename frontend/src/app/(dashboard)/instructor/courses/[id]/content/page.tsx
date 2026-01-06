@@ -508,15 +508,8 @@ function PreviewLessonDialog({
           if (url.includes('/api/files/lessons/documents/')) {
             return url.replace('/api/files/lessons/documents/', '/api/files/view/documents/');
           }
-          // If URL is already absolute (starts with http), use as is
-          if (url.startsWith('http://') || url.startsWith('https://')) {
-            return url.replace('/api/files/lessons/documents/', '/api/files/view/documents/');
-          }
-          // Otherwise, construct from API base URL
           const file = url.split('/').pop();
-          const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
-          const baseUrl = apiBaseUrl.endsWith('/api') ? apiBaseUrl.replace('/api', '') : apiBaseUrl.replace(/\/api$/, '');
-          return `${baseUrl}/api/files/view/documents/${file}`;
+          return `http://localhost:8080/api/files/view/documents/${file}`;
         };
         const viewUrl = getViewUrl(lesson.documentUrl);
         return (
@@ -530,15 +523,8 @@ function PreviewLessonDialog({
           if (url.includes('/api/files/lessons/slides/')) {
             return url.replace('/api/files/lessons/slides/', '/api/files/view/slides/');
           }
-          // If URL is already absolute (starts with http), use as is
-          if (url.startsWith('http://') || url.startsWith('https://')) {
-            return url.replace('/api/files/lessons/slides/', '/api/files/view/slides/');
-          }
-          // Otherwise, construct from API base URL
           const file = url.split('/').pop();
-          const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
-          const baseUrl = apiBaseUrl.endsWith('/api') ? apiBaseUrl.replace('/api', '') : apiBaseUrl.replace(/\/api$/, '');
-          return `${baseUrl}/api/files/view/slides/${file}`;
+          return `http://localhost:8080/api/files/view/slides/${file}`;
         };
         const slideViewUrl = getSlideViewUrl(lesson.slideUrl);
         return (

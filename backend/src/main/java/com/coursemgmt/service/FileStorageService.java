@@ -36,7 +36,6 @@ public class FileStorageService {
     private final Path lessonSlideStorageLocation;
     private final String lessonSlideBaseUrl;
     private final SlideConversionService slideConversionService;
-    private final CloudStorageService cloudStorageService;
 
     public FileStorageService(@Value("${avatar.storage.path:./uploads/avatars}") String avatarStoragePath,
                               @Value("${AVATAR_BASE_URL:${avatar.base-url:http://localhost:8080/api/files/avatars}}") String avatarBaseUrl,
@@ -48,8 +47,7 @@ public class FileStorageService {
                               @Value("${lesson.document.base-url:http://localhost:8080/api/files/lessons/documents}") String lessonDocumentBaseUrl,
                               @Value("${lesson.slide.storage.path:./uploads/lessons/slides}") String lessonSlideStoragePath,
                               @Value("${lesson.slide.base-url:http://localhost:8080/api/files/lessons/slides}") String lessonSlideBaseUrl,
-                              @Lazy SlideConversionService slideConversionService,
-                              CloudStorageService cloudStorageService) {
+                              @Lazy SlideConversionService slideConversionService) {
         this.avatarStorageLocation = Paths.get(avatarStoragePath).toAbsolutePath().normalize();
         this.avatarBaseUrl = avatarBaseUrl;
         this.courseImageStorageLocation = Paths.get(courseImageStoragePath).toAbsolutePath().normalize();
@@ -61,7 +59,6 @@ public class FileStorageService {
         this.lessonSlideStorageLocation = Paths.get(lessonSlideStoragePath).toAbsolutePath().normalize();
         this.lessonSlideBaseUrl = lessonSlideBaseUrl;
         this.slideConversionService = slideConversionService;
-        this.cloudStorageService = cloudStorageService;
         try {
             Files.createDirectories(this.avatarStorageLocation);
             Files.createDirectories(this.courseImageStorageLocation);
@@ -96,19 +93,6 @@ public class FileStorageService {
         // Create unique file name: userId_timestamp_uuid.extension
         String fileName = userId + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + fileExtension;
 
-        // Try Cloudinary first if enabled
-        if (cloudStorageService.isEnabled()) {
-            try {
-                String publicId = "avatars/" + fileName.replace(fileExtension, "");
-                String cloudUrl = cloudStorageService.uploadFile(file, "avatars", publicId);
-                logger.info("Avatar uploaded to Cloudinary: {}", cloudUrl);
-                return cloudUrl;
-            } catch (Exception e) {
-                logger.warn("Failed to upload to Cloudinary, falling back to local storage: {}", e.getMessage());
-            }
-        }
-
-        // Fallback to local storage
         try {
             Path targetLocation = this.avatarStorageLocation.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
@@ -164,19 +148,6 @@ public class FileStorageService {
         // Create unique file name: courseId_timestamp_uuid.extension
         String fileName = courseId + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + fileExtension;
 
-        // Try Cloudinary first if enabled
-        if (cloudStorageService.isEnabled()) {
-            try {
-                String publicId = "courses/" + fileName.replace(fileExtension, "");
-                String cloudUrl = cloudStorageService.uploadFile(file, "courses", publicId);
-                logger.info("Course image uploaded to Cloudinary: {}", cloudUrl);
-                return cloudUrl;
-            } catch (Exception e) {
-                logger.warn("Failed to upload to Cloudinary, falling back to local storage: {}", e.getMessage());
-            }
-        }
-
-        // Fallback to local storage
         try {
             Path targetLocation = this.courseImageStorageLocation.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
@@ -232,33 +203,6 @@ public class FileStorageService {
         // Create unique file name: lessonId_timestamp_uuid.extension
         String fileName = lessonId + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + fileExtension;
 
-        // Try Cloudinary first if enabled
-        if (cloudStorageService.isEnabled()) {
-            try {
-                String publicId = "lessons/videos/" + fileName.replace(fileExtension, "");
-                logger.info("Attempting to upload video to Cloudinary: {} (size: {} bytes)", fileName, file.getSize());
-                String cloudUrl = cloudStorageService.uploadVideo(file, "lessons/videos", publicId);
-                logger.info("Video uploaded successfully to Cloudinary: {}", cloudUrl);
-                // Đảm bảo URL là Cloudinary URL, không phải local URL
-                if (cloudUrl != null && cloudUrl.contains("cloudinary.com")) {
-                    return cloudUrl;
-                } else {
-                    logger.error("Cloudinary returned invalid URL: {}", cloudUrl);
-                    throw new RuntimeException("Cloudinary upload returned invalid URL");
-                }
-            } catch (Exception e) {
-                logger.error("Failed to upload video to Cloudinary. Error: {}", e.getMessage(), e);
-                // Log stack trace for debugging
-                e.printStackTrace();
-                // Nếu Cloudinary fail, không fallback về local vì Render có ephemeral filesystem
-                // Thay vào đó, throw exception để user biết
-                throw new RuntimeException("Failed to upload video to Cloudinary. Please check Cloudinary configuration and try again. Error: " + e.getMessage(), e);
-            }
-        } else {
-            logger.info("Cloudinary is not enabled, using local storage for video: {}", fileName);
-        }
-
-        // Fallback to local storage (chỉ khi Cloudinary không enabled)
         try {
             Path targetLocation = this.lessonVideoStorageLocation.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
@@ -296,33 +240,6 @@ public class FileStorageService {
         // Create unique file name: lessonId_timestamp_uuid.extension
         String fileName = lessonId + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + fileExtension;
 
-        // Try Cloudinary first if enabled
-        if (cloudStorageService.isEnabled()) {
-            try {
-                String publicId = "lessons/documents/" + fileName.replace(fileExtension, "");
-                logger.info("Attempting to upload document to Cloudinary: {} (size: {} bytes)", fileName, file.getSize());
-                String cloudUrl = cloudStorageService.uploadDocument(file, "lessons/documents", publicId);
-                logger.info("Document uploaded successfully to Cloudinary: {}", cloudUrl);
-                // Đảm bảo URL là Cloudinary URL, không phải local URL
-                if (cloudUrl != null && cloudUrl.contains("cloudinary.com")) {
-                    return cloudUrl;
-                } else {
-                    logger.error("Cloudinary returned invalid URL: {}", cloudUrl);
-                    throw new RuntimeException("Cloudinary upload returned invalid URL");
-                }
-            } catch (Exception e) {
-                logger.error("Failed to upload document to Cloudinary. Error: {}", e.getMessage(), e);
-                // Log stack trace for debugging
-                e.printStackTrace();
-                // Nếu Cloudinary fail, không fallback về local vì Render có ephemeral filesystem
-                // Thay vào đó, throw exception để user biết
-                throw new RuntimeException("Failed to upload document to Cloudinary. Please check Cloudinary configuration and try again. Error: " + e.getMessage(), e);
-            }
-        } else {
-            logger.info("Cloudinary is not enabled, using local storage for document: {}", fileName);
-        }
-
-        // Fallback to local storage
         try {
             Path targetLocation = this.lessonDocumentStorageLocation.resolve(fileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);

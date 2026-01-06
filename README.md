@@ -13,15 +13,13 @@
 │                  Port: 3000                              │
 └────────────────────┬────────────────────────────────────┘
                      │
-        ┌────────────┴────────────┐
-        │                         │
-        ▼                         ▼
-┌──────────────────┐    ┌──────────────────┐
-│  BACKEND API     │    │  CHATBOT SERVICE │
-│  Spring Boot 3.5 │    │  Python FastAPI  │
-│  Port: 8080      │    │  Gemini AI       │
-│                  │    │  Port: 8000      │
-└────────┬─────────┘    └──────────────────┘
+                     ▼
+┌──────────────────┐
+│  BACKEND API     │
+│  Spring Boot 3.5 │
+│  Port: 8080      │
+│  + Gemini AI     │
+└────────┬─────────┘
          │
          ▼
 ┌──────────────────┐
@@ -50,7 +48,6 @@ npm install
 **Frontend (.env.local):**
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
-NEXT_PUBLIC_CHATBOT_API_URL=http://localhost:8000/api
 ```
 
 **Backend (application.properties):**
@@ -58,11 +55,7 @@ NEXT_PUBLIC_CHATBOT_API_URL=http://localhost:8000/api
 spring.datasource.url=jdbc:mysql://localhost:3306/course_management
 spring.datasource.username=root
 spring.datasource.password=your_password
-```
-
-**Chatbot (my_config.env):**
-```env
-GEMINI_API_KEY=your_gemini_api_key
+gemini.api.key=your_gemini_api_key
 ```
 
 ### **3. Start Services:**
@@ -74,22 +67,17 @@ mvnw spring-boot:run
 # → http://localhost:8080
 ```
 
-**Terminal 2 - Chatbot:**
-```bash
-python src/main.py
-# → http://localhost:8000
-```
-
-**Terminal 3 - Frontend:**
+**Terminal 2 - Frontend:**
 ```bash
 cd frontend
 npm run dev
 # → http://localhost:3000
 ```
 
-**Or use PowerShell script:**
+**Or use PowerShell scripts:**
 ```bash
-.\start_all.ps1
+.\start_backend.ps1    # Start backend
+.\start_frontend.ps1    # Start frontend
 ```
 
 ---
@@ -114,14 +102,9 @@ npm run dev
 ├── backend/                     # Spring Boot Backend
 │   └── src/main/java/com/coursemgmt/
 │       ├── controller/         # REST Controllers
-│       ├── service/            # Business Logic
+│       ├── service/            # Business Logic (including ChatbotService)
 │       ├── model/              # JPA Entities
 │       └── dto/                # Data Transfer Objects
-│
-├── src/                        # Python Chatbot
-│   ├── api/                    # FastAPI Routes
-│   ├── core/                   # Chatbot Engine
-│   └── main.py                 # Entry Point
 │
 └── Documentation/              # Root Docs
     ├── HOW_TO_RUN_COMPLETE_SYSTEM.md
@@ -213,13 +196,7 @@ npm run dev
 - MySQL 8.0
 - JPA/Hibernate
 - Maven
-
-### **Chatbot:**
-- Python 3.8+
-- FastAPI
-- Google Gemini AI
-- Redis (Session storage)
-- SQLite (Knowledge base)
+- Google Gemini AI (integrated in ChatbotService)
 
 ---
 
@@ -300,12 +277,6 @@ npm run lint         # Lint code
 cd backend
 mvnw spring-boot:run    # Development
 mvnw clean package      # Build JAR
-```
-
-### **Chatbot:**
-```bash
-python src/main.py              # Start chatbot
-uvicorn src.main:app --reload   # Development mode
 ```
 
 ---
@@ -413,12 +384,7 @@ npm run dev
 - Check MySQL running
 - Verify database credentials
 - Check port 8080 available
-
-### **Chatbot error:**
-```bash
-pip install -r requirements.txt --upgrade
-# Check Gemini API key
-```
+- Verify Gemini API key in application.properties
 
 ---
 
@@ -463,7 +429,7 @@ docker run -p 8080:8080 elearn-backend
 **Built with:**
 - Next.js 16 + React 19
 - Spring Boot 3.5
-- Google Gemini AI
+- Google Gemini AI (integrated in backend)
 - Modern UI/UX practices
 
 **Quality:**

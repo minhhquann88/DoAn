@@ -163,19 +163,7 @@ public class ChapterController {
                                                @RequestParam("file") MultipartFile file,
                                                @RequestParam(value = "durationInSeconds", required = false) Integer durationInSeconds) {
         try {
-            System.out.println("========================================");
-            System.out.println("Upload Video Request");
-            System.out.println("Course ID: " + courseId);
-            System.out.println("Chapter ID: " + chapterId);
-            System.out.println("Lesson ID: " + lessonId);
-            System.out.println("File name: " + file.getOriginalFilename());
-            System.out.println("File size: " + file.getSize() + " bytes");
-            System.out.println("Content type: " + file.getContentType());
-            System.out.println("Duration in seconds: " + durationInSeconds);
-            System.out.println("========================================");
-            
             String videoUrl = fileStorageService.storeLessonVideo(file, lessonId);
-            System.out.println("Video stored at: " + videoUrl);
             
             // Update lesson with video URL
             Lesson lesson = contentService.getLessonById(lessonId);
@@ -201,16 +189,8 @@ public class ChapterController {
             response.put("message", "Video uploaded successfully");
             response.put("videoUrl", videoUrl);
             response.put("lesson", LessonResponse.fromEntity(updatedLesson, false));
-            System.out.println("Video upload completed successfully");
-            System.out.println("========================================");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.err.println("========================================");
-            System.err.println("ERROR uploading video:");
-            System.err.println("Message: " + e.getMessage());
-            System.err.println("Cause: " + (e.getCause() != null ? e.getCause().getMessage() : "None"));
-            e.printStackTrace();
-            System.err.println("========================================");
             return ResponseEntity.badRequest().body(new MessageResponse("Error uploading video: " + e.getMessage()));
         }
     }
@@ -256,18 +236,7 @@ public class ChapterController {
                                                   @PathVariable Long lessonId,
                                                   @RequestParam("file") MultipartFile file) {
         try {
-            System.out.println("========================================");
-            System.out.println("Upload Document Request");
-            System.out.println("Course ID: " + courseId);
-            System.out.println("Chapter ID: " + chapterId);
-            System.out.println("Lesson ID: " + lessonId);
-            System.out.println("File name: " + file.getOriginalFilename());
-            System.out.println("File size: " + file.getSize() + " bytes");
-            System.out.println("Content type: " + file.getContentType());
-            System.out.println("========================================");
-            
             String documentUrl = fileStorageService.storeLessonDocument(file, lessonId);
-            System.out.println("Document stored at: " + documentUrl);
             
             // Update lesson with document URL
             Lesson lesson = contentService.getLessonById(lessonId);
@@ -286,16 +255,8 @@ public class ChapterController {
             response.put("message", "Document uploaded successfully");
             response.put("documentUrl", documentUrl);
             response.put("lesson", LessonResponse.fromEntity(updatedLesson, false));
-            System.out.println("Document upload completed successfully");
-            System.out.println("========================================");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.err.println("========================================");
-            System.err.println("ERROR uploading document:");
-            System.err.println("Message: " + e.getMessage());
-            System.err.println("Cause: " + (e.getCause() != null ? e.getCause().getMessage() : "None"));
-            e.printStackTrace();
-            System.err.println("========================================");
             return ResponseEntity.badRequest().body(new MessageResponse("Error uploading document: " + e.getMessage()));
         }
     }

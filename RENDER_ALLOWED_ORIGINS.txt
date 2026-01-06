@@ -1,2 +1,0 @@
-ALLOWED_ORIGINS=https://e-learning-puce-two.vercel.app,https://e-learning-3yk718cx4-s1cko271s-projects.vercel.app,http://localhost:3000
-
