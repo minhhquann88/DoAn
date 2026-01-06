@@ -6,10 +6,13 @@ import com.coursemgmt.dto.CourseStatisticsResponse;
 import com.coursemgmt.dto.CourseAnalyticsResponse;
 import com.coursemgmt.dto.MessageResponse;
 import com.coursemgmt.dto.MeetingResponse;
+import com.coursemgmt.dto.ChapterResponse;
+import com.coursemgmt.dto.LessonResponse;
 import com.coursemgmt.model.Course;
 import com.coursemgmt.repository.CourseRepository;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.CourseService;
+import com.coursemgmt.service.ContentService;
 import com.coursemgmt.service.FileStorageService;
 import com.coursemgmt.service.MeetingService;
 import jakarta.validation.Valid;
@@ -79,6 +82,16 @@ public class CourseController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request,
                                                        @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        // Debug logging
+        if (userDetails != null) {
+            System.out.println("=== CREATE COURSE DEBUG ===");
+            System.out.println("User ID: " + userDetails.getId());
+            System.out.println("Username: " + userDetails.getUsername());
+            System.out.println("Authorities: " + userDetails.getAuthorities());
+            System.out.println("==========================");
+        } else {
+            System.out.println("ERROR: userDetails is null!");
+        }
         Course course = courseService.createCourse(request, userDetails);
         return ResponseEntity.ok(CourseResponse.fromEntity(course));
     }
@@ -175,11 +188,25 @@ public class CourseController {
         return ResponseEntity.ok(CourseResponse.fromEntity(approvedCourse));
     }
 
+    @Autowired
+    private ContentService contentService;
+
     // 5. Lấy chi tiết 1 khóa học (Public)
     @GetMapping("/{id}")
     public ResponseEntity<CourseResponse> getCourseById(@PathVariable Long id) {
         CourseResponse course = courseService.getCourseById(id);
         return ResponseEntity.ok(course);
+    }
+
+    // 5.1. Lấy curriculum công khai (chỉ tên chapters và lessons, không có nội dung chi tiết)
+    @GetMapping("/{id}/curriculum")
+    public ResponseEntity<List<ChapterResponse>> getPublicCurriculum(@PathVariable Long id) {
+        // Lấy preview lesson ID nếu có
+        LessonResponse previewLesson = contentService.getPreviewLesson(id);
+        Long previewLessonId = (previewLesson != null) ? previewLesson.getId() : null;
+        
+        List<ChapterResponse> curriculum = contentService.getPublicCurriculum(id, previewLessonId);
+        return ResponseEntity.ok(curriculum);
     }
 
 

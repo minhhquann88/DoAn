@@ -116,6 +116,21 @@ export const getPreviewLesson = async (courseId: number): Promise<LessonResponse
 };
 
 /**
+ * Get public curriculum (chapters and lessons list without content details)
+ * Public API - no authentication required
+ * Used for course detail page to show curriculum structure
+ */
+export const getPublicCurriculum = async (courseId: number): Promise<ChapterResponse[]> => {
+  try {
+    const response = await apiClient.get<ChapterResponse[]>(`/v1/courses/${courseId}/curriculum`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching public curriculum:', error);
+    return [];
+  }
+};
+
+/**
  * Mark lesson as completed (Student only)
  */
 export const markLessonAsCompleted = async (lessonId: number): Promise<{ message: string }> => {
@@ -233,20 +248,83 @@ export const uploadLessonVideo = async (
  */
 export const extractVideoDuration = (file: File): Promise<number> => {
   return new Promise((resolve, reject) => {
+    // Validate file first
+    if (!file || file.size === 0) {
+      reject(new Error('File is empty or invalid'));
+      return;
+    }
+
+    // Check if file is a video
+    if (!file.type.startsWith('video/')) {
+      reject(new Error('File is not a video'));
+      return;
+    }
+
     const video = document.createElement('video');
     video.preload = 'metadata';
+    video.muted = true; // Mute to allow autoplay in some browsers
+    video.playsInline = true; // For iOS compatibility
+    
+    let objectUrl: string | null = null;
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    const cleanup = () => {
+      if (objectUrl) {
+        window.URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      video.remove(); // Clean up video element
+    };
+    
+    // Set timeout (30 seconds)
+    timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timeout: Video metadata loading took too long'));
+    }, 30000);
     
     video.onloadedmetadata = () => {
-      window.URL.revokeObjectURL(video.src);
-      resolve(Math.floor(video.duration));
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      const duration = Math.floor(video.duration);
+      if (isNaN(duration) || duration <= 0) {
+        cleanup();
+        reject(new Error('Invalid video duration'));
+        return;
+      }
+      
+      cleanup();
+      resolve(duration);
     };
     
-    video.onerror = () => {
-      window.URL.revokeObjectURL(video.src);
-      reject(new Error('Failed to load video metadata'));
+    video.onerror = (e) => {
+      cleanup();
+      const error = (e as any).target?.error;
+      const errorMessage = error 
+        ? `Failed to load video metadata: ${error.message || 'Unknown error'}`
+        : 'Failed to load video metadata';
+      reject(new Error(errorMessage));
     };
     
-    video.src = URL.createObjectURL(file);
+    // Additional error handlers
+    video.onabort = () => {
+      cleanup();
+      reject(new Error('Video loading was aborted'));
+    };
+    
+    try {
+      objectUrl = URL.createObjectURL(file);
+      video.src = objectUrl;
+      
+      // Try to load metadata
+      video.load();
+    } catch (error: any) {
+      cleanup();
+      reject(new Error(`Failed to create object URL: ${error.message || 'Unknown error'}`));
+    }
   });
 };
 

@@ -493,6 +493,20 @@ function PreviewLessonDialog({
             style={{ maxHeight: '70vh' }}
           />
         );
+      case 'YOUTUBE':
+        if (!lesson.videoUrl) return <p className="text-muted-foreground">Chưa có link YouTube</p>;
+        const embedUrl = getYouTubeEmbedUrl(lesson.videoUrl);
+        if (!embedUrl) return <p className="text-muted-foreground">Link YouTube không hợp lệ</p>;
+        return (
+          <div className="aspect-video w-full">
+            <iframe
+              src={embedUrl}
+              className="w-full h-full rounded-lg"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        );
       case 'TEXT':
         return (
           <div className="p-8 prose max-w-none">
@@ -686,6 +700,8 @@ function LessonItem({
     switch (lesson.contentType) {
       case 'VIDEO':
         return <Video className="h-4 w-4" />;
+      case 'YOUTUBE':
+        return <Video className="h-4 w-4" />; // Dùng icon Video cho YouTube
       case 'TEXT':
         return <FileText className="h-4 w-4" />;
       case 'DOCUMENT':
@@ -701,6 +717,8 @@ function LessonItem({
     switch (lesson.contentType) {
       case 'VIDEO':
         return 'Video';
+      case 'YOUTUBE':
+        return 'YouTube';
       case 'TEXT':
         return 'Bài đọc';
       case 'DOCUMENT':
@@ -725,7 +743,8 @@ function LessonItem({
             <Badge variant="outline" className="text-xs">
               {getContentTypeLabel()}
             </Badge>
-            {lesson.durationInMinutes && (
+            {/* Chỉ hiển thị thời lượng nếu không phải YOUTUBE và có duration > 0 */}
+            {lesson.contentType !== 'YOUTUBE' && lesson.durationInMinutes && lesson.durationInMinutes > 0 && (
               <span className="text-xs text-muted-foreground">
                 {lesson.durationInMinutes} phút
               </span>

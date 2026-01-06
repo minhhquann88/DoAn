@@ -241,6 +241,53 @@ public class ContentService {
         return LessonResponse.fromEntity(firstLesson, false);
     }
 
+    /**
+     * Lấy curriculum công khai (chỉ tên chapters và lessons, không có nội dung chi tiết)
+     * Dùng cho trang chi tiết khóa học để hiển thị danh sách nội dung
+     * @param courseId ID của khóa học
+     * @param previewLessonId ID của lesson preview (nếu có)
+     * @return Danh sách ChapterResponse với lessons (không có nội dung chi tiết)
+     */
+    public List<ChapterResponse> getPublicCurriculum(Long courseId, Long previewLessonId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
+        
+        // Lấy chapters với lessons (sắp xếp theo position)
+        List<Chapter> chapters = chapterRepository.findByCourseIdWithLessons(courseId);
+        
+        return chapters.stream()
+                .sorted((c1, c2) -> {
+                    int pos1 = c1.getPosition() != null ? c1.getPosition() : Integer.MAX_VALUE;
+                    int pos2 = c2.getPosition() != null ? c2.getPosition() : Integer.MAX_VALUE;
+                    return Integer.compare(pos1, pos2);
+                })
+                .map(chapter -> {
+                    List<LessonResponse> lessonResponses = chapter.getLessons().stream()
+                            .sorted((l1, l2) -> {
+                                int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
+                                int pos2 = l2.getPosition() != null ? l2.getPosition() : Integer.MAX_VALUE;
+                                return Integer.compare(pos1, pos2);
+                            })
+                            .map(lesson -> {
+                                // Tạo LessonResponse nhưng không có nội dung chi tiết
+                                LessonResponse lessonResponse = new LessonResponse();
+                                lessonResponse.setId(lesson.getId());
+                                lessonResponse.setTitle(lesson.getTitle());
+                                lessonResponse.setContentType(lesson.getContentType());
+                                lessonResponse.setPosition(lesson.getPosition());
+                                lessonResponse.setDurationInMinutes(lesson.getDurationInMinutes());
+                                // Đánh dấu lesson nào là preview
+                                lessonResponse.setIsPreview(previewLessonId != null && lesson.getId().equals(previewLessonId));
+                                // Không set videoUrl, documentUrl, slideUrl, content để bảo mật
+                                return lessonResponse;
+                            })
+                            .collect(Collectors.toList());
+                    
+                    return ChapterResponse.fromEntity(chapter, lessonResponses);
+                })
+                .collect(Collectors.toList());
+    }
+
     // Reorder chapters
     @Transactional
     public void reorderChapters(Long courseId, Map<Long, Integer> chapterPositions) {

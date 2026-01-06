@@ -66,9 +66,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ResponseEntity<MessageResponse> handleAccessDeniedException(AccessDeniedException ex) {
+        String message = ex.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            message = "Bạn không có quyền truy cập tài nguyên này. Vui lòng kiểm tra lại vai trò của bạn.";
+        }
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(new MessageResponse("Access denied: You don't have permission to access this resource"));
+                .body(new MessageResponse(message));
     }
 
     // Handle Validation Errors (400)

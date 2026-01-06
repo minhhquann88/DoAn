@@ -46,6 +46,16 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                
+                // Debug logging for role checking
+                if (request.getRequestURI().contains("/courses") && request.getMethod().equals("POST")) {
+                    logger.info("=== JWT AUTH DEBUG ===");
+                    logger.info("Request URI: {}", request.getRequestURI());
+                    logger.info("Username: {}", username);
+                    logger.info("Authorities: {}", userDetails.getAuthorities());
+                    logger.info("======================");
+                }
+                
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
@@ -54,6 +64,8 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else if (jwt == null && request.getRequestURI().contains("/courses") && request.getMethod().equals("POST")) {
+                logger.warn("JWT token is null for POST /courses request");
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e);

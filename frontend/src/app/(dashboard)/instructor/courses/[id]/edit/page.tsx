@@ -27,7 +27,7 @@ const courseSchema = z.object({
   price: z.number().min(0, 'Giá tiền phải lớn hơn hoặc bằng 0'),
   imageUrl: z.string().url('URL ảnh không hợp lệ').optional().or(z.literal('')),
   totalDurationInHours: z.number().int().min(0, 'Thời lượng phải lớn hơn hoặc bằng 0').optional(),
-  categoryId: z.number().min(1, 'Vui lòng chọn danh mục'),
+  categoryId: z.number({ required_error: 'Vui lòng chọn danh mục' }).min(1, 'Vui lòng chọn danh mục'),
 });
 
 type CourseFormData = z.infer<typeof courseSchema>;
@@ -57,6 +57,15 @@ export default function EditCoursePage() {
     reset,
   } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
+    mode: 'onChange',
+    defaultValues: {
+      title: '',
+      description: '',
+      price: 0,
+      imageUrl: '',
+      totalDurationInHours: 0,
+      categoryId: 0,
+    },
   });
 
   const imageUrl = watch('imageUrl');
@@ -114,19 +123,24 @@ export default function EditCoursePage() {
     fetchCategories();
   }, [addToast]);
 
-  // Reset form when course data is loaded
+  // Reset form when course data and categories are loaded
   React.useEffect(() => {
-    if (course) {
-      reset({
-        title: course.title,
-        description: course.description,
-        price: course.price,
-        imageUrl: course.imageUrl || '',
-        totalDurationInHours: course.totalDurationInHours || 0,
-        categoryId: course.categoryId || course.category?.id,
-      });
+    if (course && !isLoadingCategories && categories.length > 0) {
+      const categoryId = course.categoryId || course.category?.id;
+      if (categoryId) {
+        reset({
+          title: course.title || '',
+          description: course.description || '',
+          price: course.price || 0,
+          imageUrl: course.imageUrl || '',
+          totalDurationInHours: course.totalDurationInHours || 0,
+          categoryId: categoryId,
+        }, {
+          keepDefaultValues: false,
+        });
+      }
     }
-  }, [course, reset]);
+  }, [course, categories, isLoadingCategories, reset]);
 
   const handleImageUpload = async (file: File): Promise<string> => {
     // Upload image directly since course already exists
