@@ -180,14 +180,6 @@ public class CourseController {
         return ResponseEntity.ok(new MessageResponse("Course deleted successfully!"));
     }
 
-    // 4. Duyệt khóa học (Admin)
-    @PatchMapping("/{id}/approve") // Dùng PATCH vì chỉ cập nhật 1 phần (status)
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<CourseResponse> approveCourse(@PathVariable Long id) {
-        Course approvedCourse = courseService.approveCourse(id);
-        return ResponseEntity.ok(CourseResponse.fromEntity(approvedCourse));
-    }
-
     @Autowired
     private ContentService contentService;
 
@@ -254,16 +246,7 @@ public class CourseController {
         return ResponseEntity.ok(analytics);
     }
 
-    // 8. Giảng viên gửi yêu cầu phê duyệt khóa học
-    @PostMapping("/{id}/request-approval")
-    @PreAuthorize("hasRole('LECTURER') and @courseSecurityService.isInstructor(authentication, #id)")
-    public ResponseEntity<CourseResponse> requestCourseApproval(@PathVariable Long id,
-                                                                @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        Course approvedCourse = courseService.requestApproval(id, userDetails);
-        return ResponseEntity.ok(CourseResponse.fromEntity(approvedCourse));
-    }
-
-    // 9. Giảng viên tự publish khóa học (Marketplace Model - Self-Publish)
+    // 8. Giảng viên tự publish khóa học (Marketplace Model - Self-Publish)
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<CourseResponse> publishCourse(@PathVariable Long id,

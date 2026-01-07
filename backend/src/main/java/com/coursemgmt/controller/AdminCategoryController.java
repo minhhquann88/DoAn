@@ -23,7 +23,7 @@ public class AdminCategoryController {
 
     /**
      * GET /api/v1/admin/categories
-     * Lấy tất cả danh mục
+     * Lấy tất cả danh mục (Admin only)
      */
     @GetMapping
     public ResponseEntity<List<Category>> getAllCategories() {
@@ -33,7 +33,7 @@ public class AdminCategoryController {
 
     /**
      * GET /api/v1/admin/categories/{id}
-     * Lấy danh mục theo ID
+     * Lấy danh mục theo ID (Admin only)
      */
     @GetMapping("/{id}")
     public ResponseEntity<Category> getCategoryById(@PathVariable Long id) {
@@ -44,7 +44,7 @@ public class AdminCategoryController {
 
     /**
      * POST /api/v1/admin/categories
-     * Tạo danh mục mới
+     * Tạo danh mục mới (Admin only)
      */
     @PostMapping
     public ResponseEntity<?> createCategory(@Valid @RequestBody Map<String, String> request) {
@@ -74,7 +74,7 @@ public class AdminCategoryController {
 
     /**
      * PUT /api/v1/admin/categories/{id}
-     * Cập nhật danh mục
+     * Cập nhật danh mục (Admin only)
      */
     @PutMapping("/{id}")
     public ResponseEntity<?> updateCategory(
@@ -108,7 +108,7 @@ public class AdminCategoryController {
 
     /**
      * DELETE /api/v1/admin/categories/{id}
-     * Xóa danh mục
+     * Xóa danh mục (Admin only)
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCategory(@PathVariable Long id) {

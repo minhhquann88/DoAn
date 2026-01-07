@@ -225,25 +225,6 @@ public class CourseService {
         return courseRepository.save(course);
     }
 
-    // Chức năng: Gửi yêu cầu phê duyệt (Giảng viên)
-    @Transactional
-    public Course requestApproval(Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found!"));
-
-        // Chỉ cho phép gửi yêu cầu nếu khóa học đang ở trạng thái DRAFT hoặc đã bị từ chối
-        // Nếu đã PUBLISHED thì không cần gửi lại
-        if (course.getStatus() == ECourseStatus.PUBLISHED) {
-            throw new RuntimeException("Khóa học đã được phê duyệt rồi!");
-        }
-
-        // Đặt trạng thái về PENDING_APPROVAL để chờ Admin duyệt
-        course.setStatus(ECourseStatus.PENDING_APPROVAL);
-        course.setUpdatedAt(LocalDateTime.now());
-
-        return courseRepository.save(course);
-    }
-
     // Chức năng 3: Xóa khóa học
     @Transactional
     public void deleteCourse(Long courseId) {
@@ -294,18 +275,7 @@ public class CourseService {
         return courseRepository.save(course);
     }
 
-    // Chức năng 4: Admin duyệt khóa học
-    @Transactional
-    public Course approveCourse(Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found!"));
-
-        course.setStatus(ECourseStatus.PUBLISHED);
-        course.setUpdatedAt(LocalDateTime.now());
-        return courseRepository.save(course);
-    }
-
-    // Chức năng 5: Lấy 1 khóa học
+    // Chức năng 4: Lấy 1 khóa học
     public CourseResponse getCourseById(Long courseId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
@@ -635,28 +605,7 @@ public class CourseService {
         return courseRepository.save(course);
     }
 
-    // Chức năng 8: Giảng viên gửi yêu cầu phê duyệt khóa học
-    @Transactional
-    public Course requestApproval(Long courseId, UserDetailsImpl userDetails) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found!"));
-
-        // Kiểm tra xem người gửi yêu cầu có phải là giảng viên của khóa học không
-        if (!course.getInstructor().getId().equals(userDetails.getId())) {
-            throw new RuntimeException("You are not authorized to request approval for this course.");
-        }
-
-        // Không cho phép gửi yêu cầu nếu khóa học đã PUBLISHED
-        if (ECourseStatus.PUBLISHED.equals(course.getStatus())) {
-            throw new RuntimeException("Course is already published and cannot be sent for re-approval.");
-        }
-
-        course.setStatus(ECourseStatus.PENDING_APPROVAL);
-        course.setUpdatedAt(LocalDateTime.now());
-        return courseRepository.save(course);
-    }
-
-    // Chức năng 9: Giảng viên tự publish khóa học (Marketplace Model - Self-Publish)
+    // Chức năng 8: Giảng viên tự publish khóa học (Marketplace Model - Self-Publish)
     @Transactional
     public Course publishCourse(Long courseId, UserDetailsImpl userDetails) {
         System.out.println("========================================");

@@ -70,14 +70,6 @@ export const deleteCourse = async (id: string | number): Promise<void> => {
 };
 
 /**
- * Approve a course (Admin only)
- */
-export const approveCourse = async (id: string | number): Promise<Course> => {
-  const response = await apiClient.patch<Course>(`/v1/courses/${id}/approve`);
-  return response.data;
-};
-
-/**
  * Get course statistics
  */
 export const getCourseStatistics = async (id: string | number): Promise<any> => {

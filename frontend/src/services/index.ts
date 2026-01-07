@@ -13,7 +13,6 @@ export {
   createCourse,
   updateCourse,
   deleteCourse,
-  approveCourse,
   uploadCourseImage,
   getFeaturedCourses,
   publishCourse,
