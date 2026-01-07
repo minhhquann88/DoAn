@@ -32,15 +32,13 @@ public class ChatbotService {
     @Value("${gemini.api.model:gemini-2.0-flash-exp}")
     private String geminiModel;
     
+    /**
+     * Xử lý tin nhắn từ người dùng và trả về phản hồi từ AI
+     */
     public ChatResponse processMessage(ChatRequest request, Long userId) {
         try {
-            // Build context from course if courseId is provided
             String context = buildContext(request.getCourseId());
-            
-            // Build prompt with context
             String prompt = buildPrompt(request.getMessage(), context);
-            
-            // Call Gemini API
             String response = callGeminiAPI(prompt);
             
             ChatResponse chatResponse = new ChatResponse();
@@ -57,6 +55,9 @@ public class ChatbotService {
         }
     }
     
+    /**
+     * Xây dựng context từ thông tin khóa học hoặc context mặc định
+     */
     private String buildContext(Long courseId) {
         if (courseId == null) {
             return "Bạn là trợ lý ảo của nền tảng E-learning. Bạn có thể giúp người dùng tìm hiểu về các khóa học, đăng ký khóa học, chính sách hoàn tiền, và các câu hỏi khác liên quan đến nền tảng.";
@@ -77,6 +78,9 @@ public class ChatbotService {
         return "Khóa học không tồn tại.";
     }
     
+    /**
+     * Tạo prompt hoàn chỉnh từ context và tin nhắn người dùng
+     */
     private String buildPrompt(String userMessage, String context) {
         return String.format(
             "%s\n\nNgười dùng hỏi: %s\n\nHãy trả lời một cách thân thiện và hữu ích bằng tiếng Việt.",
@@ -85,6 +89,9 @@ public class ChatbotService {
         );
     }
     
+    /**
+     * Gọi Google Gemini API để lấy phản hồi từ AI
+     */
     private String callGeminiAPI(String prompt) {
         if (geminiApiKey == null || geminiApiKey.isEmpty()) {
             log.warn("Gemini API key not configured");
@@ -113,7 +120,6 @@ public class ChatbotService {
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> body = (Map<String, Object>) response.getBody();
-                // Parse Gemini API response
                 return parseGeminiResponse(body);
             } else {
                 log.error("Gemini API returned error: {}", response.getStatusCode());
@@ -125,6 +131,9 @@ public class ChatbotService {
         }
     }
     
+    /**
+     * Parse phản hồi từ Gemini API để lấy text
+     */
     @SuppressWarnings("unchecked")
     private String parseGeminiResponse(Map<String, Object> response) {
         try {

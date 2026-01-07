@@ -22,6 +22,10 @@ public class LessonResponse {
     @JsonProperty("isCompleted")
     private boolean isCompleted;
 
+    // Trạng thái khóa bài học (chỉ được mở khi đã học bài trước)
+    @JsonProperty("isLocked")
+    private boolean isLocked = false;
+
     public static LessonResponse fromEntity(Lesson lesson, boolean isCompleted) {
         LessonResponse dto = new LessonResponse();
         dto.setId(lesson.getId());
@@ -31,6 +35,7 @@ public class LessonResponse {
         dto.setPosition(lesson.getPosition());
         dto.setIsPreview(lesson.getIsPreview() != null ? lesson.getIsPreview() : false);
         dto.setCompleted(isCompleted);
+        // isLocked sẽ được set từ bên ngoài
 
         // Trả về nội dung chi tiết cho học viên đã đăng ký (không cần đợi hoàn thành)
         // Học viên cần xem video để học, không phải chỉ khi đã hoàn thành
@@ -39,6 +44,12 @@ public class LessonResponse {
         dto.setSlideUrl(lesson.getSlideUrl());
         dto.setContent(lesson.getContent());
 
+        return dto;
+    }
+
+    public static LessonResponse fromEntity(Lesson lesson, boolean isCompleted, boolean isLocked) {
+        LessonResponse dto = fromEntity(lesson, isCompleted);
+        dto.isLocked = isLocked;
         return dto;
     }
 }

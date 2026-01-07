@@ -1,16 +1,4 @@
-/**
- * Content Management Service
- * API Base: 
- * - Access: /api/content
- * - Management: /api/manage/content
- * 
- * Backend uses Chapter/Lesson hierarchical model
- */
 import apiClient from '@/lib/api';
-
-// =====================
-// TYPES - Matching Backend Models
-// =====================
 
 export interface Lesson {
   id: number;
@@ -19,7 +7,7 @@ export interface Lesson {
   description?: string;
   contentType: 'VIDEO' | 'TEXT' | 'DOCUMENT' | 'QUIZ';
   contentUrl?: string;
-  duration?: number; // in minutes
+  duration?: number;
   orderIndex: number;
   isFree: boolean;
   createdAt?: string;
@@ -54,8 +42,9 @@ export interface LessonResponse {
   content?: string;
   durationInMinutes?: number;
   position: number;
-  isPreview?: boolean; // Cho phép giảng viên preview bài học trước khi publish
+  isPreview?: boolean;
   isCompleted?: boolean;
+  isLocked?: boolean; // Trạng thái khóa bài học (chỉ được mở khi đã học bài trước)
 }
 
 export interface ChapterRequest {
@@ -70,9 +59,9 @@ export interface LessonRequest {
   documentUrl?: string;
   slideUrl?: string;
   content?: string; // For TEXT content type
-  durationInMinutes?: number; // Optional vì YouTube không cần duration
+  durationInMinutes?: number;
   position: number;
-  isPreview?: boolean; // Cho phép giảng viên preview bài học trước khi publish
+  isPreview?: boolean;
 }
 
 export interface UserProgress {
@@ -81,32 +70,22 @@ export interface UserProgress {
   completedAt?: string;
 }
 
-// =====================
-// CONTENT ACCESS API (/api/content)
-// For Students and Instructors to view content
-// =====================
-
 /**
- * Get full course content (chapters and lessons)
- * Requires authentication - user must be enrolled or instructor
+ * Lấy toàn bộ nội dung khóa học (chapters và lessons)
  */
 export const getCourseContent = async (courseId: number): Promise<ChapterResponse[]> => {
-  // Use /api/content endpoint for students (allows enrolled users or instructors)
   const response = await apiClient.get<ChapterResponse[]>(`/content/courses/${courseId}`);
   return response.data;
 };
 
 /**
- * Get preview lesson (first lesson) of a paid course
- * Public API - no authentication required
- * Returns null if course is free or has no preview lesson
+ * Lấy bài học preview của khóa học có phí
  */
 export const getPreviewLesson = async (courseId: number): Promise<LessonResponse | null> => {
   try {
     const response = await apiClient.get<LessonResponse>(`/content/courses/${courseId}/preview`);
     return response.data;
   } catch (error: any) {
-    // Return null if not found (404) or any error
     if (error.response?.status === 404) {
       return null;
     }
@@ -116,9 +95,7 @@ export const getPreviewLesson = async (courseId: number): Promise<LessonResponse
 };
 
 /**
- * Get public curriculum (chapters and lessons list without content details)
- * Public API - no authentication required
- * Used for course detail page to show curriculum structure
+ * Lấy cấu trúc chương trình học công khai (không có chi tiết nội dung)
  */
 export const getPublicCurriculum = async (courseId: number): Promise<ChapterResponse[]> => {
   try {
@@ -131,7 +108,7 @@ export const getPublicCurriculum = async (courseId: number): Promise<ChapterResp
 };
 
 /**
- * Mark lesson as completed (Student only)
+ * Đánh dấu lesson đã hoàn thành
  */
 export const markLessonAsCompleted = async (lessonId: number): Promise<{ message: string }> => {
   const response = await apiClient.post(`/content/lessons/${lessonId}/complete`);
@@ -139,12 +116,12 @@ export const markLessonAsCompleted = async (lessonId: number): Promise<{ message
 };
 
 /**
- * Update lesson watch time/progress (for video lessons)
+ * Cập nhật tiến độ xem video của lesson
  */
 export const updateLessonProgress = async (
   lessonId: number,
-  watchedTime: number, // seconds
-  totalDuration: number // seconds
+  watchedTime: number,
+  totalDuration: number
 ): Promise<{ message: string }> => {
   const response = await apiClient.post(`/content/lessons/${lessonId}/progress`, {
     watchedTime: Math.round(watchedTime),
@@ -153,15 +130,8 @@ export const updateLessonProgress = async (
   return response.data;
 };
 
-// =====================
-// CONTENT MANAGEMENT API (/api/manage/content)
-// For Instructors and Admins to manage content
-// =====================
-
-// --- CHAPTER MANAGEMENT ---
-
 /**
- * Create a new chapter in a course
+ * Tạo chapter mới trong khóa học
  */
 export const createChapter = async (courseId: number, data: ChapterRequest): Promise<ChapterResponse> => {
   const response = await apiClient.post<{ chapter: ChapterResponse }>(`/v1/courses/${courseId}/chapters`, data);
@@ -169,7 +139,7 @@ export const createChapter = async (courseId: number, data: ChapterRequest): Pro
 };
 
 /**
- * Update a chapter
+ * Cập nhật chapter
  */
 export const updateChapter = async (courseId: number, chapterId: number, data: ChapterRequest): Promise<ChapterResponse> => {
   const response = await apiClient.put<{ chapter: ChapterResponse }>(`/v1/courses/${courseId}/chapters/${chapterId}`, data);
@@ -177,17 +147,15 @@ export const updateChapter = async (courseId: number, chapterId: number, data: C
 };
 
 /**
- * Delete a chapter
+ * Xóa chapter
  */
 export const deleteChapter = async (courseId: number, chapterId: number): Promise<{ message: string }> => {
   const response = await apiClient.delete(`/v1/courses/${courseId}/chapters/${chapterId}`);
   return response.data;
 };
 
-// --- LESSON MANAGEMENT ---
-
 /**
- * Create a new lesson in a chapter
+ * Tạo lesson mới trong chapter
  */
 export const createLesson = async (courseId: number, chapterId: number, data: LessonRequest): Promise<LessonResponse> => {
   const response = await apiClient.post<{ lesson: LessonResponse }>(`/v1/courses/${courseId}/chapters/${chapterId}/lessons`, data);
@@ -195,7 +163,7 @@ export const createLesson = async (courseId: number, chapterId: number, data: Le
 };
 
 /**
- * Update a lesson
+ * Cập nhật lesson
  */
 export const updateLesson = async (courseId: number, chapterId: number, lessonId: number, data: LessonRequest): Promise<LessonResponse> => {
   const response = await apiClient.put<{ lesson: LessonResponse }>(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`, data);
@@ -203,7 +171,7 @@ export const updateLesson = async (courseId: number, chapterId: number, lessonId
 };
 
 /**
- * Delete a lesson
+ * Xóa lesson
  */
 export const deleteLesson = async (courseId: number, chapterId: number, lessonId: number): Promise<{ message: string }> => {
   const response = await apiClient.delete(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`);
@@ -211,7 +179,7 @@ export const deleteLesson = async (courseId: number, chapterId: number, lessonId
 };
 
 /**
- * Preview a lesson (for instructors only)
+ * Preview lesson cho giảng viên
  */
 export const previewLesson = async (courseId: number, chapterId: number, lessonId: number): Promise<LessonResponse> => {
   const response = await apiClient.get<LessonResponse>(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/preview`);
@@ -219,9 +187,7 @@ export const previewLesson = async (courseId: number, chapterId: number, lessonI
 };
 
 /**
- * Upload video file for a lesson
- * Note: Longer timeout for large video files
- * @param durationInSeconds Optional duration in seconds (will be extracted from video if not provided)
+ * Upload video file cho lesson
  */
 export const uploadLessonVideo = async (
   courseId: number, 
@@ -238,23 +204,20 @@ export const uploadLessonVideo = async (
   const response = await apiClient.post<{ videoUrl: string }>(
     `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-video`, 
     formData,
-    { timeout: 600000 } // 10 minutes timeout for large videos
+    { timeout: 600000 }
   );
   return response.data.videoUrl;
 };
 
 /**
- * Extract duration from video file
+ * Trích xuất thời lượng từ file video
  */
 export const extractVideoDuration = (file: File): Promise<number> => {
   return new Promise((resolve, reject) => {
-    // Validate file first
     if (!file || file.size === 0) {
       reject(new Error('File is empty or invalid'));
       return;
     }
-
-    // Check if file is a video
     if (!file.type.startsWith('video/')) {
       reject(new Error('File is not a video'));
       return;
@@ -262,8 +225,8 @@ export const extractVideoDuration = (file: File): Promise<number> => {
 
     const video = document.createElement('video');
     video.preload = 'metadata';
-    video.muted = true; // Mute to allow autoplay in some browsers
-    video.playsInline = true; // For iOS compatibility
+    video.muted = true;
+    video.playsInline = true;
     
     let objectUrl: string | null = null;
     let timeoutId: NodeJS.Timeout | null = null;
@@ -277,10 +240,9 @@ export const extractVideoDuration = (file: File): Promise<number> => {
         clearTimeout(timeoutId);
         timeoutId = null;
       }
-      video.remove(); // Clean up video element
+      video.remove();
     };
     
-    // Set timeout (30 seconds)
     timeoutId = setTimeout(() => {
       cleanup();
       reject(new Error('Timeout: Video metadata loading took too long'));
@@ -309,7 +271,6 @@ export const extractVideoDuration = (file: File): Promise<number> => {
       reject(new Error(errorMessage));
     };
     
-    // Additional error handlers
     video.onabort = () => {
       cleanup();
       reject(new Error('Video loading was aborted'));
@@ -318,8 +279,6 @@ export const extractVideoDuration = (file: File): Promise<number> => {
     try {
       objectUrl = URL.createObjectURL(file);
       video.src = objectUrl;
-      
-      // Try to load metadata
       video.load();
     } catch (error: any) {
       cleanup();
@@ -341,18 +300,10 @@ export const roundDurationToMinutes = (durationInSeconds: number): number => {
 };
 
 /**
- * Extract duration from YouTube URL using backend API
- * Backend will use YouTube Data API v3 if API key is available
- */
-/**
- * Extract duration từ YouTube URL (gọi backend API)
- * @param courseId ID của course (cần cho endpoint)
- * @param youtubeUrl URL của YouTube video
- * @returns Số phút (đã làm tròn), hoặc null nếu không thể extract
+ * Trích xuất thời lượng từ YouTube URL
  */
 export const extractYouTubeDuration = async (courseId: number, youtubeUrl: string): Promise<number | null> => {
   try {
-    // baseURL đã có /api rồi, nên không cần thêm /api ở đây
     const response = await apiClient.get(`/v1/courses/${courseId}/chapters/extract-youtube-duration`, {
       params: { url: youtubeUrl }
     });
@@ -364,7 +315,7 @@ export const extractYouTubeDuration = async (courseId: number, youtubeUrl: strin
 };
 
 /**
- * Upload document file for a lesson
+ * Upload document file cho lesson
  */
 export const uploadLessonDocument = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {
   const formData = new FormData();
@@ -372,14 +323,13 @@ export const uploadLessonDocument = async (courseId: number, chapterId: number, 
   const response = await apiClient.post<{ documentUrl: string }>(
     `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-document`, 
     formData,
-    { timeout: 120000 } // 2 minutes timeout for documents
+    { timeout: 120000 }
   );
   return response.data.documentUrl;
 };
 
 /**
- * Upload slide file for a lesson
- * Note: Longer timeout because PPT/PPTX files are converted to PDF on server
+ * Upload slide file cho lesson
  */
 export const uploadLessonSlide = async (courseId: number, chapterId: number, lessonId: number, file: File): Promise<string> => {
   const formData = new FormData();
@@ -387,13 +337,13 @@ export const uploadLessonSlide = async (courseId: number, chapterId: number, les
   const response = await apiClient.post<{ slideUrl: string }>(
     `/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/upload-slide`, 
     formData,
-    { timeout: 300000 } // 5 minutes timeout for slide conversion
+    { timeout: 300000 }
   );
   return response.data.slideUrl;
 };
 
 /**
- * Reorder chapters
+ * Sắp xếp lại thứ tự chapters
  */
 export const reorderChapters = async (courseId: number, chapterPositions: Record<number, number>): Promise<{ message: string }> => {
   const response = await apiClient.patch(`/v1/courses/${courseId}/chapters/reorder`, chapterPositions);
@@ -401,17 +351,15 @@ export const reorderChapters = async (courseId: number, chapterPositions: Record
 };
 
 /**
- * Reorder lessons in a chapter
+ * Sắp xếp lại thứ tự lessons trong chapter
  */
 export const reorderLessons = async (courseId: number, chapterId: number, lessonPositions: Record<number, number>): Promise<{ message: string }> => {
   const response = await apiClient.patch(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/reorder`, lessonPositions);
   return response.data;
 };
 
-// --- IMPORT/EXPORT ---
-
 /**
- * Export course content to Excel
+ * Export nội dung khóa học ra file Excel
  */
 export const exportCourseContent = async (courseId: number): Promise<Blob> => {
   const response = await apiClient.get(`/manage/content/courses/${courseId}/export`, {
@@ -446,12 +394,8 @@ export const importCourseContent = async (
   return response.data;
 };
 
-// =====================
-// HELPER FUNCTIONS
-// =====================
-
 /**
- * Download export file
+ * Tải file export xuống
  */
 export const downloadExportFile = (blob: Blob, courseId: number) => {
   const url = window.URL.createObjectURL(blob);
@@ -465,7 +409,7 @@ export const downloadExportFile = (blob: Blob, courseId: number) => {
 };
 
 /**
- * Calculate total course duration from chapters
+ * Tính tổng thời lượng khóa học từ các chapters
  */
 export const calculateCourseDuration = (chapters: ChapterResponse[]): number => {
   return chapters.reduce((total, chapter) => {
@@ -477,14 +421,14 @@ export const calculateCourseDuration = (chapters: ChapterResponse[]): number => 
 };
 
 /**
- * Count total lessons in course
+ * Đếm tổng số bài học trong khóa học
  */
 export const countTotalLessons = (chapters: ChapterResponse[]): number => {
   return chapters.reduce((total, chapter) => total + chapter.lessons.length, 0);
 };
 
 /**
- * Calculate completion percentage
+ * Tính phần trăm hoàn thành khóa học
  */
 export const calculateCompletionPercentage = (chapters: ChapterResponse[]): number => {
   const totalLessons = countTotalLessons(chapters);
@@ -497,35 +441,17 @@ export const calculateCompletionPercentage = (chapters: ChapterResponse[]): numb
   return Math.round((completedLessons / totalLessons) * 100);
 };
 
-// =====================
-// LEGACY FUNCTIONS (kept for backward compatibility)
-// These map old API calls to new structure
-// =====================
-
-// =====================
-// EXPORTS
-// =====================
-
 export default {
-  // Content Access
   getCourseContent,
   markLessonAsCompleted,
-
-  // Chapter Management
   createChapter,
   updateChapter,
   deleteChapter,
-
-  // Lesson Management
   createLesson,
   updateLesson,
   deleteLesson,
-
-  // Import/Export
   exportCourseContent,
   importCourseContent,
-
-  // Helpers
   downloadExportFile,
   calculateCourseDuration,
   countTotalLessons,

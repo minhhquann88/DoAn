@@ -48,7 +48,6 @@ public class MeetingController {
             try {
                 meetingStatus = EMeetingStatus.valueOf(status.toUpperCase());
             } catch (IllegalArgumentException e) {
-                // Invalid status, ignore
             }
         }
         

@@ -51,7 +51,9 @@ public class ChapterController {
     @Autowired
     private ExcelService excelService;
 
-    // 1. Lấy danh sách chapters của một course (cho instructor - không cần enrollment)
+    /**
+     * Lấy danh sách chapters của một course
+     */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<List<ChapterResponse>> getChapters(@PathVariable Long courseId,
@@ -60,7 +62,9 @@ public class ChapterController {
         return ResponseEntity.ok(chapters);
     }
 
-    // 2. Tạo chapter mới
+    /**
+     * Tạo chapter mới
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<?> createChapter(@PathVariable Long courseId,
@@ -68,7 +72,6 @@ public class ChapterController {
                                           @AuthenticationPrincipal UserDetailsImpl userDetails) {
         try {
             Chapter chapter = contentService.createChapter(courseId, request);
-            // Create empty lessons list for new chapter
             ChapterResponse chapterResponse = ChapterResponse.fromEntity(chapter, List.of());
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Chapter created successfully");
@@ -79,7 +82,9 @@ public class ChapterController {
         }
     }
 
-    // 3. Cập nhật chapter
+    /**
+     * Cập nhật chapter
+     */
     @PutMapping("/{chapterId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> updateChapter(@PathVariable Long courseId,
@@ -87,7 +92,6 @@ public class ChapterController {
                                           @Valid @RequestBody ChapterRequest request) {
         try {
             Chapter chapter = contentService.updateChapter(chapterId, request);
-            // Load lessons for this chapter
             List<Lesson> lessons = contentService.getChapterLessons(chapterId);
             List<LessonResponse> lessonResponses = lessons.stream()
                     .map(lesson -> LessonResponse.fromEntity(lesson, false))
@@ -102,7 +106,9 @@ public class ChapterController {
         }
     }
 
-    // 4. Xóa chapter
+    /**
+     * Xóa chapter
+     */
     @DeleteMapping("/{chapterId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> deleteChapter(@PathVariable Long courseId,
@@ -115,7 +121,9 @@ public class ChapterController {
         }
     }
 
-    // 5. Tạo lesson mới trong chapter
+    /**
+     * Tạo lesson mới trong chapter
+     */
     @PostMapping("/{chapterId}/lessons")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> createLesson(@PathVariable Long courseId,
@@ -132,7 +140,9 @@ public class ChapterController {
         }
     }
 
-    // 6. Cập nhật lesson
+    /**
+     * Cập nhật lesson
+     */
     @PutMapping("/{chapterId}/lessons/{lessonId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> updateLesson(@PathVariable Long courseId,
@@ -150,7 +160,9 @@ public class ChapterController {
         }
     }
 
-    // 7. Xóa lesson
+    /**
+     * Xóa lesson
+     */
     @DeleteMapping("/{chapterId}/lessons/{lessonId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> deleteLesson(@PathVariable Long courseId,
@@ -164,7 +176,9 @@ public class ChapterController {
         }
     }
 
-    // 8. Upload video file cho lesson
+    /**
+     * Upload video file cho lesson
+     */
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-video")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonVideo(@PathVariable Long courseId,
@@ -174,8 +188,6 @@ public class ChapterController {
                                                @RequestParam(value = "durationInSeconds", required = false) Integer durationInSeconds) {
         try {
             String videoUrl = fileStorageService.storeLessonVideo(file, lessonId);
-            
-            // Update lesson with video URL
             Lesson lesson = contentService.getLessonById(lessonId);
             LessonRequest updateRequest = new LessonRequest();
             updateRequest.setTitle(lesson.getTitle());
@@ -184,8 +196,6 @@ public class ChapterController {
             updateRequest.setDocumentUrl(lesson.getDocumentUrl());
             updateRequest.setContent(lesson.getContent());
             updateRequest.setPosition(lesson.getPosition());
-            
-            // Tự động tính duration nếu frontend gửi durationInSeconds
             if (durationInSeconds != null && durationInSeconds > 0) {
                 Integer roundedDuration = videoDurationService.roundDurationToMinutes(durationInSeconds);
                 updateRequest.setDurationInMinutes(roundedDuration);
@@ -205,7 +215,9 @@ public class ChapterController {
         }
     }
 
-    // 9. Extract duration từ YouTube URL
+    /**
+     * Extract duration từ YouTube URL
+     */
     @GetMapping("/extract-youtube-duration")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> extractYouTubeDuration(@RequestParam("url") String youtubeUrl) {
@@ -216,7 +228,6 @@ public class ChapterController {
             
             Integer durationInMinutes = videoDurationService.getYouTubeDurationInMinutes(youtubeUrl.trim());
             if (durationInMinutes == null || durationInMinutes <= 0) {
-                // Trả về 200 với duration = null thay vì 400 để frontend có thể xử lý gracefully
                 Map<String, Object> response = new HashMap<>();
                 response.put("durationInMinutes", null);
                 response.put("message", "Không thể lấy thời lượng từ YouTube URL. Vui lòng kiểm tra URL hoặc API key.");
@@ -230,7 +241,6 @@ public class ChapterController {
         } catch (Exception e) {
             System.err.println("Error extracting YouTube duration: " + e.getMessage());
             e.printStackTrace();
-            // Trả về 200 với duration = null thay vì 500 để frontend có thể xử lý gracefully
             Map<String, Object> response = new HashMap<>();
             response.put("durationInMinutes", null);
             response.put("message", "Lỗi khi lấy thời lượng: " + e.getMessage());
@@ -238,7 +248,9 @@ public class ChapterController {
         }
     }
 
-    // 10. Upload document file cho lesson
+    /**
+     * Upload document file cho lesson
+     */
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-document")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonDocument(@PathVariable Long courseId,
@@ -247,8 +259,6 @@ public class ChapterController {
                                                   @RequestParam("file") MultipartFile file) {
         try {
             String documentUrl = fileStorageService.storeLessonDocument(file, lessonId);
-            
-            // Update lesson with document URL
             Lesson lesson = contentService.getLessonById(lessonId);
             LessonRequest updateRequest = new LessonRequest();
             updateRequest.setTitle(lesson.getTitle());
@@ -271,7 +281,9 @@ public class ChapterController {
         }
     }
 
-    // 10. Upload slide file cho lesson
+    /**
+     * Upload slide file cho lesson
+     */
     @PostMapping("/{chapterId}/lessons/{lessonId}/upload-slide")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> uploadLessonSlide(@PathVariable Long courseId,
@@ -280,8 +292,6 @@ public class ChapterController {
                                                @RequestParam("file") MultipartFile file) {
         try {
             String slideUrl = fileStorageService.storeLessonSlide(file, lessonId);
-            
-            // Update lesson with slide URL
             Lesson lesson = contentService.getLessonById(lessonId);
             LessonRequest updateRequest = new LessonRequest();
             updateRequest.setTitle(lesson.getTitle());
@@ -305,7 +315,9 @@ public class ChapterController {
         }
     }
 
-    // 11. Cập nhật thứ tự chapters
+    /**
+     * Cập nhật thứ tự chapters
+     */
     @PatchMapping("/reorder")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<?> reorderChapters(@PathVariable Long courseId,
@@ -318,7 +330,9 @@ public class ChapterController {
         }
     }
 
-    // 11. Cập nhật thứ tự lessons trong chapter
+    /**
+     * Cập nhật thứ tự lessons trong chapter
+     */
     @PatchMapping("/{chapterId}/lessons/reorder")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfChapter(authentication, #chapterId)")
     public ResponseEntity<?> reorderLessons(@PathVariable Long courseId,
@@ -332,7 +346,9 @@ public class ChapterController {
         }
     }
 
-    // 12. Preview lesson (cho giảng viên xem trước bài học)
+    /**
+     * Preview lesson cho giảng viên xem trước bài học
+     */
     @GetMapping("/{chapterId}/lessons/{lessonId}/preview")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
     public ResponseEntity<?> previewLesson(@PathVariable Long courseId,
@@ -350,7 +366,9 @@ public class ChapterController {
         }
     }
 
-    // 13. Export nội dung khóa học ra file Excel
+    /**
+     * Export nội dung khóa học ra file Excel
+     */
     @GetMapping("/export")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<Resource> exportLessons(@PathVariable Long courseId) throws IOException {
@@ -366,7 +384,9 @@ public class ChapterController {
                 .body(new InputStreamResource(in));
     }
 
-    // 14. Import nội dung khóa học từ file Excel
+    /**
+     * Import nội dung khóa học từ file Excel
+     */
     @PostMapping("/import")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<MessageResponse> importLessons(@PathVariable Long courseId,

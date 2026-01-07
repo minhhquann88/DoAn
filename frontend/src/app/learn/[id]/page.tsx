@@ -15,6 +15,7 @@ import {
   X,
   Loader2,
   MessageSquare,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -62,6 +63,7 @@ interface Lesson {
   type: 'VIDEO' | 'ARTICLE' | 'SLIDE' | 'QUIZ' | 'ASSIGNMENT';
   duration?: number;
   isCompleted: boolean;
+  isLocked?: boolean; // Trạng thái khóa bài học
   videoUrl?: string;
   contentUrl?: string;
   slideUrl?: string;
@@ -165,6 +167,7 @@ export default function LearningPage() {
           duration: lesson.durationInMinutes,
           // Try both isCompleted and completed (Jackson might serialize differently)
           isCompleted: (lesson as any).isCompleted ?? (lesson as any).completed ?? false,
+          isLocked: (lesson as any).isLocked ?? false, // Trạng thái khóa bài học
           videoUrl: lesson.videoUrl,
           contentUrl: lesson.documentUrl, // For DOCUMENT type lessons
           slideUrl: lesson.slideUrl, // For SLIDE type lessons
@@ -515,40 +518,58 @@ export default function LearningPage() {
                     </AccordionTrigger>
                     <AccordionContent>
                       <ul className="space-y-1 mt-2">
-                        {section.lessons.map((lesson) => (
-                          <li key={lesson.id}>
-                            <button
-                              onClick={() => setCurrentLessonId(lesson.id)}
-                              className={`
-                                w-full text-left p-3 rounded-lg transition-colors
-                                ${currentLessonId === lesson.id
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'hover:bg-muted'
-                                }
-                              `}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div>
-                                  {lesson.isCompleted ? (
-                                    <CheckCircle2 className="h-4 w-4 text-accent" />
-                                  ) : (
-                                    getLessonIcon(lesson.type)
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium line-clamp-2">
-                                    {lesson.title}
-                                  </p>
-                                  {lesson.duration && (
-                                    <p className="text-xs opacity-70 mt-0.5">
-                                      {lesson.duration} phút
+                        {section.lessons.map((lesson) => {
+                          const isLocked = lesson.isLocked === true;
+                          return (
+                            <li key={lesson.id}>
+                              <button
+                                onClick={() => {
+                                  if (!isLocked) {
+                                    setCurrentLessonId(lesson.id);
+                                  } else {
+                                    addToast({
+                                      type: 'warning',
+                                      title: 'Bài học bị khóa',
+                                      description: 'Bạn cần hoàn thành bài học trước đó để mở khóa bài học này.',
+                                    });
+                                  }
+                                }}
+                                disabled={isLocked}
+                                className={`
+                                  w-full text-left p-3 rounded-lg transition-colors
+                                  ${isLocked 
+                                    ? 'opacity-50 cursor-not-allowed' 
+                                    : currentLessonId === lesson.id
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'hover:bg-muted'
+                                  }
+                                `}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div>
+                                    {lesson.isCompleted ? (
+                                      <CheckCircle2 className="h-4 w-4 text-accent" />
+                                    ) : isLocked ? (
+                                      <Lock className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      getLessonIcon(lesson.type)
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-medium line-clamp-2 ${isLocked ? 'text-muted-foreground' : ''}`}>
+                                      {lesson.title}
                                     </p>
-                                  )}
+                                    {lesson.duration && (
+                                      <p className="text-xs opacity-70 mt-0.5">
+                                        {lesson.duration} phút
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </button>
-                          </li>
-                        ))}
+                              </button>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </AccordionContent>
                   </AccordionItem>

@@ -447,16 +447,82 @@ public class ContentService {
             throw new RuntimeException("Không thể tải nội dung khóa học: " + e.getMessage(), e);
         }
 
-        // Map sang DTO
+        // Map sang DTO với logic khóa bài học tuần tự
         System.out.println("Mapping chapters to DTOs...");
         try {
-            return chapters.stream().map(chapter -> {
-                List<LessonResponse> lessonResponses = chapter.getLessons().stream()
-                        .map(lesson -> {
-                            boolean isCompleted = isInstructor || finalCompletedLessonIds.contains(lesson.getId());
-                            return LessonResponse.fromEntity(lesson, isCompleted);
+            // Sắp xếp chapters theo position
+            List<Chapter> sortedChapters = chapters.stream()
+                    .sorted((c1, c2) -> {
+                        int pos1 = c1.getPosition() != null ? c1.getPosition() : Integer.MAX_VALUE;
+                        int pos2 = c2.getPosition() != null ? c2.getPosition() : Integer.MAX_VALUE;
+                        return Integer.compare(pos1, pos2);
+                    })
+                    .collect(Collectors.toList());
+            
+            return sortedChapters.stream().map(chapter -> {
+                // Sắp xếp lessons trong chapter theo position
+                List<Lesson> sortedLessons = chapter.getLessons().stream()
+                        .sorted((l1, l2) -> {
+                            int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
+                            int pos2 = l2.getPosition() != null ? l2.getPosition() : Integer.MAX_VALUE;
+                            return Integer.compare(pos1, pos2);
                         })
                         .collect(Collectors.toList());
+
+                List<LessonResponse> lessonResponses = new java.util.ArrayList<>();
+                Lesson previousLesson = null;
+                
+                for (int i = 0; i < sortedLessons.size(); i++) {
+                    Lesson lesson = sortedLessons.get(i);
+                    boolean isCompleted = isInstructor || finalCompletedLessonIds.contains(lesson.getId());
+                    
+                    // Xác định bài học có bị khóa không
+                    boolean isLocked = false;
+                    
+                    if (!isInstructor) {
+                        // Giảng viên không bị khóa bài nào
+                        if (i == 0) {
+                            // Bài học đầu tiên trong chapter
+                            // Kiểm tra xem có phải chapter đầu tiên không
+                            boolean isFirstChapter = sortedChapters.indexOf(chapter) == 0;
+                            if (isFirstChapter) {
+                                // Bài học đầu tiên của chapter đầu tiên: không khóa
+                                isLocked = false;
+                            } else {
+                                // Bài học đầu tiên của chapter sau: khóa nếu bài học cuối cùng của chapter trước chưa hoàn thành
+                                int currentChapterIndex = sortedChapters.indexOf(chapter);
+                                Chapter previousChapter = sortedChapters.get(currentChapterIndex - 1);
+                                
+                                // Lấy bài học cuối cùng của chapter trước
+                                List<Lesson> previousChapterLessons = previousChapter.getLessons().stream()
+                                        .sorted((l1, l2) -> {
+                                            int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
+                                            int pos2 = l2.getPosition() != null ? l2.getPosition() : Integer.MAX_VALUE;
+                                            return Integer.compare(pos1, pos2);
+                                        })
+                                        .collect(Collectors.toList());
+                                
+                                if (!previousChapterLessons.isEmpty()) {
+                                    Lesson lastLessonInPreviousChapter = previousChapterLessons.get(previousChapterLessons.size() - 1);
+                                    boolean lastLessonCompleted = finalCompletedLessonIds.contains(lastLessonInPreviousChapter.getId());
+                                    isLocked = !lastLessonCompleted;
+                                } else {
+                                    // Chapter trước không có lesson nào: không khóa
+                                    isLocked = false;
+                                }
+                            }
+                        } else {
+                            // Bài học không phải đầu tiên: khóa nếu bài học trước chưa hoàn thành
+                            boolean previousLessonCompleted = previousLesson != null && 
+                                    finalCompletedLessonIds.contains(previousLesson.getId());
+                            isLocked = !previousLessonCompleted;
+                        }
+                    }
+                    
+                    lessonResponses.add(LessonResponse.fromEntity(lesson, isCompleted, isLocked));
+                    previousLesson = lesson;
+                }
+                
                 return ChapterResponse.fromEntity(chapter, lessonResponses);
             }).collect(Collectors.toList());
         } catch (Exception e) {

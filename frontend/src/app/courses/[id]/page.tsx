@@ -557,7 +557,8 @@ export default function CourseDetailPage() {
                                   <ul className="space-y-2">
                                     {chapter.lessons?.map((lesson) => {
                                       const isPreview = lesson.isPreview === true || lesson.id === previewLessonId;
-                                      const isLocked = !isEnrolled && !isPreview;
+                                      // Sử dụng isLocked từ backend nếu có, nếu không thì fallback về logic cũ
+                                      const isLocked = (lesson as any).isLocked ?? (!isEnrolled && !isPreview);
                                       
                                       return (
                                         <li 

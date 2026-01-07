@@ -89,28 +89,36 @@ public class VNPayService {
         List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
         Collections.sort(fieldNames);
         
+        // Filter out null/empty values first
+        List<String> validFieldNames = new ArrayList<>();
+        for (String fieldName : fieldNames) {
+            String fieldValue = vnpParams.get(fieldName);
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                validFieldNames.add(fieldName);
+            }
+        }
+        
         StringBuilder hashData = new StringBuilder();
         StringBuilder query = new StringBuilder();
         
-        Iterator<String> itr = fieldNames.iterator();
-        while (itr.hasNext()) {
-            String fieldName = itr.next();
+        for (int i = 0; i < validFieldNames.size(); i++) {
+            String fieldName = validFieldNames.get(i);
             String fieldValue = vnpParams.get(fieldName);
-            if (fieldValue != null && !fieldValue.isEmpty()) {
-                // Build hash data
-                hashData.append(fieldName);
-                hashData.append('=');
-                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                
-                // Build query
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
-                query.append('=');
-                query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                
-                if (itr.hasNext()) {
-                    query.append('&');
-                    hashData.append('&');
-                }
+            
+            // Build hash data - fieldName KHÔNG encode, fieldValue CÓ encode
+            hashData.append(fieldName);
+            hashData.append('=');
+            hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+            
+            // Build query - cả fieldName và fieldValue đều encode
+            query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
+            query.append('=');
+            query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+            
+            // Chỉ thêm & nếu không phải field cuối cùng
+            if (i < validFieldNames.size() - 1) {
+                query.append('&');
+                hashData.append('&');
             }
         }
         
@@ -154,21 +162,30 @@ public class VNPayService {
         List<String> fieldNames = new ArrayList<>(paramsCopy.keySet());
         Collections.sort(fieldNames);
         
+        // Filter out null/empty values first (giống như khi tạo payment URL)
+        List<String> validFieldNames = new ArrayList<>();
+        for (String fieldName : fieldNames) {
+            String fieldValue = paramsCopy.get(fieldName);
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                validFieldNames.add(fieldName);
+            }
+        }
+        
         StringBuilder hashData = new StringBuilder();
         try {
-        Iterator<String> itr = fieldNames.iterator();
-        while (itr.hasNext()) {
-            String fieldName = itr.next();
+            for (int i = 0; i < validFieldNames.size(); i++) {
+                String fieldName = validFieldNames.get(i);
                 String fieldValue = paramsCopy.get(fieldName);
-            if (fieldValue != null && !fieldValue.isEmpty()) {
-                    // URL encode fieldName and fieldValue (same as when creating payment URL)
-                    hashData.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
+                
+                // Build hash data - fieldName KHÔNG encode, fieldValue CÓ encode (giống như khi tạo payment URL)
+                hashData.append(fieldName);
                 hashData.append('=');
-                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                if (itr.hasNext()) {
+                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                
+                // Chỉ thêm & nếu không phải field cuối cùng
+                if (i < validFieldNames.size() - 1) {
                     hashData.append('&');
                 }
-            }
             }
         } catch (UnsupportedEncodingException e) {
             System.err.println("ERROR: Failed to URL encode for signature verification: " + e.getMessage());

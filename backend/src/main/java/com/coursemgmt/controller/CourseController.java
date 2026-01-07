@@ -48,16 +48,13 @@ public class CourseController {
     @Autowired
     private MeetingService meetingService;
 
-    // Valid sort fields for Course entity
     private static final Set<String> VALID_SORT_FIELDS = new HashSet<>(Arrays.asList(
             "id", "title", "description", "price", "imageUrl", "totalDurationInHours",
             "status", "createdAt", "updatedAt"
     ));
 
     /**
-     * Sanitize sort parameter to prevent 400 errors from invalid field names
-     * @param sort Original sort string (e.g., "enrollmentCount,desc")
-     * @return Sanitized sort string with valid field name (e.g., "createdAt,desc")
+     * Sanitize sort parameter để tránh lỗi 400 từ tên field không hợp lệ
      */
     private String sanitizeSort(String sort) {
         if (sort == null || sort.isEmpty()) {
@@ -68,21 +65,20 @@ public class CourseController {
         String fieldName = parts[0].trim();
         String direction = parts.length > 1 ? parts[1].trim() : "desc";
 
-        // Check if field name is valid
         if (!VALID_SORT_FIELDS.contains(fieldName)) {
-            // Replace invalid field with default (createdAt)
             return "createdAt," + direction;
         }
 
         return fieldName + "," + direction;
     }
 
-    // 1. Tạo khóa học (Admin, Giảng viên)
+    /**
+     * Tạo khóa học mới
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request,
                                                        @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        // Debug logging
         if (userDetails != null) {
             System.out.println("=== CREATE COURSE DEBUG ===");
             System.out.println("User ID: " + userDetails.getId());
@@ -96,7 +92,9 @@ public class CourseController {
         return ResponseEntity.ok(CourseResponse.fromEntity(course));
     }
 
-    // 2. Cập nhật khóa học (Admin hoặc Giảng viên sở hữu)
+    /**
+     * Cập nhật khóa học
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
     public ResponseEntity<CourseResponse> updateCourse(@PathVariable Long id,
@@ -105,7 +103,9 @@ public class CourseController {
         return ResponseEntity.ok(CourseResponse.fromEntity(updatedCourse));
     }
 
-    // 2.1. Upload ảnh bìa khóa học
+    /**
+     * Upload ảnh bìa khóa học
+     */
     @PostMapping(value = "/{id}/image", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
     public ResponseEntity<?> uploadCourseImage(@PathVariable Long id,
@@ -114,8 +114,6 @@ public class CourseController {
             System.out.println("========================================");
             System.out.println("Upload Course Image Request");
             System.out.println("Course ID: " + id);
-            
-            // Validate file
             if (file == null || file.isEmpty()) {
                 System.err.println("File is null or empty!");
                 return ResponseEntity.badRequest().body(new MessageResponse("File is required and cannot be empty"));
@@ -126,17 +124,10 @@ public class CourseController {
             System.out.println("Content type: " + file.getContentType());
             System.out.println("File is empty: " + file.isEmpty());
             System.out.println("========================================");
-
-            // Validate course exists (getCourseById throws exception if not found)
             CourseResponse courseResponse = courseService.getCourseById(id);
             System.out.println("Course found: " + courseResponse.getTitle());
-
-            // Store the image file
             String imageUrl = fileStorageService.storeCourseImage(file, id);
             System.out.println("Image stored at: " + imageUrl);
-
-            // Update course with new image URL
-            // Get current course entity to preserve other fields
             Course currentCourse = courseRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Course not found!"));
             
@@ -169,11 +160,10 @@ public class CourseController {
         }
     }
 
-    // 3. Xóa khóa học (Admin hoặc Giảng viên)
+    /**
+     * Xóa khóa học
+     */
     @DeleteMapping("/{id}")
-    // Cho phép Admin hoặc bất kỳ Giảng viên nào xóa khóa học.
-    // Lý do: logic kiểm tra sở hữu dễ gây lỗi khi chuyển quyền hoặc dữ liệu không đồng bộ.
-    // UI đã giới hạn chỉ hiển thị khóa học của chính giảng viên trong trang "Khóa học của tôi".
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ResponseEntity<MessageResponse> deleteCourse(@PathVariable Long id) {
         courseService.deleteCourse(id);

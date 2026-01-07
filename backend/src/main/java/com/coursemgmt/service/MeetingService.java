@@ -46,7 +46,6 @@ public class MeetingService {
     private String generateMeetingCode() {
         String code;
         do {
-            // Format: XXX-#### (e.g., ABC-1234)
             String prefix = generateRandomString(3).toUpperCase();
             int number = 1000 + random.nextInt(9000);
             code = prefix + "-" + number;
@@ -64,50 +63,38 @@ public class MeetingService {
     }
 
     /**
-     * Create meeting
+     * Tạo cuộc họp mới
      */
     @Transactional
     public MeetingResponse createMeeting(MeetingRequest request, UserDetailsImpl userDetails) {
         Meeting meeting = new Meeting();
         meeting.setTitle(request.getTitle());
         meeting.setDescription(request.getDescription());
-        
-        // Set instructor
         User instructor = userRepository.findById(userDetails.getId())
             .orElseThrow(() -> new ResourceNotFoundException("User", "id", userDetails.getId()));
         meeting.setInstructor(instructor);
-        
-        // Set course if provided
         if (request.getCourseId() != null) {
             Course course = courseRepository.findById(request.getCourseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", request.getCourseId()));
-            
-            // Verify instructor owns the course
             if (!course.getInstructor().getId().equals(userDetails.getId())) {
                 throw new RuntimeException("You are not authorized to create meetings for this course");
             }
             
             meeting.setCourse(course);
         }
-        
-        // Generate meeting code
         meeting.setMeetingCode(generateMeetingCode());
-        
-        // Set time - if startImmediately is true or startTime is null, start now
         LocalDateTime startTime;
         if (request.getStartImmediately() != null && request.getStartImmediately()) {
             startTime = LocalDateTime.now();
             meeting.setStatus(EMeetingStatus.ONGOING);
         } else if (request.getStartTime() != null) {
             startTime = request.getStartTime();
-            // Determine status based on start time
             if (startTime.isBefore(LocalDateTime.now()) || startTime.isEqual(LocalDateTime.now())) {
                 meeting.setStatus(EMeetingStatus.ONGOING);
             } else {
                 meeting.setStatus(EMeetingStatus.SCHEDULED);
             }
         } else {
-            // Default: start immediately if no startTime provided
             startTime = LocalDateTime.now();
             meeting.setStatus(EMeetingStatus.ONGOING);
         }
@@ -119,20 +106,15 @@ public class MeetingService {
         }
         
         meeting.setMaxParticipants(request.getMaxParticipants() != null ? request.getMaxParticipants() : 50);
-        
-        // Parse settings
         if (request.getSettings() != null) {
             try {
                 meeting.setSettings(objectMapper.writeValueAsString(request.getSettings()));
             } catch (Exception e) {
-                // Default settings
                 meeting.setSettings("{\"allowScreenShare\":true,\"allowChat\":true,\"muteOnJoin\":false}");
             }
         }
         
         Meeting saved = meetingRepository.save(meeting);
-        
-        // Auto-join instructor as HOST (only if not already a participant)
         Optional<MeetingParticipant> existingParticipant = participantRepository
             .findByMeetingIdAndUserId(saved.getId(), instructor.getId());
         
@@ -149,19 +131,15 @@ public class MeetingService {
     }
 
     /**
-     * Update meeting
+     * Cập nhật thông tin cuộc họp
      */
     @Transactional
     public MeetingResponse updateMeeting(Long meetingId, MeetingRequest request, UserDetailsImpl userDetails) {
         Meeting meeting = meetingRepository.findById(meetingId)
             .orElseThrow(() -> new ResourceNotFoundException("Meeting", "id", meetingId));
-        
-        // Verify ownership
         if (!meeting.getInstructor().getId().equals(userDetails.getId())) {
             throw new RuntimeException("You are not authorized to update this meeting");
         }
-        
-        // Only allow update if SCHEDULED
         if (meeting.getStatus() != EMeetingStatus.SCHEDULED) {
             throw new RuntimeException("Can only update scheduled meetings");
         }
@@ -188,7 +166,6 @@ public class MeetingService {
             try {
                 meeting.setSettings(objectMapper.writeValueAsString(request.getSettings()));
             } catch (Exception e) {
-                // Keep existing settings
             }
         }
         
@@ -197,7 +174,7 @@ public class MeetingService {
     }
 
     /**
-     * Delete meeting
+     * Xóa cuộc họp
      */
     @Transactional
     public void deleteMeeting(Long meetingId, UserDetailsImpl userDetails) {
@@ -208,8 +185,6 @@ public class MeetingService {
         if (!meeting.getInstructor().getId().equals(userDetails.getId())) {
             throw new RuntimeException("You are not authorized to delete this meeting");
         }
-        
-        // Only allow delete if SCHEDULED or ENDED
         if (meeting.getStatus() == EMeetingStatus.ONGOING) {
             throw new RuntimeException("Cannot delete ongoing meeting. Please end it first.");
         }
@@ -218,7 +193,7 @@ public class MeetingService {
     }
 
     /**
-     * Get meeting by ID
+     * Lấy thông tin cuộc họp theo ID
      */
     public MeetingResponse getMeeting(Long meetingId) {
         Meeting meeting = meetingRepository.findById(meetingId)
@@ -227,7 +202,7 @@ public class MeetingService {
     }
 
     /**
-     * Get meeting by code
+     * Lấy thông tin cuộc họp theo mã
      */
     public MeetingResponse getMeetingByCode(String code) {
         Meeting meeting = meetingRepository.findByMeetingCode(code)
@@ -236,7 +211,7 @@ public class MeetingService {
     }
 
     /**
-     * Get all meetings (with filters)
+     * Lấy danh sách cuộc họp với các bộ lọc
      */
     public List<MeetingResponse> getMeetings(Long courseId, EMeetingStatus status, Long instructorId) {
         List<Meeting> meetings;
@@ -261,7 +236,7 @@ public class MeetingService {
     }
 
     /**
-     * Get meetings for a course
+     * Lấy danh sách cuộc họp của một khóa học
      */
     public List<MeetingResponse> getCourseMeetings(Long courseId) {
         List<Meeting> meetings = meetingRepository.findByCourseIdOrderByStartTimeDesc(courseId);
@@ -271,14 +246,12 @@ public class MeetingService {
     }
 
     /**
-     * Start meeting (change status to ONGOING)
+     * Bắt đầu cuộc họp
      */
     @Transactional
     public MeetingResponse startMeeting(Long meetingId, UserDetailsImpl userDetails) {
         Meeting meeting = meetingRepository.findById(meetingId)
             .orElseThrow(() -> new ResourceNotFoundException("Meeting", "id", meetingId));
-        
-        // Verify ownership
         if (!meeting.getInstructor().getId().equals(userDetails.getId())) {
             throw new RuntimeException("You are not authorized to start this meeting");
         }
@@ -295,26 +268,20 @@ public class MeetingService {
     }
 
     /**
-     * End meeting (change status to ENDED)
+     * Kết thúc cuộc họp
      */
     @Transactional
     public MeetingResponse endMeeting(Long meetingId, UserDetailsImpl userDetails) {
         Meeting meeting = meetingRepository.findById(meetingId)
             .orElseThrow(() -> new ResourceNotFoundException("Meeting", "id", meetingId));
-        
-        // Verify ownership
         if (!meeting.getInstructor().getId().equals(userDetails.getId())) {
             throw new RuntimeException("You are not authorized to end this meeting");
         }
-        
         if (meeting.getStatus() != EMeetingStatus.ONGOING) {
             throw new RuntimeException("Can only end ongoing meetings");
         }
-        
         meeting.setStatus(EMeetingStatus.ENDED);
         meeting.setEndTime(LocalDateTime.now());
-        
-        // Mark all participants as left
         List<MeetingParticipant> participants = participantRepository.findByMeetingId(meetingId);
         for (MeetingParticipant participant : participants) {
             if (participant.getLeftAt() == null) {
