@@ -213,8 +213,8 @@ export const deleteLesson = async (courseId: number, chapterId: number, lessonId
 /**
  * Preview a lesson (for instructors only)
  */
-export const previewLesson = async (lessonId: number): Promise<LessonResponse> => {
-  const response = await apiClient.get<LessonResponse>(`/manage/content/lessons/${lessonId}/preview`);
+export const previewLesson = async (courseId: number, chapterId: number, lessonId: number): Promise<LessonResponse> => {
+  const response = await apiClient.get<LessonResponse>(`/v1/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}/preview`);
   return response.data;
 };
 

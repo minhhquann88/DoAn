@@ -10,16 +10,23 @@ import com.coursemgmt.model.Lesson;
 import com.coursemgmt.security.services.CourseSecurityService;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.ContentService;
+import com.coursemgmt.service.ExcelService;
 import com.coursemgmt.service.FileStorageService;
 import com.coursemgmt.service.VideoDurationService;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +47,9 @@ public class ChapterController {
 
     @Autowired
     private VideoDurationService videoDurationService;
+
+    @Autowired
+    private ExcelService excelService;
 
     // 1. Lấy danh sách chapters của một course (cho instructor - không cần enrollment)
     @GetMapping
@@ -319,6 +329,53 @@ public class ChapterController {
             return ResponseEntity.ok(new MessageResponse("Lessons reordered successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error reordering lessons: " + e.getMessage()));
+        }
+    }
+
+    // 12. Preview lesson (cho giảng viên xem trước bài học)
+    @GetMapping("/{chapterId}/lessons/{lessonId}/preview")
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructorOfLesson(authentication, #lessonId)")
+    public ResponseEntity<?> previewLesson(@PathVariable Long courseId,
+                                          @PathVariable Long chapterId,
+                                          @PathVariable Long lessonId) {
+        try {
+            Lesson lesson = contentService.getLessonById(lessonId);
+            return ResponseEntity.ok(LessonResponse.fromEntity(lesson, false));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                    .body(new MessageResponse("Lesson not found: " + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new MessageResponse("Error previewing lesson: " + e.getMessage()));
+        }
+    }
+
+    // 13. Export nội dung khóa học ra file Excel
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
+    public ResponseEntity<Resource> exportLessons(@PathVariable Long courseId) throws IOException {
+        ByteArrayInputStream in = excelService.exportLessons(courseId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=NoiDungKhoaHoc_" + courseId + ".xlsx");
+
+        return ResponseEntity
+                .ok()
+                .headers(headers)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(new InputStreamResource(in));
+    }
+
+    // 14. Import nội dung khóa học từ file Excel
+    @PostMapping("/import")
+    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
+    public ResponseEntity<MessageResponse> importLessons(@PathVariable Long courseId,
+                                                         @RequestParam("file") MultipartFile file) {
+        try {
+            excelService.importLessons(courseId, file);
+            return ResponseEntity.ok(new MessageResponse("Import nội dung thành công!"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Lỗi khi import: " + e.getMessage()));
         }
     }
 }

@@ -287,9 +287,9 @@ export default function CourseContentPage() {
     deleteLessonMutation.mutate({ chapterId, lessonId });
   };
 
-  const handlePreviewLesson = async (lessonId: number) => {
+  const handlePreviewLesson = async (chapterId: number, lessonId: number) => {
     try {
-      const lesson = await previewLessonApi(lessonId);
+      const lesson = await previewLessonApi(Number(courseId), chapterId, lessonId);
       setPreviewLesson(lesson);
       setPreviewDialogOpen(true);
     } catch (error: any) {
@@ -392,7 +392,7 @@ export default function CourseContentPage() {
                           onAddLesson={() => handleCreateLesson(chapter.id)}
                           onEditLesson={(lesson) => handleEditLesson(chapter.id, lesson)}
                           onDeleteLesson={(lessonId, lessonTitle) => handleDeleteLesson(chapter.id, lessonId, lessonTitle)}
-                          onPreviewLesson={(lessonId) => handlePreviewLesson(lessonId)}
+                          onPreviewLesson={(chapterId, lessonId) => handlePreviewLesson(chapterId, lessonId)}
                           onReorderLessons={(lessonPositions) => {
                             reorderLessonsMutation.mutate({ chapterId: chapter.id, lessonPositions });
                           }}
@@ -592,7 +592,7 @@ function ChapterCard({
   onAddLesson: () => void;
   onEditLesson: (lesson: LessonResponse) => void;
   onDeleteLesson: (lessonId: number, lessonTitle: string) => void;
-  onPreviewLesson: (lessonId: number) => void;
+  onPreviewLesson: (chapterId: number, lessonId: number) => void;
   onReorderLessons: (lessonPositions: Record<number, number>) => void;
 }) {
   return (
@@ -665,7 +665,7 @@ function ChapterCard({
                             dragHandleProps={provided.dragHandleProps}
                             onEdit={() => onEditLesson(lesson)}
                             onDelete={() => onDeleteLesson(lesson.id, lesson.title)}
-                            onPreview={() => onPreviewLesson(lesson.id)}
+                            onPreview={() => onPreviewLesson(chapter.id, lesson.id)}
                           />
                         </div>
                       )}
