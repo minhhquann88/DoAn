@@ -89,10 +89,12 @@ public class TransactionService {
         String paymentUrl = "";
         try {
             if ("VNPAY".equals(request.getPaymentGateway())) {
+                // Tạo orderInfo từ course title (sẽ được sanitize trong VNPayService)
+                String orderInfo = "Thanh toan khoa hoc: " + course.getTitle();
                 paymentUrl = vnPayService.createPaymentUrl(
                     txCode, // Sử dụng transaction code
                     saved.getAmount(),
-                    "Thanh toan khoa hoc: " + course.getTitle(),
+                    orderInfo,
                     request.getReturnUrl(),
                     request.getBankCode() // Use provided bankCode or null (let user choose)
                 );

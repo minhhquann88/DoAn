@@ -38,6 +38,32 @@ public class VNPayService {
     }
 
     /**
+     * Sanitize và giới hạn độ dài orderInfo cho VNPay
+     * VNPay giới hạn vnp_OrderInfo tối đa 255 ký tự (sau khi URL encode)
+     * Loại bỏ ký tự đặc biệt có thể gây vấn đề khi encode
+     */
+    private String sanitizeOrderInfo(String orderInfo) {
+        if (orderInfo == null || orderInfo.isEmpty()) {
+            return "Thanh toan khoa hoc";
+        }
+        
+        // Loại bỏ các ký tự đặc biệt có thể gây vấn đề khi URL encode
+        // Giữ lại: chữ cái, số, khoảng trắng, dấu tiếng Việt, dấu chấm, dấu phẩy, dấu gạch ngang
+        String sanitized = orderInfo
+            .replaceAll("[<>\"'&()\\[\\]{}]", "") // Loại bỏ các ký tự đặc biệt: < > " ' & ( ) [ ] { }
+            .replaceAll("\\s+", " ") // Thay nhiều khoảng trắng bằng 1 khoảng trắng
+            .trim();
+        
+        // Giới hạn độ dài tối đa 180 ký tự (để an toàn, tránh vượt quá 255 sau khi URL encode)
+        // Vì tiếng Việt có dấu, khi encode có thể tăng độ dài đáng kể
+        if (sanitized.length() > 180) {
+            sanitized = sanitized.substring(0, 177) + "...";
+        }
+        
+        return sanitized;
+    }
+
+    /**
      * Tạo URL thanh toán VNPay
      * @param transactionCode Transaction code (unique identifier)
      * @param amount Số tiền (VND)
@@ -61,7 +87,8 @@ public class VNPayService {
         vnpParams.put("vnp_CurrCode", "VND");
         // Transaction reference: sử dụng transaction code
         vnpParams.put("vnp_TxnRef", transactionCode);
-        vnpParams.put("vnp_OrderInfo", orderInfo);
+        // Sanitize orderInfo để tránh lỗi với ký tự đặc biệt và độ dài quá mức
+        vnpParams.put("vnp_OrderInfo", sanitizeOrderInfo(orderInfo));
         vnpParams.put("vnp_OrderType", "other");
         vnpParams.put("vnp_Locale", "vn");
         vnpParams.put("vnp_ReturnUrl", returnUrl != null ? returnUrl : vnpReturnUrl);

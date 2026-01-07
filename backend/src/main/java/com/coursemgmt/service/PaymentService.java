@@ -100,10 +100,12 @@ public class PaymentService {
             // Sử dụng return URL từ biến môi trường (VNPayService)
             String returnUrl = vnPayService.getDefaultReturnUrl();
             // Sử dụng transactionCode làm vnp_TxnRef cho VNPay
+            // Tạo orderInfo từ course title (sẽ được sanitize trong VNPayService)
+            String orderInfo = "Thanh toan khoa hoc: " + course.getTitle();
             String paymentUrl = vnPayService.createPaymentUrl(
                 transactionCode, // VNPay sẽ dùng transactionCode này làm vnp_TxnRef
                 saved.getAmount(),
-                "Thanh toan khoa hoc: " + course.getTitle(),
+                orderInfo,
                 returnUrl,
                 null // Let user choose payment method on VNPay
             );
