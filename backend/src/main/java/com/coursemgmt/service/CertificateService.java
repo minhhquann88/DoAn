@@ -47,7 +47,36 @@ public class CertificateService {
     }
     
     /**
-     * Tự động cấp chứng chỉ khi hoàn thành khóa học
+     * Tự động cấp chứng chỉ khi hoàn thành khóa học (Dùng nội bộ từ ContentService)
+     */
+    @Transactional
+    public void autoIssueCertificate(Enrollment enrollment) {
+        // Kiểm tra nếu đã có chứng chỉ thì không cấp nữa
+        if (certificateRepository.existsByEnrollmentId(enrollment.getId())) {
+            return;
+        }
+
+        // Tạo chứng chỉ mới
+        Certificate certificate = new Certificate();
+        certificate.setEnrollment(enrollment);
+        certificate.setCertificateCode(generateCertificateCode());
+        certificate.setIssuedAt(LocalDateTime.now());
+
+        Certificate saved = certificateRepository.save(certificate);
+
+        // Tạo PDF
+        try {
+            String pdfUrl = pdfGeneratorService.generateCertificatePdfAndSave(saved);
+            saved.setPdfUrl(pdfUrl);
+            certificateRepository.save(saved);
+        } catch (Exception e) {
+            // Chỉ log lỗi, không làm dừng tiến trình chính
+            System.err.println("Failed to generate PDF for auto-issued certificate: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Tự động cấp chứng chỉ khi hoàn thành khóa học (Thông qua Request)
      */
     @Transactional
     public CertificateDTO issueCertificate(CertificateRequest request) {
