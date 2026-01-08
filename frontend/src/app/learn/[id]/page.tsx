@@ -187,12 +187,32 @@ export default function LearningPage() {
     return mapped;
   }, [chapters]);
   
-  // Set first lesson as current when curriculum loads
+  // Set first lesson as current when curriculum loads (only if no lesson is selected)
+  // LƯU Ý: Chỉ set bài đầu tiên khi chưa có bài nào được chọn
+  // Khi refetch data, giữ nguyên bài học hiện tại để không tự động chuyển bài
   React.useEffect(() => {
     if (curriculum.length > 0 && !currentLessonId) {
       const firstLesson = curriculum[0]?.lessons[0];
       if (firstLesson) {
         setCurrentLessonId(firstLesson.id);
+      }
+    }
+  }, [curriculum, currentLessonId]);
+  
+  // Đảm bảo currentLessonId vẫn hợp lệ sau khi refetch data
+  // Nếu bài học hiện tại không còn trong curriculum (có thể bị xóa), giữ nguyên hoặc chuyển về bài đầu tiên
+  React.useEffect(() => {
+    if (curriculum.length > 0 && currentLessonId) {
+      const allLessons = curriculum.flatMap(section => section.lessons);
+      const lessonExists = allLessons.some(lesson => lesson.id === currentLessonId);
+      // Nếu bài học hiện tại không còn tồn tại, không tự động chuyển - giữ nguyên để tránh làm gián đoạn học viên
+      // Chỉ reset nếu thực sự cần thiết (ví dụ: bài học bị xóa)
+      if (!lessonExists) {
+        // Tìm bài học gần nhất hoặc bài đầu tiên
+        const firstLesson = curriculum[0]?.lessons[0];
+        if (firstLesson) {
+          setCurrentLessonId(firstLesson.id);
+        }
       }
     }
   }, [curriculum, currentLessonId]);
@@ -239,55 +259,58 @@ export default function LearningPage() {
   };
   
   // Mark lesson as completed mutation
+  // LƯU Ý: Sau khi hoàn thành bài học, chỉ đánh dấu hoàn thành và cập nhật UI
+  // KHÔNG tự động chuyển sang bài học tiếp theo - để học viên tự quyết định
+  // KHÔNG refetch ngay lập tức để tránh refresh/reload trang và gián đoạn video
   const completeLessonMutation = useMutation({
     mutationFn: async (lessonId: number) => {
       return await markLessonAsCompleted(lessonId);
     },
     onSuccess: async () => {
-      // Wait a bit to ensure backend transaction is committed
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Remove queries from cache first to force fresh fetch (more aggressive than invalidate)
-      queryClient.removeQueries({ queryKey: ['course-content', params.id] });
-      queryClient.removeQueries({ queryKey: ['enrollment', params.id, user?.id] });
-      
-      // Also invalidate other related queries to sync progress across all pages
-      queryClient.invalidateQueries({ queryKey: ['certificates', params.id] });
-      queryClient.invalidateQueries({ queryKey: ['my-courses'] });
-      queryClient.invalidateQueries({ queryKey: ['my-enrollments'] });
-      queryClient.invalidateQueries({ queryKey: ['featured-courses'] }); // Homepage featured courses
-      queryClient.invalidateQueries({ queryKey: ['courses'] }); // Courses listing page
-      queryClient.invalidateQueries({ queryKey: ['course', params.id] }); // Course detail page
-      
-      // Then refetch course content and enrollment to immediately update UI
-      console.log('Refetching course content and enrollment...');
-      try {
-        const [courseContentResult, enrollmentResult] = await Promise.all([
-          refetchCourseContent(),
-          refetchEnrollment(),
-        ]);
+      // Cập nhật local state ngay lập tức để UI phản hồi nhanh
+      // mà không cần refetch (tránh refresh/reload trang)
+      if (chapters && currentLessonId) {
+        // Update local curriculum state để đánh dấu bài học là hoàn thành
+        const updatedChapters = chapters.map(chapter => ({
+          ...chapter,
+          lessons: chapter.lessons.map(lesson => 
+            lesson.id === currentLessonId 
+              ? { ...lesson, isCompleted: true }
+              : lesson
+          )
+        }));
         
-        // Debug: Log the refetched data
-        console.log('Refetched course content:', courseContentResult.data);
-        if (courseContentResult.data) {
-          const completedCount = courseContentResult.data
-            .flatMap(ch => ch.lessons)
-            .filter(l => l.isCompleted).length;
-          console.log('Completed lessons count:', completedCount);
-          courseContentResult.data.forEach(chapter => {
-            const chapterCompleted = chapter.lessons.filter(l => l.isCompleted).length;
-            console.log(`Chapter "${chapter.title}": ${chapterCompleted}/${chapter.lessons.length} completed`);
-            chapter.lessons.forEach(lesson => {
-              console.log(`  Lesson "${lesson.title}": isCompleted=${lesson.isCompleted}`);
-            });
-          });
-        }
+        // Cập nhật cache với data đã được update (optimistic update)
+        queryClient.setQueryData(['course-content', params.id], updatedChapters);
+      }
+      
+      // Cập nhật enrollment progress một cách tối ưu
+      // Lưu ý: Sau khi cập nhật chapters trong cache, curriculum sẽ tự động được tính lại
+      // nên chúng ta cần tính progress dựa trên chapters đã được cập nhật
+      if (enrollment && chapters) {
+        // Tính tổng số bài học từ chapters đã được cập nhật
+        const totalLessons = chapters.reduce((sum, chapter) => sum + chapter.lessons.length, 0);
+        // Đếm số bài học đã hoàn thành (bao gồm bài học vừa hoàn thành)
+        const completedLessons = chapters
+          .flatMap(chapter => chapter.lessons)
+          .filter(lesson => {
+            // Bài học hiện tại luôn được coi là đã hoàn thành (vừa mới hoàn thành)
+            if (lesson.id === currentLessonId) return true;
+            // Các bài học khác kiểm tra trạng thái isCompleted từ backend
+            return (lesson as any).isCompleted ?? (lesson as any).completed ?? false;
+          }).length;
+        const newProgress = totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
         
-        // Check if course is completed using the refetched enrollment data
-        const updatedEnrollment = enrollmentResult.data;
+        const updatedEnrollment = {
+          ...enrollment,
+          progress: Math.round(newProgress * 100) / 100,
+          status: newProgress >= 100 ? 'COMPLETED' : enrollment.status,
+        };
         
-        if (updatedEnrollment && (updatedEnrollment.progress >= 100 || updatedEnrollment.status === 'COMPLETED')) {
-          // Course completed - show certificate notification
+        queryClient.setQueryData(['enrollment', params.id, user?.id], updatedEnrollment);
+        
+        // Kiểm tra nếu khóa học đã hoàn thành
+        if (newProgress >= 100 || updatedEnrollment.status === 'COMPLETED') {
           addToast({
             type: 'success',
             title: 'Chúc mừng!',
@@ -299,13 +322,36 @@ export default function LearningPage() {
             description: 'Đã đánh dấu bài học hoàn thành!',
           });
         }
-      } catch (error) {
-        console.error('Error refetching data:', error);
+      } else {
         addToast({
           type: 'success',
           description: 'Đã đánh dấu bài học hoàn thành!',
         });
       }
+      
+      // Invalidate các queries khác trong background (không refetch ngay)
+      // Để đồng bộ dữ liệu khi người dùng chuyển trang hoặc refresh thủ công
+      queryClient.invalidateQueries({ queryKey: ['certificates', params.id] });
+      queryClient.invalidateQueries({ queryKey: ['my-courses'] });
+      queryClient.invalidateQueries({ queryKey: ['my-enrollments'] });
+      queryClient.invalidateQueries({ queryKey: ['featured-courses'] });
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+      queryClient.invalidateQueries({ queryKey: ['course', params.id] });
+      
+      // Refetch data trong background sau một khoảng thời gian (không làm gián đoạn video)
+      // Sử dụng setTimeout để refetch sau khi video đã tiếp tục phát
+      setTimeout(async () => {
+        try {
+          // Refetch trong background để đồng bộ với backend
+          await Promise.all([
+            refetchCourseContent(),
+            refetchEnrollment(),
+          ]);
+        } catch (error) {
+          console.error('Error refetching data in background:', error);
+          // Không hiển thị lỗi cho user vì đây là background sync
+        }
+      }, 2000); // Đợi 2 giây để video tiếp tục phát trước khi refetch
     },
     onError: (error: any) => {
       console.error('Error marking lesson as completed:', error);
@@ -642,16 +688,20 @@ export default function LearningPage() {
                           });
                           
                           // Auto-mark as completed when video reaches 90% (only once)
+                          // LƯU Ý: Chỉ đánh dấu hoàn thành, KHÔNG tự động chuyển sang bài tiếp theo
                           if (percentage >= 90 && currentLessonId && !currentLesson.isCompleted && !hasAutoCompleted) {
                             setHasAutoCompleted(true);
                             handleCompleteLesson();
+                            // KHÔNG gọi handleNext() ở đây - để học viên tự quyết định
                           }
                         }
                       }}
                       onEnded={() => {
                         // Auto-mark as completed when video ends
+                        // LƯU Ý: Chỉ đánh dấu hoàn thành, KHÔNG tự động chuyển sang bài tiếp theo
                         if (currentLessonId && !currentLesson.isCompleted) {
                           handleCompleteLesson();
+                          // KHÔNG gọi handleNext() ở đây - để học viên tự quyết định
                         }
                       }}
                     >
@@ -883,7 +933,17 @@ export default function LearningPage() {
               
               <Button
                 onClick={handleNext}
-                disabled={currentIndex === allLessons.length - 1}
+                disabled={
+                  currentIndex === allLessons.length - 1 || 
+                  !currentLesson?.isCompleted
+                }
+                title={
+                  !currentLesson?.isCompleted 
+                    ? 'Bạn cần hoàn thành bài học này trước khi chuyển sang bài tiếp theo'
+                    : currentIndex === allLessons.length - 1
+                    ? 'Đây là bài học cuối cùng'
+                    : 'Chuyển sang bài tiếp theo'
+                }
               >
                 Bài tiếp theo
                 <ChevronRight className="h-4 w-4 ml-2" />

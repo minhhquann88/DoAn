@@ -3,12 +3,18 @@ package com.coursemgmt.service;
 import com.coursemgmt.model.Certificate;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -51,6 +57,9 @@ public class PdfGeneratorService {
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             
+            // Load font hỗ trợ tiếng Việt từ hệ thống hoặc classpath
+            loadVietnameseFont(builder);
+            
             // Set UTF-8 encoding explicitly
             // OpenHTMLToPDF will automatically handle UTF-8 if HTML has proper charset declaration
             builder.withHtmlContent(htmlContent, null);
@@ -60,6 +69,145 @@ public class PdfGeneratorService {
             
             return outputStream.toByteArray();
         }
+    }
+    
+    /**
+     * Load font hỗ trợ tiếng Việt cho OpenHTMLToPDF
+     * Ưu tiên: Noto Sans > Arial Unicode MS > DejaVu Sans > Arial > Times New Roman
+     */
+    private void loadVietnameseFont(PdfRendererBuilder builder) throws IOException {
+        // Danh sách các font có thể hỗ trợ tiếng Việt
+        String[] fontPaths = {
+            // Windows fonts (thử cả chữ hoa và chữ thường)
+            "C:/Windows/Fonts/NotoSans-Regular.ttf",
+            "C:/Windows/Fonts/NOTOSANS-REGULAR.TTF",
+            "C:/Windows/Fonts/NotoSansCJK-Regular.ttc",
+            "C:/Windows/Fonts/arialuni.ttf", // Arial Unicode MS
+            "C:/Windows/Fonts/ARIALUNI.TTF",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/ARIAL.TTF",
+            "C:/Windows/Fonts/times.ttf",
+            "C:/Windows/Fonts/TIMES.TTF",
+            // Linux fonts
+            "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            // macOS fonts
+            "/Library/Fonts/Arial Unicode.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        };
+        
+        boolean fontLoaded = false;
+        
+        // Thử load font từ hệ thống
+        for (String fontPath : fontPaths) {
+            File fontFile = new File(fontPath);
+            if (fontFile.exists() && fontFile.isFile()) {
+                try {
+                    // Load font với tên "Noto Sans" hoặc "Arial Unicode MS" hoặc "DejaVu Sans"
+                    String fontName = getFontName(fontPath);
+                    builder.useFont(fontFile, fontName);
+                    fontLoaded = true;
+                    System.out.println("Loaded font: " + fontPath + " as " + fontName);
+                    break;
+                } catch (Exception e) {
+                    System.err.println("Failed to load font from " + fontPath + ": " + e.getMessage());
+                }
+            }
+        }
+        
+        // Nếu không tìm thấy font từ hệ thống, thử tìm trong thư mục Fonts trên Windows
+        if (!fontLoaded) {
+            String windowsFontsDir = "C:/Windows/Fonts";
+            File fontsDir = new File(windowsFontsDir);
+            if (fontsDir.exists() && fontsDir.isDirectory()) {
+                File[] fontFiles = fontsDir.listFiles((dir, name) -> {
+                    String lowerName = name.toLowerCase();
+                    return (lowerName.contains("noto") || 
+                            lowerName.contains("arial") || 
+                            lowerName.contains("dejavu")) && 
+                           (lowerName.endsWith(".ttf") || lowerName.endsWith(".ttc"));
+                });
+                
+                if (fontFiles != null && fontFiles.length > 0) {
+                    // Ưu tiên Noto Sans
+                    for (File fontFile : fontFiles) {
+                        String fileName = fontFile.getName().toLowerCase();
+                        if (fileName.contains("noto") && !fileName.contains("cjk")) {
+                            try {
+                                String fontName = getFontName(fontFile.getAbsolutePath());
+                                builder.useFont(fontFile, fontName);
+                                fontLoaded = true;
+                                System.out.println("Loaded font: " + fontFile.getAbsolutePath() + " as " + fontName);
+                                break;
+                            } catch (Exception e) {
+                                System.err.println("Failed to load font: " + e.getMessage());
+                            }
+                        }
+                    }
+                    
+                    // Nếu không có Noto Sans, thử Arial Unicode MS
+                    if (!fontLoaded) {
+                        for (File fontFile : fontFiles) {
+                            String fileName = fontFile.getName().toLowerCase();
+                            if (fileName.contains("arial") && fileName.contains("uni")) {
+                                try {
+                                    builder.useFont(fontFile, "Arial Unicode MS");
+                                    fontLoaded = true;
+                                    System.out.println("Loaded font: " + fontFile.getAbsolutePath() + " as Arial Unicode MS");
+                                    break;
+                                } catch (Exception e) {
+                                    System.err.println("Failed to load font: " + e.getMessage());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Nếu không tìm thấy font từ hệ thống, thử load từ classpath
+        if (!fontLoaded) {
+            try {
+                Resource fontResource = new ClassPathResource("fonts/NotoSans-Regular.ttf");
+                if (fontResource.exists()) {
+                    InputStream fontStream = fontResource.getInputStream();
+                    Path tempFont = Files.createTempFile("noto-sans-", ".ttf");
+                    Files.copy(fontStream, tempFont, StandardCopyOption.REPLACE_EXISTING);
+                    builder.useFont(tempFont.toFile(), "Noto Sans");
+                    fontLoaded = true;
+                    System.out.println("Loaded font from classpath: fonts/NotoSans-Regular.ttf");
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to load font from classpath: " + e.getMessage());
+            }
+        }
+        
+        // Nếu vẫn không load được, sử dụng font mặc định (có thể không hỗ trợ đầy đủ tiếng Việt)
+        if (!fontLoaded) {
+            System.err.println("Warning: No Vietnamese font found. PDF may display incorrectly for Vietnamese text.");
+        }
+    }
+    
+    /**
+     * Lấy tên font từ đường dẫn file
+     */
+    private String getFontName(String fontPath) {
+        String fileName = new File(fontPath).getName().toLowerCase();
+        if (fileName.contains("noto")) {
+            return "Noto Sans";
+        } else if (fileName.contains("arial") && fileName.contains("uni")) {
+            return "Arial Unicode MS";
+        } else if (fileName.contains("arial")) {
+            return "Arial";
+        } else if (fileName.contains("dejavu")) {
+            return "DejaVu Sans";
+        } else if (fileName.contains("liberation")) {
+            return "Liberation Sans";
+        } else if (fileName.contains("times")) {
+            return "Times New Roman";
+        }
+        return "Noto Sans"; // Default
     }
     
     /**
@@ -131,7 +279,7 @@ public class PdfGeneratorService {
             margin: 0;
         }
         body {
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
             margin: 0;
             padding: 40px;
             background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
@@ -147,47 +295,47 @@ public class PdfGeneratorService {
             font-size: 48px;
             color: #667eea;
             margin-bottom: 20px;
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
         }
         h2 {
             font-size: 24px;
             color: #333;
             margin-bottom: 40px;
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
         }
         .recipient {
             font-size: 36px;
             color: #764ba2;
             margin: 30px 0;
             font-weight: bold;
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
         }
         .course {
             font-size: 28px;
             color: #333;
             margin: 20px 0;
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
         }
         .instructor {
             font-size: 18px;
             color: #666;
             margin-top: 40px;
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
         }
         .date {
             font-size: 16px;
             color: #999;
             margin-top: 20px;
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
         }
         .code {
             font-size: 14px;
             color: #999;
             margin-top: 30px;
-            font-family: "DejaVu Sans Mono", "Courier New", monospace;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", "Courier New", monospace;
         }
         p {
-            font-family: "DejaVu Sans", "Arial Unicode MS", "Noto Sans", Arial, sans-serif;
+            font-family: "Noto Sans", "Arial Unicode MS", "DejaVu Sans", Arial, sans-serif;
         }
     </style>
 </head>
