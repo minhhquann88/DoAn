@@ -38,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
@@ -716,13 +717,41 @@ public class CourseService {
     // Chức năng 10: Lấy danh sách khóa học của học viên (My Courses)
     @Transactional(readOnly = true) // IMPORTANT: Add @Transactional to avoid LazyInitializationException
     public List<CourseResponse> getMyCourses(Long userId) {
+        System.out.println("========================================");
         System.out.println("CourseService.getMyCourses: Fetching courses for user ID: " + userId);
+        
+        // Debug: Kiểm tra user có tồn tại không
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            System.err.println("ERROR: User with ID " + userId + " not found!");
+            return List.of();
+        }
+        User user = userOpt.get();
+        System.out.println("CourseService.getMyCourses: User found - ID: " + user.getId() + ", Username: " + user.getUsername() + ", Email: " + user.getEmail());
         
         try {
             // Use JOIN FETCH query to avoid LazyInitializationException
             List<Enrollment> enrollments = enrollmentRepository.findByUserIdWithCourse(userId);
             
-            System.out.println("CourseService.getMyCourses: Found " + enrollments.size() + " enrollments");
+            System.out.println("CourseService.getMyCourses: Found " + enrollments.size() + " enrollments for user ID: " + userId);
+            
+            // Debug: Log tất cả enrollments tìm được
+            if (enrollments.isEmpty()) {
+                System.out.println("WARNING: No enrollments found for user ID: " + userId);
+                // Thử query trực tiếp để debug
+                List<Enrollment> directQuery = enrollmentRepository.findByUserId(userId, org.springframework.data.domain.PageRequest.of(0, 100)).getContent();
+                System.out.println("DEBUG: Direct query found " + directQuery.size() + " enrollments");
+                if (!directQuery.isEmpty()) {
+                    System.out.println("DEBUG: First enrollment - User ID: " + directQuery.get(0).getUser().getId() + ", Course ID: " + directQuery.get(0).getCourse().getId());
+                }
+            } else {
+                for (Enrollment e : enrollments) {
+                    System.out.println("DEBUG: Enrollment ID: " + e.getId() + 
+                        ", User ID: " + (e.getUser() != null ? e.getUser().getId() : "NULL") + 
+                        ", Course ID: " + (e.getCourse() != null ? e.getCourse().getId() : "NULL") +
+                        ", Course Title: " + (e.getCourse() != null ? e.getCourse().getTitle() : "NULL"));
+                }
+            }
             
             // Extract courses from enrollments
             List<CourseResponse> courses = enrollments.stream()

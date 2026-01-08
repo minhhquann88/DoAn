@@ -218,12 +218,19 @@ public class PaymentService {
         
         // User is same for all transactions
         Long userId = transactions.get(0).getUser().getId();
+        User user = transactions.get(0).getUser();
+        
+        System.out.println(">>> ========================================");
+        System.out.println(">>> Creating enrollments for " + transactions.size() + " course(s)");
+        System.out.println(">>> User ID: " + userId);
+        System.out.println(">>> User Username: " + (user != null ? user.getUsername() : "NULL"));
+        System.out.println(">>> User Email: " + (user != null ? user.getEmail() : "NULL"));
+        System.out.println(">>> ========================================");
         
         // Create enrollment for each transaction's course
-        System.out.println(">>> Creating enrollments for " + transactions.size() + " course(s)");
-        
         for (Transaction transaction : transactions) {
             Course course = transaction.getCourse();
+            System.out.println(">>> Processing transaction for Course ID: " + (course != null ? course.getId() : "NULL"));
             createSingleEnrollment(userId, course, transaction);
         }
         
@@ -324,11 +331,24 @@ public class PaymentService {
         
         System.out.println(">>> SUCCESS: Enrollment created with ID: " + savedEnrollment.getId());
         System.out.println(">>> Enrollment saved for User " + userId + " in Course " + courseId);
+        System.out.println(">>> Saved Enrollment - User ID in object: " + savedEnrollment.getUser().getId());
+        System.out.println(">>> Saved Enrollment - Course ID in object: " + savedEnrollment.getCourse().getId());
         
-        // Verify the save
+        // Verify the save bằng cách query lại
         Optional<Enrollment> verifyEnrollment = enrollmentRepository.findById(savedEnrollment.getId());
         if (verifyEnrollment.isPresent()) {
-            System.out.println(">>> VERIFIED: Enrollment exists in database with ID: " + verifyEnrollment.get().getId());
+            Enrollment verified = verifyEnrollment.get();
+            System.out.println(">>> VERIFIED: Enrollment exists in database with ID: " + verified.getId());
+            System.out.println(">>> Verified Enrollment - User ID: " + (verified.getUser() != null ? verified.getUser().getId() : "NULL"));
+            System.out.println(">>> Verified Enrollment - Course ID: " + (verified.getCourse() != null ? verified.getCourse().getId() : "NULL"));
+            
+            // Verify bằng cách query với userId và courseId
+            Optional<Enrollment> verifyByUserAndCourse = enrollmentRepository.findByUserIdAndCourseId(userId, courseId);
+            if (verifyByUserAndCourse.isPresent()) {
+                System.out.println(">>> VERIFIED: Enrollment found by userId and courseId - ID: " + verifyByUserAndCourse.get().getId());
+            } else {
+                System.err.println(">>> ERROR: Enrollment NOT found by userId (" + userId + ") and courseId (" + courseId + ")!");
+            }
         } else {
             System.err.println(">>> ERROR: Enrollment was not saved properly! ID: " + savedEnrollment.getId());
         }
