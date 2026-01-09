@@ -3,9 +3,7 @@ package com.coursemgmt.controller;
 import com.coursemgmt.dto.CourseRequest;
 import com.coursemgmt.dto.CourseResponse;
 import com.coursemgmt.dto.CourseStatisticsResponse;
-import com.coursemgmt.dto.CourseAnalyticsResponse;
 import com.coursemgmt.dto.MessageResponse;
-import com.coursemgmt.dto.MeetingResponse;
 import com.coursemgmt.dto.ChapterResponse;
 import com.coursemgmt.dto.LessonResponse;
 import com.coursemgmt.model.Course;
@@ -45,17 +43,13 @@ public class CourseController {
     @Autowired
     private CourseRepository courseRepository;
 
-    @Autowired
-    private MeetingService meetingService;
 
     private static final Set<String> VALID_SORT_FIELDS = new HashSet<>(Arrays.asList(
             "id", "title", "description", "price", "imageUrl", "totalDurationInHours",
             "status", "createdAt", "updatedAt"
     ));
 
-    /**
-     * Sanitize sort parameter để tránh lỗi 400 từ tên field không hợp lệ
-     */
+    // Sanitize sort parameter để tránh lỗi 400 từ tên field không hợp lệ
     private String sanitizeSort(String sort) {
         if (sort == null || sort.isEmpty()) {
             return "createdAt,desc";
@@ -72,29 +66,16 @@ public class CourseController {
         return fieldName + "," + direction;
     }
 
-    /**
-     * Tạo khóa học mới
-     */
+    // Tạo khóa học mới
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ResponseEntity<CourseResponse> createCourse(@Valid @RequestBody CourseRequest request,
                                                        @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        if (userDetails != null) {
-            System.out.println("=== CREATE COURSE DEBUG ===");
-            System.out.println("User ID: " + userDetails.getId());
-            System.out.println("Username: " + userDetails.getUsername());
-            System.out.println("Authorities: " + userDetails.getAuthorities());
-            System.out.println("==========================");
-        } else {
-            System.out.println("ERROR: userDetails is null!");
-        }
         Course course = courseService.createCourse(request, userDetails);
         return ResponseEntity.ok(CourseResponse.fromEntity(course));
     }
 
-    /**
-     * Cập nhật khóa học
-     */
+    // Cập nhật khóa học
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
     public ResponseEntity<CourseResponse> updateCourse(@PathVariable Long id,
@@ -103,31 +84,18 @@ public class CourseController {
         return ResponseEntity.ok(CourseResponse.fromEntity(updatedCourse));
     }
 
-    /**
-     * Upload ảnh bìa khóa học
-     */
+    // Upload ảnh bìa khóa học
     @PostMapping(value = "/{id}/image", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
     public ResponseEntity<?> uploadCourseImage(@PathVariable Long id,
                                                 @RequestParam("file") MultipartFile file) {
         try {
-            System.out.println("========================================");
-            System.out.println("Upload Course Image Request");
-            System.out.println("Course ID: " + id);
             if (file == null || file.isEmpty()) {
-                System.err.println("File is null or empty!");
                 return ResponseEntity.badRequest().body(new MessageResponse("File is required and cannot be empty"));
             }
             
-            System.out.println("File name: " + file.getOriginalFilename());
-            System.out.println("File size: " + file.getSize());
-            System.out.println("Content type: " + file.getContentType());
-            System.out.println("File is empty: " + file.isEmpty());
-            System.out.println("========================================");
             CourseResponse courseResponse = courseService.getCourseById(id);
-            System.out.println("Course found: " + courseResponse.getTitle());
             String imageUrl = fileStorageService.storeCourseImage(file, id);
-            System.out.println("Image stored at: " + imageUrl);
             Course currentCourse = courseRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Course not found!"));
             
@@ -146,7 +114,6 @@ public class CourseController {
             }
             
             Course updatedCourse = courseService.updateCourse(id, updateRequest);
-            System.out.println("Course updated successfully");
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Course image uploaded successfully");
@@ -154,15 +121,11 @@ public class CourseController {
             response.put("course", CourseResponse.fromEntity(updatedCourse));
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.err.println("Error uploading course image: " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(new MessageResponse("Error uploading course image: " + e.getMessage()));
         }
     }
 
-    /**
-     * Xóa khóa học
-     */
+    // Xóa khóa học
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
     public ResponseEntity<MessageResponse> deleteCourse(@PathVariable Long id) {
@@ -173,17 +136,16 @@ public class CourseController {
     @Autowired
     private ContentService contentService;
 
-    // 5. Lấy chi tiết 1 khóa học (Public)
+    // Lấy chi tiết 1 khóa học (Public)
     @GetMapping("/{id}")
     public ResponseEntity<CourseResponse> getCourseById(@PathVariable Long id) {
         CourseResponse course = courseService.getCourseById(id);
         return ResponseEntity.ok(course);
     }
 
-    // 5.1. Lấy curriculum công khai (chỉ tên chapters và lessons, không có nội dung chi tiết)
+    // Lấy curriculum công khai (chỉ tên chapters và lessons, không có nội dung chi tiết)
     @GetMapping("/{id}/curriculum")
     public ResponseEntity<List<ChapterResponse>> getPublicCurriculum(@PathVariable Long id) {
-        // Lấy preview lesson ID nếu có
         LessonResponse previewLesson = contentService.getPreviewLesson(id);
         Long previewLessonId = (previewLesson != null) ? previewLesson.getId() : null;
         
@@ -191,52 +153,42 @@ public class CourseController {
         return ResponseEntity.ok(curriculum);
     }
 
-
-    // 5.2. Lấy danh sách khóa học nổi bật (Featured Courses - Public)
+    // Lấy danh sách khóa học nổi bật (Featured Courses - Public)
     @GetMapping("/featured")
     public ResponseEntity<List<CourseResponse>> getFeaturedCourses() {
         List<CourseResponse> featuredCourses = courseService.getFeaturedCourses();
         return ResponseEntity.ok(featuredCourses);
     }
 
-    // 6. Tìm kiếm, lọc, sắp xếp khóa học (Public)
+    // Tìm kiếm, lọc, sắp xếp khóa học (Public)
     @GetMapping
     public ResponseEntity<Page<CourseResponse>> getAllCourses(
-            @RequestParam(required = false) String keyword, // Từ khóa tìm kiếm
-            @RequestParam(required = false) Long categoryId, // Lọc theo danh mục
-            @RequestParam(required = false) Double minPrice, // Giá tối thiểu
-            @RequestParam(required = false) Double maxPrice, // Giá tối đa
-            @RequestParam(required = false) Boolean isFree, // Lọc khóa học miễn phí
-            @RequestParam(required = false) Boolean isPaid, // Lọc khóa học có phí
-            @RequestParam(required = false) String level, // Lọc theo cấp độ (BEGINNER, INTERMEDIATE, ADVANCED, EXPERT)
-            @RequestParam(required = false) Double minRating, // Đánh giá tối thiểu
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) Boolean isFree,
+            @RequestParam(required = false) Boolean isPaid,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) Double minRating,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt,desc") String sort // Sắp xếp
+            @RequestParam(defaultValue = "createdAt,desc") String sort
     ) {
-        // Sanitize sort parameter to prevent 400 errors from invalid field names
         String sanitizedSort = sanitizeSort(sort);
         Page<CourseResponse> courses = courseService.getAllPublishedCourses(keyword, categoryId, minPrice, maxPrice, isFree, isPaid, level, minRating, page, size, sanitizedSort);
         return ResponseEntity.ok(courses);
     }
 
-    // 7. Thống kê (Admin hoặc Giảng viên sở hữu)
+    // Thống kê (Admin hoặc Giảng viên sở hữu)
     @GetMapping("/{id}/statistics")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
     public ResponseEntity<CourseStatisticsResponse> getCourseStatistics(@PathVariable Long id) {
         CourseStatisticsResponse stats = courseService.getCourseStatistics(id);
         return ResponseEntity.ok(stats);
     }
-    
-    // 8. Analytics chi tiết (Admin hoặc Giảng viên sở hữu)
-    @GetMapping("/{id}/analytics")
-    @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #id)")
-    public ResponseEntity<CourseAnalyticsResponse> getCourseAnalytics(@PathVariable Long id) {
-        CourseAnalyticsResponse analytics = courseService.getCourseAnalytics(id);
-        return ResponseEntity.ok(analytics);
-    }
 
-    // 8. Giảng viên tự publish khóa học (Marketplace Model - Self-Publish)
+    // Giảng viên tự publish khóa học
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<CourseResponse> publishCourse(@PathVariable Long id,
@@ -245,7 +197,7 @@ public class CourseController {
         return ResponseEntity.ok(CourseResponse.fromEntity(publishedCourse));
     }
 
-    // 10. Giảng viên gỡ khóa học (Unpublish) - PUBLISHED -> DRAFT
+    // Giảng viên gỡ khóa học (Unpublish) - PUBLISHED -> DRAFT
     @PostMapping("/{id}/unpublish")
     @PreAuthorize("hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<CourseResponse> unpublishCourse(@PathVariable Long id,
@@ -254,41 +206,13 @@ public class CourseController {
         return ResponseEntity.ok(CourseResponse.fromEntity(unpublishedCourse));
     }
 
-    // 10. Đánh dấu khóa học là nổi bật (Featured) - Chỉ Admin
-    @PatchMapping("/{id}/feature")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<CourseResponse> toggleFeatured(@PathVariable Long id,
-                                                          @RequestParam(defaultValue = "true") Boolean isFeatured) {
-        Course course = courseService.toggleFeatured(id, isFeatured);
-        return ResponseEntity.ok(CourseResponse.fromEntity(course));
-    }
-
-    // 11. Lấy danh sách khóa học của học viên (My Courses)
+    // Lấy danh sách khóa học của học viên (My Courses)
     @GetMapping("/my-courses")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<CourseResponse>> getMyCourses(
             @AuthenticationPrincipal UserDetailsImpl userDetails
     ) {
-        System.out.println("========================================");
-        System.out.println("GetMyCourses: Request received for user ID: " + userDetails.getId());
-        
         List<CourseResponse> courses = courseService.getMyCourses(userDetails.getId());
-        
-        System.out.println("GetMyCourses: Found " + courses.size() + " courses for user " + userDetails.getId());
-        if (courses.size() > 0) {
-            System.out.println("GetMyCourses: Course IDs: " + 
-                courses.stream().map(CourseResponse::getId).toList());
-        }
-        System.out.println("========================================");
-        
         return ResponseEntity.ok(courses);
-    }
-
-    // 12. Get meetings for a course
-    @GetMapping("/{id}/meetings")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<MeetingResponse>> getCourseMeetings(@PathVariable Long id) {
-        List<MeetingResponse> meetings = meetingService.getCourseMeetings(id);
-        return ResponseEntity.ok(meetings);
     }
 }

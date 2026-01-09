@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.TextStyle;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,22 +31,16 @@ public class EnrollmentService {
     @Autowired
     private CertificateRepository certificateRepository;
 
-    /**
-     * Lấy danh sách enrollment theo course
-     * Security: Double-check ownership - only Admin or Course Owner can access
-     */
+    // Lấy danh sách enrollment theo course
     public Page<EnrollmentDTO> getEnrollmentsByCourse(Long courseId, Long currentUserId, Pageable pageable) {
-        // Fetch the course to verify ownership
         Course course = courseRepository.findById(courseId)
             .orElseThrow(() -> new RuntimeException("Course not found with id: " + courseId));
         
-        // Check if current user is Admin
         User currentUser = userRepository.findById(currentUserId)
             .orElseThrow(() -> new RuntimeException("User not found"));
         boolean isAdmin = currentUser.getRoles().stream()
             .anyMatch(role -> role.getName() == ERole.ROLE_ADMIN);
         
-        // Security Check: Only Admin or Course Owner can access
         if (!isAdmin && (course.getInstructor() == null || !course.getInstructor().getId().equals(currentUserId))) {
             throw new AccessDeniedException("You are not authorized to view enrollments for this course");
         }
@@ -56,18 +49,13 @@ public class EnrollmentService {
         return enrollments.map(this::convertToDTO);
     }
 
-    /**
-     * Lấy danh sách enrollment theo student
-     * Security: Double-check identity - only Admin or the student themselves can access
-     */
+    // Lấy danh sách enrollment theo student
     public Page<EnrollmentDTO> getEnrollmentsByStudent(Long studentId, Long currentUserId, Pageable pageable) {
-        // Check if current user is Admin
         User currentUser = userRepository.findById(currentUserId)
             .orElseThrow(() -> new RuntimeException("User not found"));
         boolean isAdmin = currentUser.getRoles().stream()
             .anyMatch(role -> role.getName() == ERole.ROLE_ADMIN);
         
-        // Security Check: Only Admin or the student themselves can access
         if (!isAdmin && !studentId.equals(currentUserId)) {
             throw new AccessDeniedException("You are not authorized to view this student's enrollments");
         }
@@ -76,29 +64,22 @@ public class EnrollmentService {
         return enrollments.map(this::convertToDTO);
     }
 
-    /**
-     * Lấy enrollment theo ID
-     */
+    // Lấy enrollment theo ID
     public EnrollmentDTO getEnrollmentById(Long enrollmentId) {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
             .orElseThrow(() -> new RuntimeException("Enrollment not found with id: " + enrollmentId));
         return convertToDTO(enrollment);
     }
 
-    /**
-     * Tạo enrollment mới
-     */
+    // Tạo enrollment mới
     @Transactional
     public EnrollmentDTO createEnrollment(EnrollmentCreateRequest request) {
-        // Validate student exists
         User student = userRepository.findById(request.getStudentId())
             .orElseThrow(() -> new RuntimeException("Student not found with id: " + request.getStudentId()));
         
-        // Validate course exists
         Course course = courseRepository.findById(request.getCourseId())
             .orElseThrow(() -> new RuntimeException("Course not found with id: " + request.getCourseId()));
         
-        // Check if already enrolled
         Optional<Enrollment> existing = enrollmentRepository
             .findByUserIdAndCourseId(request.getStudentId(), request.getCourseId());
         
@@ -106,7 +87,6 @@ public class EnrollmentService {
             throw new RuntimeException("Student already enrolled in this course");
         }
         
-        // Create enrollment
         Enrollment enrollment = new Enrollment();
         enrollment.setUser(student);
         enrollment.setCourse(course);
@@ -118,15 +98,12 @@ public class EnrollmentService {
         return convertToDTO(saved);
     }
 
-    /**
-     * Cập nhật trạng thái enrollment
-     */
+    // Cập nhật trạng thái enrollment
     @Transactional
     public EnrollmentDTO updateEnrollment(Long enrollmentId, EnrollmentUpdateRequest request) {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
             .orElseThrow(() -> new RuntimeException("Enrollment not found with id: " + enrollmentId));
         
-        // Update status
         if (request.getStatus() != null) {
             try {
                 EEnrollmentStatus newStatus = EEnrollmentStatus.valueOf(request.getStatus());
@@ -136,49 +113,34 @@ public class EnrollmentService {
             }
         }
         
-        // Update progress
         if (request.getProgress() != null) {
             enrollment.setProgress(request.getProgress());
             
-            // Auto-complete if progress reaches 100%
             if (request.getProgress() >= 100.0 && enrollment.getStatus() != EEnrollmentStatus.COMPLETED) {
                 enrollment.setStatus(EEnrollmentStatus.COMPLETED);
             }
-        }
-        
-        // Update score - would need to add field to entity
-        if (request.getCurrentScore() != null) {
-            // Would update in actual implementation if field exists
         }
         
         Enrollment updated = enrollmentRepository.save(enrollment);
         return convertToDTO(updated);
     }
 
-    /**
-     * Xóa học viên khỏi khóa học (Admin only)
-     */
+    // Xóa học viên khỏi khóa học (Admin only)
     @Transactional
     public void removeEnrollment(Long enrollmentId) {
         Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
             .orElseThrow(() -> new RuntimeException("Enrollment not found with id: " + enrollmentId));
         
-        // Can add business logic here (e.g., refund check)
         enrollmentRepository.delete(enrollment);
     }
 
-    /**
-     * Lấy lịch sử học tập của học viên
-     * Security: Double-check identity - only Admin or the student themselves can access
-     */
+    // Lấy lịch sử học tập của học viên
     public StudentLearningHistoryDTO getStudentLearningHistory(Long studentId, Long currentUserId) {
-        // Check if current user is Admin
         User currentUser = userRepository.findById(currentUserId)
             .orElseThrow(() -> new RuntimeException("User not found"));
         boolean isAdmin = currentUser.getRoles().stream()
             .anyMatch(role -> role.getName() == ERole.ROLE_ADMIN);
         
-        // Security Check: Only Admin or the student themselves can access
         if (!isAdmin && !studentId.equals(currentUserId)) {
             throw new AccessDeniedException("You are not authorized to view this student's learning history");
         }
@@ -191,25 +153,21 @@ public class EnrollmentService {
         history.setStudentName(student.getFullName());
         history.setEmail(student.getEmail());
         
-        // Get all enrollments
         List<Enrollment> enrollments = enrollmentRepository
             .findByUserId(studentId, Pageable.unpaged())
             .getContent();
         
         history.setTotalCoursesEnrolled(enrollments.size());
         
-        // Count by status
         long completed = enrollments.stream()
             .filter(e -> EEnrollmentStatus.COMPLETED.equals(e.getStatus()))
             .count();
-        // Note: DROPPED status not in current enum, using 0
         long dropped = 0;
         
         history.setCoursesCompleted((int) completed);
         history.setCoursesDropped((int) dropped);
         history.setCoursesInProgress(enrollments.size() - (int) completed - (int) dropped);
         
-        // Calculate overall progress
         if (!enrollments.isEmpty()) {
             double avgProgress = enrollments.stream()
                 .mapToDouble(Enrollment::getProgress)
@@ -218,19 +176,16 @@ public class EnrollmentService {
             history.setOverallProgress(avgProgress);
         }
         
-        // Get certificates
         Long certCount = certificateRepository
             .findByEnrollmentUserId(studentId, Pageable.unpaged())
             .getTotalElements();
         history.setCertificatesEarned(certCount.intValue());
         
-        // Convert enrollments to DTOs
         List<EnrollmentDTO> enrollmentDTOs = enrollments.stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
         history.setEnrollments(enrollmentDTOs);
         
-        // Last activity - using enrolledAt as proxy
         Optional<LocalDateTime> lastAccess = enrollments.stream()
             .map(Enrollment::getEnrolledAt)
             .filter(Objects::nonNull)
@@ -240,59 +195,8 @@ public class EnrollmentService {
         return history;
     }
 
-    /**
-     * Thống kê học viên mới theo tháng
-     */
-    public MonthlyStudentStatsDTO getMonthlyStudentStats(int year) {
-        MonthlyStudentStatsDTO stats = new MonthlyStudentStatsDTO();
-        
-        List<MonthlyStudentStatsDTO.MonthlyData> monthlyData = new ArrayList<>();
-        
-        for (int month = 1; month <= 12; month++) {
-            LocalDateTime startOfMonth = LocalDateTime.of(year, month, 1, 0, 0);
-            LocalDateTime endOfMonth = startOfMonth.plusMonths(1).minusSeconds(1);
-            
-            // Count new enrollments in this month
-            // Note: This is simplified - in production, would use proper queries
-            List<Enrollment> enrollments = enrollmentRepository
-                .findByUserId(1L, Pageable.unpaged()) // Simplified
-                .getContent();
-            
-            long monthEnrollments = enrollments.stream()
-                .filter(e -> e.getEnrolledAt() != null)
-                .filter(e -> e.getEnrolledAt().isAfter(startOfMonth) && 
-                           e.getEnrolledAt().isBefore(endOfMonth))
-                .count();
-            
-            long monthCompletions = enrollments.stream()
-                .filter(e -> EEnrollmentStatus.COMPLETED.equals(e.getStatus()))
-                .filter(e -> e.getEnrolledAt() != null)
-                .filter(e -> e.getEnrolledAt().isAfter(startOfMonth) && 
-                           e.getEnrolledAt().isBefore(endOfMonth))
-                .count();
-            
-            String monthName = startOfMonth.getMonth()
-                .getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + " " + year;
-            
-            MonthlyStudentStatsDTO.MonthlyData data = new MonthlyStudentStatsDTO.MonthlyData(
-                year,
-                month,
-                monthName,
-                monthEnrollments, // Simplified
-                monthEnrollments,
-                monthCompletions
-            );
-            
-            monthlyData.add(data);
-        }
-        
-        stats.setMonthlyData(monthlyData);
-        return stats;
-    }
 
-    /**
-     * Convert Enrollment entity to DTO
-     */
+    // Convert Enrollment entity to DTO
     private EnrollmentDTO convertToDTO(Enrollment enrollment) {
         EnrollmentDTO dto = new EnrollmentDTO();
         dto.setId(enrollment.getId());
@@ -325,21 +229,15 @@ public class EnrollmentService {
         return dto;
     }
 
-    /**
-     * Lấy danh sách học viên của giảng viên hiện tại (My Students)
-     * Returns all students enrolled in ANY course owned by the current instructor
-     */
+    // Lấy danh sách học viên của giảng viên hiện tại (My Students)
     public Page<EnrollmentDTO> getMyStudents(Long instructorId, Long courseId, Pageable pageable) {
-        // Get all courses owned by this instructor
         List<Course> instructorCourses = courseRepository.findByInstructorId(instructorId);
         
         if (instructorCourses.isEmpty()) {
             return new PageImpl<>(Collections.emptyList(), pageable, 0);
         }
         
-        // Filter by specific course if provided
         if (courseId != null) {
-            // Verify the course belongs to this instructor
             boolean courseBelongsToInstructor = instructorCourses.stream()
                 .anyMatch(c -> c.getId().equals(courseId));
             
@@ -347,17 +245,14 @@ public class EnrollmentService {
                 throw new AccessDeniedException("You are not authorized to view enrollments for this course");
             }
             
-            // Return enrollments for this specific course
             Page<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId, pageable);
             return enrollments.map(this::convertToDTO);
         }
         
-        // Get enrollments from all courses owned by this instructor
         List<Long> courseIds = instructorCourses.stream()
             .map(Course::getId)
             .collect(Collectors.toList());
         
-        // Fetch all enrollments for these courses
         List<Enrollment> allEnrollments = new ArrayList<>();
         for (Long cId : courseIds) {
             List<Enrollment> enrollments = enrollmentRepository.findByCourseId(cId, Pageable.unpaged())
@@ -365,18 +260,15 @@ public class EnrollmentService {
             allEnrollments.addAll(enrollments);
         }
         
-        // Remove duplicates (same student in multiple courses)
         Map<Long, Enrollment> uniqueEnrollments = new LinkedHashMap<>();
         for (Enrollment enrollment : allEnrollments) {
             Long studentId = enrollment.getUser().getId();
-            // Keep the most recent enrollment per student
             if (!uniqueEnrollments.containsKey(studentId) || 
                 enrollment.getEnrolledAt().isAfter(uniqueEnrollments.get(studentId).getEnrolledAt())) {
                 uniqueEnrollments.put(studentId, enrollment);
             }
         }
         
-        // Paginate manually
         List<EnrollmentDTO> enrollmentDTOs = uniqueEnrollments.values().stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());

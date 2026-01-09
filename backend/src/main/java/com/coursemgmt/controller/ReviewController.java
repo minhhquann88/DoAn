@@ -29,9 +29,7 @@ public class ReviewController {
     @Autowired
     private ReviewService reviewService;
 
-    /**
-     * Tạo hoặc cập nhật đánh giá cho khóa học
-     */
+    // Tạo hoặc cập nhật đánh giá cho khóa học
     @PostMapping("/courses/{courseId}")
     @PreAuthorize("hasRole('STUDENT') or hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<?> createOrUpdateReview(
@@ -51,9 +49,7 @@ public class ReviewController {
         }
     }
 
-    /**
-     * Lấy đánh giá của user hiện tại cho một khóa học
-     */
+    // Lấy đánh giá của user hiện tại cho một khóa học
     @GetMapping("/courses/{courseId}/my-review")
     @PreAuthorize("hasRole('STUDENT') or hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<?> getMyReview(
@@ -67,14 +63,11 @@ public class ReviewController {
         if (review.isPresent()) {
             return ResponseEntity.ok(review.get());
         } else {
-            // Return empty response with 200 status
             return ResponseEntity.ok().build();
         }
     }
 
-    /**
-     * Lấy tất cả đánh giá của một khóa học
-     */
+    // Lấy tất cả đánh giá của một khóa học
     @GetMapping("/courses/{courseId}")
     public ResponseEntity<Page<ReviewDTO>> getCourseReviews(
             @PathVariable Long courseId,
@@ -92,18 +85,14 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
-    /**
-     * Lấy thông tin rating tổng hợp của khóa học
-     */
+    // Lấy thông tin rating tổng hợp của khóa học
     @GetMapping("/courses/{courseId}/rating")
     public ResponseEntity<CourseRatingDTO> getCourseRating(@PathVariable Long courseId) {
         CourseRatingDTO rating = reviewService.getCourseRating(courseId);
         return ResponseEntity.ok(rating);
     }
 
-    /**
-     * Kiểm tra user có thể đánh giá khóa học không
-     */
+    // Kiểm tra user có thể đánh giá khóa học không
     @GetMapping("/courses/{courseId}/can-review")
     @PreAuthorize("hasRole('STUDENT') or hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<?> canReview(
@@ -120,9 +109,7 @@ public class ReviewController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Xóa đánh giá
-     */
+    // Xóa đánh giá
     @DeleteMapping("/{reviewId}")
     @PreAuthorize("hasRole('STUDENT') or hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<?> deleteReview(
@@ -137,9 +124,7 @@ public class ReviewController {
         }
     }
 
-    /**
-     * Giảng viên phản hồi đánh giá
-     */
+    // Giảng viên phản hồi đánh giá
     @PostMapping("/{reviewId}/reply")
     @PreAuthorize("hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<?> replyToReview(
@@ -160,9 +145,7 @@ public class ReviewController {
         }
     }
 
-    /**
-     * Lấy tất cả đánh giá cho các khóa học của giảng viên
-     */
+    // Lấy tất cả đánh giá cho các khóa học của giảng viên
     @GetMapping("/instructor/my-course-reviews")
     @PreAuthorize("hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<Page<ReviewDTO>> getInstructorCourseReviews(
@@ -175,9 +158,7 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
-    /**
-     * Đếm số đánh giá chưa phản hồi
-     */
+    // Đếm số đánh giá chưa phản hồi
     @GetMapping("/instructor/unreplied-count")
     @PreAuthorize("hasRole('LECTURER') or hasRole('ADMIN')")
     public ResponseEntity<?> getUnrepliedCount(@AuthenticationPrincipal UserDetailsImpl userDetails) {

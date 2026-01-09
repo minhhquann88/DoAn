@@ -43,7 +43,7 @@ public class AuthService {
     RoleRepository roleRepository;
 
     @Autowired
-    PasswordEncoder encoder; // Encoder BCrypt
+    PasswordEncoder encoder;
 
     @Autowired
     JwtUtils jwtUtils;
@@ -57,38 +57,43 @@ public class AuthService {
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
-    // Chức năng Đăng nhập
+    // Đăng nhập người dùng
     public JwtResponse loginUser(LoginRequest loginRequest) {
-        // Kiểm tra tài khoản có bị khóa không trước khi authenticate
+        // Tìm user theo username hoặc email
         Optional<User> userOptional = userRepository.findByUsernameOrEmail(
                 loginRequest.getUsernameOrEmail(), 
                 loginRequest.getUsernameOrEmail()
         );
         
+        // Kiểm tra tài khoản có bị khóa không
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             if (user.getIsEnabled() != null && !user.getIsEnabled()) {
-                // Tài khoản bị khóa, ném DisabledException với message rõ ràng
                 String lockMessage = user.getLockReason() != null && !user.getLockReason().trim().isEmpty()
                     ? user.getLockReason()
                     : "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.";
-                throw new org.springframework.security.authentication.DisabledException(lockMessage);
+                throw new org.springframework.security.authentication.DisabledException(lockMessage); // Throw exception nếu bị khóa
             }
         }
         
+        // Xác thực username/password với Spring Security
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getUsernameOrEmail(),
                         loginRequest.getPassword()));
 
+        // Lưu Authentication vào SecurityContext → Để các request sau biết user đã đăng nhập
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(authentication); // Trả token JWT
+        // Tạo JWT token từ Authentication → Token chứa username, roles, expiry time
+        String jwt = jwtUtils.generateJwtToken(authentication);
 
+        // Lấy thông tin user và roles từ Authentication
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
 
+        // Trả về JWT token + thông tin user
         return new JwtResponse(jwt,
                 userDetails.getId(),
                 userDetails.getUsername(),
@@ -96,42 +101,46 @@ public class AuthService {
                 roles);
     }
 
-    // Chức năng Đăng ký
+    // Đăng ký người dùng mới
     @Transactional
     public User registerUser(RegisterRequest registerRequest) {
+        // Kiểm tra username đã tồn tại
         if (userRepository.existsByUsername(registerRequest.getUsername())) {
             throw new RuntimeException("Error: Username is already taken!");
         }
 
+        // Kiểm tra email đã tồn tại 
         if (userRepository.existsByEmail(registerRequest.getEmail())) {
             throw new RuntimeException("Error: Email is already in use!");
         }
 
+        // Tạo User object mới
         User user = new User();
         user.setUsername(registerRequest.getUsername());
         user.setEmail(registerRequest.getEmail());
-        user.setPassword(encoder.encode(registerRequest.getPassword())); // Mã hóa BCrypt
+        user.setPassword(encoder.encode(registerRequest.getPassword())); // Mã hóa
         user.setFullName(registerRequest.getFullName());
         user.setCreatedAt(LocalDateTime.now());
-        user.setIsEnabled(true); // Tạm thời để true, sau này có thể set false để xác thực email
+        user.setIsEnabled(true);
 
+        // Xử lý roles
         Set<String> strRoles = registerRequest.getRoles();
         Set<Role> roles = new HashSet<>();
 
-        // Security: Block admin and mod roles from public registration
+        // Không cho đăng ký role ADMIN 
         if (strRoles != null && !strRoles.isEmpty()) {
-            if (strRoles.contains("admin") || strRoles.contains("mod")) {
+            if (strRoles.contains("admin")) {
                 throw new RuntimeException("Error: Role is not allowed for public registration.");
             }
         }
 
-        // Default role: If roles are null/empty, default to 'user' (Student)
+        // Nếu không có role → Mặc định là STUDENT
         if (strRoles == null || strRoles.isEmpty()) {
             Role userRole = roleRepository.findByName(ERole.ROLE_STUDENT)
                     .orElseThrow(() -> new RuntimeException("Error: Role 'STUDENT' is not found."));
             roles.add(userRole);
         } else {
-            // Allowed Roles: Only allow 'user' (Student) or 'lecturer' (Instructor)
+            // Chỉ cho phép đăng ký role LECTURER hoặc STUDENT
             strRoles.forEach(role -> {
                 switch (role.toLowerCase()) {
                     case "lecturer":
@@ -139,10 +148,8 @@ public class AuthService {
                                 .orElseThrow(() -> new RuntimeException("Error: Role 'LECTURER' is not found."));
                         roles.add(lecturerRole);
                         break;
-                    case "user":
                     case "student":
                     default:
-                        // Default to Student role for any unrecognized role
                         Role userRole = roleRepository.findByName(ERole.ROLE_STUDENT)
                                 .orElseThrow(() -> new RuntimeException("Error: Role 'STUDENT' is not found."));
                         roles.add(userRole);
@@ -151,143 +158,119 @@ public class AuthService {
             });
         }
         user.setRoles(roles);
+        // Lưu user vào database 
         return userRepository.save(user);
     }
 
-    // Chức năng Quên mật khẩu
+    // Xử lý quên mật khẩu
     @Transactional
     public void handleForgotPassword(ForgotPasswordRequest request, HttpServletRequest servletRequest) {
+        // Tìm user theo email 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("Email không tồn tại trong hệ thống!"));
 
-        // Tìm token cũ nếu có
+        // Kiểm tra có token cũ không 
+        // Nếu có thì cập nhật, không thì tạo mới 
         Optional<PasswordResetToken> existingToken = tokenRepository.findByUser(user);
-
-        // Tạo token mới
         String token = UUID.randomUUID().toString();
         PasswordResetToken resetToken;
         
         if (existingToken.isPresent()) {
-            // Cập nhật token cũ thay vì xóa và tạo mới (tránh duplicate key)
-            resetToken = existingToken.get();
+            resetToken = existingToken.get(); 
             resetToken.setToken(token);
-            resetToken.setExpiryDate(LocalDateTime.now().plusHours(24));
+            resetToken.setExpiryDate(LocalDateTime.now().plusHours(24)); 
         } else {
-            // Tạo token mới nếu chưa có
-            resetToken = new PasswordResetToken(token, user);
+            resetToken = new PasswordResetToken(token, user); 
         }
-        
-        tokenRepository.save(resetToken);
 
-        // Tạo link reset (trỏ về phía Frontend)
-        // Sử dụng frontend URL từ config thay vì backend URL
-        String resetLink = frontendUrl + "/reset-password?token=" + token;
-
-        // Gửi email
-        emailService.sendPasswordResetEmail(user.getEmail(), resetLink);
+        // Lưu token vào database
+        tokenRepository.save(resetToken); 
+        String resetLink = frontendUrl + "/reset-password?token=" + token; 
+        // Gửi email chứa link reset
+        emailService.sendPasswordResetEmail(user.getEmail(), resetLink); 
     }
 
-    // Chức năng Đặt lại mật khẩu
+    // Xử lý đặt lại mật khẩu
     @Transactional
     public void handleResetPassword(ResetPasswordRequest request) {
+        // Bước 1: Tìm token trong database → Query: SELECT * FROM password_reset_tokens WHERE token = ?
         PasswordResetToken resetToken = tokenRepository.findByToken(request.getToken())
                 .orElseThrow(() -> new RuntimeException("Error: Invalid reset token!"));
 
+        // Bước 2: Kiểm tra token có hết hạn không (expiryDate < now)
         if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
-            tokenRepository.delete(resetToken);
+            tokenRepository.delete(resetToken); // Xóa token hết hạn
             throw new RuntimeException("Error: Token expired!");
         }
 
-        User user = resetToken.getUser();
+        User user = resetToken.getUser(); // Lấy user từ token
         
-        // Kiểm tra mật khẩu mới không được giống mật khẩu cũ
+        // Bước 3: Kiểm tra mật khẩu mới không được giống mật khẩu cũ
         if (encoder.matches(request.getNewPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu cũ. Vui lòng chọn mật khẩu khác.");
         }
         
+        // Bước 4: Mã hóa mật khẩu mới bằng BCrypt → Lưu vào database
         user.setPassword(encoder.encode(request.getNewPassword()));
         userRepository.save(user);
-
-        // Xóa token sau khi dùng xong
+        // Bước 5: Xóa token sau khi dùng (token chỉ dùng 1 lần)
         tokenRepository.delete(resetToken);
     }
 
-    // Chức năng Cập nhật Profile
+    // Cập nhật thông tin profile
     @Transactional
     public User updateProfile(Long userId, UpdateProfileRequest request) {
-        // Step 1: Fetch user by ID
-        System.out.println("UpdateProfile: Fetching user with ID: " + userId);
+        // Bước 1: Tìm user theo ID → Query: SELECT * FROM users WHERE id = ?
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    System.out.println("UpdateProfile: User not found with ID: " + userId);
-                    return new UsernameNotFoundException("User not found!");
-                });
+                .orElseThrow(() -> new UsernameNotFoundException("User not found!"));
 
-        // Validate request
         if (request == null) {
-            System.out.println("UpdateProfile: Request is null");
             throw new IllegalArgumentException("Request không hợp lệ");
         }
 
-        // Step 2: Update fields ONLY if they are not null (Partial Update)
-        // Note: Email update is restricted for security - only allow if not changing or changing to new valid email
+        // Bước 2: Partial Update - Chỉ update field có giá trị (không null)
+        // Nếu đổi email → Kiểm tra email mới chưa được sử dụng
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            System.out.println("UpdateProfile: Email change requested - checking if email exists");
-            if (userRepository.existsByEmail(request.getEmail())) {
+            if (userRepository.existsByEmail(request.getEmail())) { // Query: SELECT COUNT(*) FROM users WHERE email = ?
                 throw new IllegalArgumentException("Email này đã được sử dụng");
             }
             user.setEmail(request.getEmail());
-            System.out.println("UpdateProfile: Email updated");
         }
 
         if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
-            System.out.println("UpdateProfile: Updating fullName to: " + request.getFullName());
             user.setFullName(request.getFullName());
         }
 
         if (request.getAvatarUrl() != null) {
-            System.out.println("UpdateProfile: Updating avatarUrl");
             user.setAvatarUrl(request.getAvatarUrl());
         }
 
         if (request.getBio() != null) {
-            System.out.println("UpdateProfile: Updating bio");
             user.setBio(request.getBio());
         }
 
-        // Update expertise - allow empty string to clear the field
+        // Cho phép xóa field bằng cách gửi empty string → Convert thành null
         if (request.getExpertise() != null) {
-            System.out.println("UpdateProfile: Updating expertise to: " + request.getExpertise());
             user.setExpertise(request.getExpertise().trim().isEmpty() ? null : request.getExpertise().trim());
         }
 
-        // Update phoneNumber - allow empty string to clear the field
         if (request.getPhoneNumber() != null) {
-            System.out.println("UpdateProfile: Updating phoneNumber to: " + request.getPhoneNumber());
             user.setPhoneNumber(request.getPhoneNumber().trim().isEmpty() ? null : request.getPhoneNumber().trim());
         }
 
-        // Update address - allow empty string to clear the field
         if (request.getAddress() != null) {
-            System.out.println("UpdateProfile: Updating address to: " + request.getAddress());
             user.setAddress(request.getAddress().trim().isEmpty() ? null : request.getAddress().trim());
         }
 
-        // Update emailNotificationEnabled
         if (request.getEmailNotificationEnabled() != null) {
-            System.out.println("UpdateProfile: Updating emailNotificationEnabled to: " + request.getEmailNotificationEnabled());
             user.setEmailNotificationEnabled(request.getEmailNotificationEnabled());
         }
 
-        // Step 3: CRITICAL - Save to database to persist changes
-        System.out.println("UpdateProfile: Saving user to database...");
-        User savedUser = userRepository.save(user);
-        System.out.println("UpdateProfile: Profile updated successfully for user ID: " + userId);
-        
-        return savedUser;
+        // Bước 3: Lưu thay đổi vào database → UPDATE users SET ...
+        return userRepository.save(user);
     }
 
-    // New method to update only avatar URL
+    // Cập nhật avatar URL
     @Transactional
     public User updateAvatarUrl(Long userId, String avatarUrl) {
         User user = userRepository.findById(userId)
@@ -296,18 +279,17 @@ public class AuthService {
         return userRepository.save(user);
     }
 
-    // New method to get user by ID
+    // Lấy user theo ID
     public User getUserById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
     }
 
-    // Get user profile as DTO to avoid Jackson infinite recursion
+    // Lấy thông tin profile dưới dạng DTO
     public ProfileResponse getUserProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
         
-        // Map User entity to ProfileResponse DTO
         return new ProfileResponse(
                 user.getId(),
                 user.getUsername(),
@@ -323,62 +305,41 @@ public class AuthService {
         );
     }
 
-    // Chức năng Đổi mật khẩu
+    // Đổi mật khẩu
     @Transactional
     public void changePassword(Long userId, ChangePasswordRequest request) {
-        // Step 1: Check User - Find user by ID
-        System.out.println("ChangePassword: Fetching user with ID: " + userId);
+        // Bước 1: Tìm user theo ID
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> {
-                    System.out.println("ChangePassword: User not found with ID: " + userId);
-                    return new UsernameNotFoundException("User not found!");
-                });
+                .orElseThrow(() -> new UsernameNotFoundException("User not found!"));
 
-        // Validate request data
+        // Bước 2: Validate request
         if (request == null) {
-            System.out.println("ChangePassword: Request is null");
             throw new IllegalArgumentException("Request không hợp lệ");
         }
         if (request.getOldPassword() == null || request.getOldPassword().trim().isEmpty()) {
-            System.out.println("ChangePassword: Old password is null or empty");
             throw new IllegalArgumentException("Mật khẩu hiện tại không được để trống");
         }
         if (request.getNewPassword() == null || request.getNewPassword().trim().isEmpty()) {
-            System.out.println("ChangePassword: New password is null or empty");
             throw new IllegalArgumentException("Mật khẩu mới không được để trống");
         }
 
-        // Step 2: Verify Old Password - Use passwordEncoder.matches()
-        System.out.println("ChangePassword: Checking old password...");
-        String storedPassword = user.getPassword();
+        String storedPassword = user.getPassword(); // Lấy password đã mã hóa từ database
         if (storedPassword == null || storedPassword.trim().isEmpty()) {
-            System.out.println("ChangePassword: Stored password is null or empty");
             throw new RuntimeException("Lỗi: Mật khẩu trong database không hợp lệ");
         }
 
-        // Crucial: Verify old password matches
+        // Bước 3: Verify old password → encoder.matches() so sánh plain password với hashed password
         if (!encoder.matches(request.getOldPassword(), storedPassword)) {
-            System.out.println("ChangePassword: Old password does not match");
             throw new IllegalArgumentException("Mật khẩu hiện tại không đúng");
         }
-        System.out.println("ChangePassword: Old password verified successfully");
 
-        // Step 3: Check if new password is different from old password
+        // Bước 4: Kiểm tra mật khẩu mới không được giống mật khẩu cũ
         if (encoder.matches(request.getNewPassword(), storedPassword)) {
-            System.out.println("ChangePassword: New password is the same as old password");
             throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu cũ. Vui lòng chọn mật khẩu khác.");
         }
-        System.out.println("ChangePassword: New password is different from old password");
 
-        // Step 4: Hash and set new password
-        System.out.println("ChangePassword: Encoding new password...");
-        String encodedNewPassword = encoder.encode(request.getNewPassword());
-        user.setPassword(encodedNewPassword);
-        System.out.println("ChangePassword: New password encoded successfully");
-
-        // Step 5: Save to database
-        System.out.println("ChangePassword: Saving user to database...");
+        // Bước 5: Mã hóa mật khẩu mới bằng BCrypt → Lưu vào database
+        user.setPassword(encoder.encode(request.getNewPassword()));
         userRepository.save(user);
-        System.out.println("ChangePassword: Password changed successfully for user ID: " + userId);
     }
 }

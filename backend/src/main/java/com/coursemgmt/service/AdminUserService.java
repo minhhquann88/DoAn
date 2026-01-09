@@ -22,26 +22,25 @@ public class AdminUserService {
     @Autowired
     private UserRepository userRepository;
 
-    /**
-     * Lấy danh sách users với phân trang và tìm kiếm
-     */
+    // Lấy danh sách users với phân trang và tìm kiếm
     public Page<AdminUserDTO> getUsers(Pageable pageable, String search) {
+        // Tạo Specification để tìm kiếm động → Query: SELECT * FROM users WHERE email LIKE ? OR fullName LIKE ?
         Specification<User> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             
             if (search != null && !search.trim().isEmpty()) {
-                String searchPattern = "%" + search.trim() + "%";
-                Predicate emailPredicate = cb.like(cb.lower(root.get("email")), searchPattern.toLowerCase());
-                Predicate namePredicate = cb.like(cb.lower(root.get("fullName")), searchPattern.toLowerCase());
-                predicates.add(cb.or(emailPredicate, namePredicate));
+                String searchPattern = "%" + search.trim() + "%"; // Pattern: %keyword% (tìm kiếm không phân biệt hoa thường)
+                Predicate emailPredicate = cb.like(cb.lower(root.get("email")), searchPattern.toLowerCase()); // WHERE LOWER(email) LIKE '%keyword%'
+                Predicate namePredicate = cb.like(cb.lower(root.get("fullName")), searchPattern.toLowerCase()); // OR LOWER(fullName) LIKE '%keyword%'
+                predicates.add(cb.or(emailPredicate, namePredicate)); // Tìm trong email HOẶC fullName
             }
             
             return cb.and(predicates.toArray(new Predicate[0]));
         };
         
+        // Query database với Specification và phân trang → SELECT * FROM users WHERE ... LIMIT ? OFFSET ?
         Page<User> userPage = userRepository.findAll(spec, pageable);
-        
-        // Convert to DTO
+        // Convert User entity → AdminUserDTO (tránh expose thông tin nhạy cảm như password)
         List<AdminUserDTO> dtoList = userPage.getContent().stream()
                 .map(AdminUserDTO::fromEntity)
                 .collect(Collectors.toList());
@@ -49,34 +48,32 @@ public class AdminUserService {
         return new PageImpl<>(dtoList, pageable, userPage.getTotalElements());
     }
 
-    /**
-     * Lấy user theo ID
-     */
+    // Lấy user theo ID
     public Optional<AdminUserDTO> getUserById(Long id) {
         return userRepository.findById(id)
                 .map(AdminUserDTO::fromEntity);
     }
 
-    /**
-     * Cập nhật trạng thái user (Active/Locked)
-     */
+    // Cập nhật trạng thái user (Active/Locked)
     public AdminUserDTO updateUserStatus(Long userId, Boolean isEnabled, String lockReason) {
+        // Bước 1: Tìm user theo ID
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
         
-        user.setIsEnabled(isEnabled);
+        user.setIsEnabled(isEnabled); // Set trạng thái: true = Active, false = Locked
         if (isEnabled != null && !isEnabled) {
-            // Khi khóa tài khoản, lưu lý do
+            // Nếu khóa tài khoản → Lưu lý do khóa
             user.setLockReason(lockReason != null && !lockReason.trim().isEmpty() 
                 ? lockReason.trim() 
                 : "Tài khoản đã bị khóa bởi quản trị viên");
         } else if (isEnabled != null && isEnabled) {
-            // Khi mở khóa, xóa lý do
+            // Nếu mở khóa → Xóa lý do khóa
             user.setLockReason(null);
         }
         
+        // Bước 2: Lưu thay đổi vào database → UPDATE users SET isEnabled = ?, lockReason = ? WHERE id = ?
         User savedUser = userRepository.save(user);
-        return AdminUserDTO.fromEntity(savedUser);
+        return AdminUserDTO.fromEntity(savedUser); // Convert → DTO
     }
 }
 

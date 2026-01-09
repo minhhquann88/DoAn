@@ -235,19 +235,7 @@ public class MeetingService {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Lấy danh sách cuộc họp của một khóa học
-     */
-    public List<MeetingResponse> getCourseMeetings(Long courseId) {
-        List<Meeting> meetings = meetingRepository.findByCourseIdOrderByStartTimeDesc(courseId);
-        return meetings.stream()
-            .map(MeetingResponse::fromEntity)
-            .collect(Collectors.toList());
-    }
-
-    /**
-     * Bắt đầu cuộc họp
-     */
+    // Bắt đầu cuộc họp
     @Transactional
     public MeetingResponse startMeeting(Long meetingId, UserDetailsImpl userDetails) {
         Meeting meeting = meetingRepository.findById(meetingId)

@@ -94,16 +94,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
            "WHERE t.status = 'SUCCESS' AND t.course.id = :courseId")
     Double calculateRevenueByCourseId(@Param("courseId") Long courseId);
     
-    // Doanh thu theo tháng cho một course cụ thể
-    @Query("SELECT MONTH(t.createdAt) as month, " +
-           "YEAR(t.createdAt) as year, " +
-           "SUM(t.amount) as revenue " +
-           "FROM Transaction t " +
-           "WHERE t.status = 'SUCCESS' AND t.course.id = :courseId AND YEAR(t.createdAt) = :year " +
-           "GROUP BY MONTH(t.createdAt), YEAR(t.createdAt) " +
-           "ORDER BY month")
-    List<Object[]> getMonthlyRevenueByCourse(@Param("courseId") Long courseId, @Param("year") int year);
-    
     // Lấy tất cả transactions của instructor (để lọc và sắp xếp)
     @Query("SELECT t FROM Transaction t " +
            "WHERE t.course.instructor.id = :instructorId " +

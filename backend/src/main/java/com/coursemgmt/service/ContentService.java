@@ -135,18 +135,13 @@ public class ContentService {
         return lessonRepository.save(lesson);
     }
 
-    /**
-     * Tính duration tự động từ video URL
-     * Hỗ trợ cả video upload và YouTube links
-     */
+    // Tính duration tự động từ video URL
     private Integer calculateDuration(LessonRequest request) {
         if (request.getVideoUrl() == null || request.getVideoUrl().isEmpty()) {
             return null;
         }
 
-        // Nếu là YouTube URL, extract duration từ YouTube API
         if (videoDurationService.isYouTubeUrl(request.getVideoUrl())) {
-            // Thử extract từ YouTube API (nếu có API key)
             String youtubeApiKey = System.getenv("YOUTUBE_API_KEY");
             if (youtubeApiKey != null && !youtubeApiKey.isEmpty()) {
                 Integer durationInSeconds = videoDurationService.extractDurationFromYouTubeUrlWithAPI(
@@ -156,12 +151,8 @@ public class ContentService {
                     return videoDurationService.roundDurationToMinutes(durationInSeconds);
                 }
             }
-            // Nếu không có API key, return null (frontend có thể gửi duration)
             return null;
         }
-
-        // Với video upload, frontend sẽ gửi duration
-        // Hoặc có thể extract từ file metadata (cần implement)
         return null;
     }
 
@@ -183,29 +174,21 @@ public class ContentService {
                 .orElseThrow(() -> new RuntimeException("Lesson not found!"));
     }
 
-    /**
-     * Lấy preview lesson đầu tiên của khóa học (public, không cần authentication)
-     * Dùng cho trang chi tiết khóa học để học viên có thể xem trước
-     * @param courseId ID của khóa học
-     * @return LessonResponse của lesson đầu tiên, hoặc null nếu không có
-     */
+    // Lấy preview lesson đầu tiên của khóa học (public)
     public LessonResponse getPreviewLesson(Long courseId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
         
-        // Chỉ cho phép preview với khóa học trả phí (price > 0)
         if (course.getPrice() == null || course.getPrice() <= 0) {
-            return null; // Khóa học miễn phí không cần preview
+            return null;
         }
         
-        // Lấy chapters với lessons (sắp xếp theo position)
         List<Chapter> chapters = chapterRepository.findByCourseIdWithLessons(courseId);
         
         if (chapters == null || chapters.isEmpty()) {
-            return null; // Không có chapter nào
+            return null;
         }
         
-        // Tìm chapter đầu tiên
         Chapter firstChapter = chapters.stream()
                 .min((c1, c2) -> {
                     int pos1 = c1.getPosition() != null ? c1.getPosition() : Integer.MAX_VALUE;
@@ -215,10 +198,9 @@ public class ContentService {
                 .orElse(null);
         
         if (firstChapter == null || firstChapter.getLessons() == null || firstChapter.getLessons().isEmpty()) {
-            return null; // Không có lesson nào trong chapter đầu tiên
+            return null;
         }
         
-        // Tìm lesson đầu tiên trong chapter đầu tiên (sắp xếp theo position)
         Lesson firstLesson = firstChapter.getLessons().stream()
                 .min((l1, l2) -> {
                     int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
@@ -231,28 +213,19 @@ public class ContentService {
             return null;
         }
         
-        // Chỉ trả về lesson có video (VIDEO content type) để preview
         if ((firstLesson.getContentType() != EContentType.VIDEO && firstLesson.getContentType() != EContentType.YOUTUBE) || 
             firstLesson.getVideoUrl() == null || firstLesson.getVideoUrl().isEmpty()) {
-            return null; // Không có video để preview
+            return null;
         }
         
-        // Trả về LessonResponse (không cần isCompleted vì đây là preview)
         return LessonResponse.fromEntity(firstLesson, false);
     }
 
-    /**
-     * Lấy curriculum công khai (chỉ tên chapters và lessons, không có nội dung chi tiết)
-     * Dùng cho trang chi tiết khóa học để hiển thị danh sách nội dung
-     * @param courseId ID của khóa học
-     * @param previewLessonId ID của lesson preview (nếu có)
-     * @return Danh sách ChapterResponse với lessons (không có nội dung chi tiết)
-     */
+    // Lấy curriculum công khai (chỉ tên chapters và lessons, không có nội dung chi tiết)
     public List<ChapterResponse> getPublicCurriculum(Long courseId, Long previewLessonId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
         
-        // Lấy chapters với lessons (sắp xếp theo position)
         List<Chapter> chapters = chapterRepository.findByCourseIdWithLessons(courseId);
         
         return chapters.stream()
@@ -269,16 +242,13 @@ public class ContentService {
                                 return Integer.compare(pos1, pos2);
                             })
                             .map(lesson -> {
-                                // Tạo LessonResponse nhưng không có nội dung chi tiết
                                 LessonResponse lessonResponse = new LessonResponse();
                                 lessonResponse.setId(lesson.getId());
                                 lessonResponse.setTitle(lesson.getTitle());
                                 lessonResponse.setContentType(lesson.getContentType());
                                 lessonResponse.setPosition(lesson.getPosition());
                                 lessonResponse.setDurationInMinutes(lesson.getDurationInMinutes());
-                                // Đánh dấu lesson nào là preview
                                 lessonResponse.setIsPreview(previewLessonId != null && lesson.getId().equals(previewLessonId));
-                                // Không set videoUrl, documentUrl, slideUrl, content để bảo mật
                                 return lessonResponse;
                             })
                             .collect(Collectors.toList());
@@ -314,16 +284,8 @@ public class ContentService {
         }
     }
 
-    // --- Lấy nội dung (cho Học viên) ---
-
     // Lấy toàn bộ nội dung (chapters + lessons) của 1 khóa học
     public List<ChapterResponse> getCourseContent(Long courseId, UserDetailsImpl userDetails) {
-        System.out.println("========================================");
-        System.out.println("ContentService.getCourseContent called");
-        System.out.println("Course ID: " + courseId);
-        System.out.println("User ID: " + (userDetails != null ? userDetails.getId() : "NULL"));
-        System.out.println("========================================");
-        
         if (userDetails == null) {
             throw new RuntimeException("User not authenticated");
         }
@@ -333,63 +295,23 @@ public class ContentService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
 
-        System.out.println("User found: " + user.getUsername() + " (ID: " + user.getId() + ")");
-        System.out.println("Course found: " + course.getTitle() + " (ID: " + course.getId() + ")");
-
-        // Kiểm tra xem user có phải là chủ khóa học không (chỉ khóa học của chính họ)
         boolean isInstructor = course.getInstructor() != null && 
                                course.getInstructor().getId().equals(user.getId());
-        System.out.println("Is Instructor (owner of this course): " + isInstructor);
 
-        // Lấy thông tin Enrollment - Try multiple methods
-        System.out.println("Attempting to find enrollment...");
-        System.out.println("Method 1: findByUserAndCourse");
         Enrollment enrollment = enrollmentRepository.findByUserAndCourse(user, course).orElse(null);
         
-        // Fallback: Try by userId and courseId
         if (enrollment == null) {
-            System.out.println("Method 1 failed. Trying Method 2: findByUserIdAndCourseId");
             enrollment = enrollmentRepository.findByUserIdAndCourseId(user.getId(), courseId).orElse(null);
         }
-        
-        // Additional check: List all enrollments for this user to debug
-        if (enrollment == null) {
-            System.out.println("Method 2 also failed. Checking all enrollments for user...");
-            List<Enrollment> allUserEnrollments = enrollmentRepository.findByUserIdWithCourse(user.getId());
-            System.out.println("Total enrollments for user " + user.getId() + ": " + allUserEnrollments.size());
-            for (Enrollment e : allUserEnrollments) {
-                System.out.println("  - Enrollment ID: " + e.getId() + ", Course ID: " + e.getCourse().getId() + ", Course Title: " + e.getCourse().getTitle());
-            }
-        }
-        
-        System.out.println("Enrollment found: " + (enrollment != null ? "YES (ID: " + enrollment.getId() + ")" : "NO"));
-        
-        if (enrollment != null) {
-            System.out.println("Enrollment Status: " + enrollment.getStatus());
-            System.out.println("Enrollment Progress: " + enrollment.getProgress() + "%");
-        }
 
-        // Authorization logic:
-        // - Cho phép nếu là instructor của khóa học này (chỉ khóa học của chính họ)
-        // - Cho phép nếu đã enrolled (bất kỳ ai, kể cả giảng viên khác xem khóa học của giảng viên khác)
-        // - Từ chối nếu không phải instructor và chưa enrolled
         if (!isInstructor && enrollment == null) {
-            System.err.println("ERROR: User " + user.getId() + " is not the instructor of course " + courseId + " and is not enrolled");
-            // Throw AccessDeniedException instead of RuntimeException to return 403 instead of 400
             throw new AccessDeniedException("Bạn chưa đăng ký khóa học này! Vui lòng đăng ký để xem nội dung.");
         }
         
-        System.out.println("Access granted - proceeding to fetch content");
-        System.out.println("========================================");
-        
-        // Lấy danh sách ID các bài học đã hoàn thành
         Set<Long> completedLessonIds = Set.of();
         if (enrollment != null) {
-            System.out.println("Fetching user progress for enrollment ID: " + enrollment.getId());
             try {
-                // Sử dụng JOIN FETCH để load lesson cùng lúc, tránh LazyInitializationException
                 Set<User_Progress> progressSet = userProgressRepository.findByEnrollmentWithLesson(enrollment);
-                System.out.println("Found " + progressSet.size() + " progress records");
                 
                 completedLessonIds = progressSet.stream()
                         .filter(progress -> {
@@ -401,8 +323,6 @@ public class ContentService {
                             try {
                                 return progress.getLesson() != null && progress.getLesson().getId() != null;
                             } catch (Exception e) {
-                                System.err.println("ERROR accessing lesson from progress: " + e.getMessage());
-                                e.printStackTrace();
                                 return false;
                             }
                         })
@@ -410,47 +330,30 @@ public class ContentService {
                             try {
                                 return progress.getLesson().getId();
                             } catch (Exception e) {
-                                System.err.println("ERROR getting lesson ID: " + e.getMessage());
-                                e.printStackTrace();
                                 return null;
                             }
                         })
                         .filter(id -> id != null)
                         .collect(Collectors.toSet());
-                System.out.println("Completed lesson IDs: " + completedLessonIds.size());
             } catch (Exception e) {
-                System.err.println("ERROR fetching user progress: " + e.getMessage());
-                e.printStackTrace();
-                // Continue with empty set if progress fetch fails
                 completedLessonIds = Set.of();
             }
         }
-        
-        System.out.println("Final completed lesson IDs count: " + completedLessonIds.size());
 
-        final Set<Long> finalCompletedLessonIds = completedLessonIds; // Cần final để dùng trong lambda
+        final Set<Long> finalCompletedLessonIds = completedLessonIds;
 
-        // Lấy danh sách Chapters với lessons (sử dụng JOIN FETCH để tránh LazyInitializationException)
-        System.out.println("Fetching chapters for course ID: " + courseId);
         List<Chapter> chapters;
         try {
             chapters = chapterRepository.findByCourseIdWithLessons(courseId);
-            System.out.println("Found " + chapters.size() + " chapters");
             
             if (chapters.isEmpty()) {
-                System.out.println("WARNING: No chapters found for course " + courseId);
-                return List.of(); // Return empty list instead of throwing error
+                return List.of();
             }
         } catch (Exception e) {
-            System.err.println("ERROR fetching chapters: " + e.getMessage());
-            e.printStackTrace();
             throw new RuntimeException("Không thể tải nội dung khóa học: " + e.getMessage(), e);
         }
 
-        // Map sang DTO với logic khóa bài học tuần tự
-        System.out.println("Mapping chapters to DTOs...");
         try {
-            // Sắp xếp chapters theo position
             List<Chapter> sortedChapters = chapters.stream()
                     .sorted((c1, c2) -> {
                         int pos1 = c1.getPosition() != null ? c1.getPosition() : Integer.MAX_VALUE;
@@ -460,7 +363,6 @@ public class ContentService {
                     .collect(Collectors.toList());
             
             return sortedChapters.stream().map(chapter -> {
-                // Sắp xếp lessons trong chapter theo position
                 List<Lesson> sortedLessons = chapter.getLessons().stream()
                         .sorted((l1, l2) -> {
                             int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
@@ -476,24 +378,17 @@ public class ContentService {
                     Lesson lesson = sortedLessons.get(i);
                     boolean isCompleted = isInstructor || finalCompletedLessonIds.contains(lesson.getId());
                     
-                    // Xác định bài học có bị khóa không
                     boolean isLocked = false;
                     
                     if (!isInstructor) {
-                        // Giảng viên không bị khóa bài nào
                         if (i == 0) {
-                            // Bài học đầu tiên trong chapter
-                            // Kiểm tra xem có phải chapter đầu tiên không
                             boolean isFirstChapter = sortedChapters.indexOf(chapter) == 0;
                             if (isFirstChapter) {
-                                // Bài học đầu tiên của chapter đầu tiên: không khóa
                                 isLocked = false;
                             } else {
-                                // Bài học đầu tiên của chapter sau: khóa nếu bài học cuối cùng của chapter trước chưa hoàn thành
                                 int currentChapterIndex = sortedChapters.indexOf(chapter);
                                 Chapter previousChapter = sortedChapters.get(currentChapterIndex - 1);
                                 
-                                // Lấy bài học cuối cùng của chapter trước
                                 List<Lesson> previousChapterLessons = previousChapter.getLessons().stream()
                                         .sorted((l1, l2) -> {
                                             int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
@@ -507,12 +402,10 @@ public class ContentService {
                                     boolean lastLessonCompleted = finalCompletedLessonIds.contains(lastLessonInPreviousChapter.getId());
                                     isLocked = !lastLessonCompleted;
                                 } else {
-                                    // Chapter trước không có lesson nào: không khóa
                                     isLocked = false;
                                 }
                             }
                         } else {
-                            // Bài học không phải đầu tiên: khóa nếu bài học trước chưa hoàn thành
                             boolean previousLessonCompleted = previousLesson != null && 
                                     finalCompletedLessonIds.contains(previousLesson.getId());
                             isLocked = !previousLessonCompleted;
@@ -526,24 +419,19 @@ public class ContentService {
                 return ChapterResponse.fromEntity(chapter, lessonResponses);
             }).collect(Collectors.toList());
         } catch (Exception e) {
-            System.err.println("ERROR mapping chapters to DTOs: " + e.getMessage());
-            e.printStackTrace();
             throw new RuntimeException("Không thể xử lý nội dung khóa học: " + e.getMessage(), e);
         }
     }
 
-    // --- Chức năng: Theo dõi tiến độ ---
+    // Đánh dấu bài học đã hoàn thành
     @Transactional
     public void markLessonAsCompleted(Long lessonId, UserDetailsImpl userDetails) {
-        System.out.println("DEBUG: markLessonAsCompleted called for lessonId=" + lessonId + ", userId=" + userDetails.getId());
-        
         User user = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng!"));
         
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy bài học với ID: " + lessonId));
         
-        // Safely get chapter and course with null checks
         Chapter chapter = lesson.getChapter();
         if (chapter == null) {
             throw new RuntimeException("Bài học chưa được gán vào chương nào!");
@@ -553,16 +441,10 @@ public class ContentService {
         if (course == null) {
             throw new RuntimeException("Chương chưa được gán vào khóa học nào!");
         }
-        
-        System.out.println("DEBUG: Found lesson '" + lesson.getTitle() + "' in course '" + course.getTitle() + "'");
 
-        // Tìm enrollment của user cho khóa học này
         Enrollment enrollment = enrollmentRepository.findByUserAndCourse(user, course)
                 .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký khóa học này!"));
-        
-        System.out.println("DEBUG: Found enrollment ID=" + enrollment.getId());
 
-        // Tìm hoặc tạo mới User_Progress
         User_Progress progress = userProgressRepository.findByEnrollmentAndLesson(enrollment, lesson)
                 .orElse(new User_Progress());
 
@@ -571,16 +453,11 @@ public class ContentService {
         progress.setIsCompleted(true);
         progress.setCompletedAt(LocalDateTime.now());
         userProgressRepository.save(progress);
-        
-        System.out.println("DEBUG: Marked lesson as completed, updating enrollment progress...");
 
-        // Cập nhật lại % tiến độ tổng của Enrollment
         updateEnrollmentProgress(enrollment);
-        
-        System.out.println("DEBUG: markLessonAsCompleted completed successfully");
     }
 
-    // --- Chức năng: Cập nhật tiến độ xem video (Auto-Progress) ---
+    // Cập nhật tiến độ xem video (Auto-Progress)
     @Transactional
     public void updateLessonWatchTime(Long lessonId, Integer watchedTime, Integer totalDuration, UserDetailsImpl userDetails) {
         User user = userRepository.findById(userDetails.getId())
@@ -589,49 +466,38 @@ public class ContentService {
                 .orElseThrow(() -> new RuntimeException("Lesson not found!"));
         Course course = lesson.getChapter().getCourse();
 
-        // Tìm enrollment của user cho khóa học này
         Enrollment enrollment = enrollmentRepository.findByUserAndCourse(user, course)
                 .orElseThrow(() -> new RuntimeException("Bạn chưa đăng ký khóa học này!"));
 
-        // Tìm hoặc tạo mới User_Progress
         User_Progress progress = userProgressRepository.findByEnrollmentAndLesson(enrollment, lesson)
                 .orElse(new User_Progress());
 
-        // Set enrollment and lesson if this is a new progress record
         if (progress.getEnrollment() == null) {
             progress.setEnrollment(enrollment);
             progress.setLesson(lesson);
         }
 
-        // Update watched time and total duration
         progress.setLastWatchedTime(watchedTime);
         progress.setTotalDuration(totalDuration);
 
-        // Calculate watch percentage
         double percent = (double) watchedTime / totalDuration;
 
-        // Crucial Check: IF watched >= 90% AND not already completed -> Auto-complete
         if (percent >= 0.9 && !Boolean.TRUE.equals(progress.getIsCompleted())) {
             progress.setIsCompleted(true);
             progress.setCompletedAt(LocalDateTime.now());
-            
-            // Trigger course-level progress recalculation
             updateEnrollmentProgress(enrollment);
         }
 
-        // Save progress (whether completed or not)
         userProgressRepository.save(progress);
     }
 
-    // Hàm private để tính toán lại tiến độ
+    // Tính toán lại tiến độ enrollment
     private void updateEnrollmentProgress(Enrollment enrollment) {
         long totalLessonsInCourse = lessonRepository.countByChapter_Course_Id(enrollment.getCourse().getId());
         if (totalLessonsInCourse == 0) {
             enrollment.setProgress(100.0);
             enrollment.setStatus(EEnrollmentStatus.COMPLETED);
             enrollmentRepository.save(enrollment);
-            
-            // Auto-issue certificate for courses with no lessons
             autoIssueCertificate(enrollment);
             return;
         }
@@ -642,18 +508,13 @@ public class ContentService {
             ? ((double) completedLessons / totalLessonsInCourse) * 100.0 
             : 100.0;
         
-        // Round to 2 decimal places
         progressPercentage = Math.round(progressPercentage * 100.0) / 100.0;
-        
-        System.out.println("Updating enrollment progress: " + completedLessons + " / " + totalLessonsInCourse + " = " + progressPercentage + "%");
         
         enrollment.setProgress(progressPercentage);
 
         if (progressPercentage >= 100.0) {
             enrollment.setStatus(EEnrollmentStatus.COMPLETED);
             enrollmentRepository.save(enrollment);
-            
-            // Auto-issue certificate when course is completed
             autoIssueCertificate(enrollment);
         } else {
             enrollment.setStatus(EEnrollmentStatus.IN_PROGRESS);
@@ -661,18 +522,12 @@ public class ContentService {
         }
     }
 
-    /**
-     * Auto-issue certificate when enrollment reaches 100% completion
-     * Check if certificate already exists BEFORE calling issueCertificate to avoid transaction rollback
-     */
+    // Tự động cấp chứng chỉ khi hoàn thành khóa học
     private void autoIssueCertificate(Enrollment enrollment) {
         try {
-            // Check if certificate already exists for this enrollment
-            // This prevents the transaction from being marked for rollback
             boolean certificateExists = certificateService.existsByEnrollmentId(enrollment.getId());
             
             if (certificateExists) {
-                logger.info("Certificate already exists for Enrollment ID: " + enrollment.getId() + " - Skipping auto-issue");
                 return;
             }
             
@@ -680,10 +535,8 @@ public class ContentService {
             certRequest.setEnrollmentId(enrollment.getId());
             
             certificateService.issueCertificate(certRequest);
-            logger.info("Auto-issued certificate for Enrollment ID: " + enrollment.getId());
         } catch (Exception e) {
             // Log but don't fail the enrollment update
-            logger.warning("Failed to auto-issue certificate for Enrollment ID: " + enrollment.getId() + " - Error: " + e.getMessage());
         }
     }
 }

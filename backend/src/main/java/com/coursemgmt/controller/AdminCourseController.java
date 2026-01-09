@@ -36,10 +36,7 @@ public class AdminCourseController {
     @Autowired
     private UserRepository userRepository;
 
-    /**
-     * GET /api/v1/admin/courses
-     * Lấy tất cả khóa học với phân trang
-     */
+    // Lấy tất cả khóa học với phân trang
     @GetMapping
     public ResponseEntity<Page<CourseResponse>> getAllCourses(
             @RequestParam(defaultValue = "0") int page,
@@ -60,10 +57,7 @@ public class AdminCourseController {
         return ResponseEntity.ok(courseResponses);
     }
 
-    /**
-     * GET /api/v1/admin/courses/{id}
-     * Lấy chi tiết khóa học
-     */
+    // Lấy chi tiết khóa học
     @GetMapping("/{id}")
     public ResponseEntity<CourseResponse> getCourseById(@PathVariable Long id) {
         return courseRepository.findById(id)
@@ -72,10 +66,7 @@ public class AdminCourseController {
             .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * GET /api/v1/admin/courses/instructors
-     * Lấy danh sách giảng viên để chuyển quyền sở hữu khóa học
-     */
+    // Lấy danh sách giảng viên để chuyển quyền sở hữu khóa học
     @GetMapping("/instructors")
     public ResponseEntity<List<AdminUserDTO>> getInstructors() {
         List<User> allUsers = userRepository.findAll();
@@ -87,10 +78,7 @@ public class AdminCourseController {
         return ResponseEntity.ok(instructors);
     }
 
-    /**
-     * PUT /api/v1/admin/courses/{id}/transfer
-     * Chuyển quyền sở hữu khóa học từ admin sang giảng viên
-     */
+    // Chuyển quyền sở hữu khóa học từ admin sang giảng viên
     @PutMapping("/{id}/transfer")
     public ResponseEntity<CourseResponse> transferCourseOwnership(
             @PathVariable Long id,

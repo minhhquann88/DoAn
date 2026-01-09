@@ -22,7 +22,7 @@ import java.util.Map;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
-@RequestMapping("/api/user") // API cho người dùng đã đăng nhập
+@RequestMapping("/api/user")
 public class UserController {
 
     @Autowired
@@ -31,101 +31,73 @@ public class UserController {
     @Autowired
     FileStorageService fileStorageService;
 
-    // Get current user profile - Fetch fresh data from database
+    // Lấy thông tin profile người dùng hiện tại
     @GetMapping("/profile")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()") // Chỉ cho phép user đã đăng nhập
     public ResponseEntity<?> getProfile() {
         try {
-            // Get current authenticated user ID
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication(); // Lấy Authentication từ SecurityContext (đã set bởi JWT Filter)
             if (authentication == null || authentication.getPrincipal() == null) {
-                System.out.println("GetProfile: Authentication is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
             }
 
-            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-            Long currentUserId = userDetails.getId();
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal(); // Lấy UserDetails từ Authentication
+            Long currentUserId = userDetails.getId(); // Lấy ID của user hiện tại
 
             if (currentUserId == null) {
-                System.out.println("GetProfile: User ID is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
             }
 
-            System.out.println("GetProfile: Fetching fresh profile data for user ID: " + currentUserId);
-
-            // CRITICAL: Fetch fresh data from database and map to DTO to avoid Jackson infinite recursion
-            ProfileResponse profileResponse = authService.getUserProfile(currentUserId);
-
-            System.out.println("GetProfile: Successfully fetched profile for user ID: " + currentUserId);
+            ProfileResponse profileResponse = authService.getUserProfile(currentUserId); // Lấy thông tin profile từ database
             return ResponseEntity.ok(profileResponse);
 
         } catch (Exception e) {
-            System.out.println("GetProfile: Error - " + e.getClass().getName() + ": " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(500).body(new MessageResponse("Lỗi hệ thống: " + e.getMessage()));
         }
     }
 
+    // Cập nhật thông tin profile
     @PutMapping("/profile")
-    @PreAuthorize("isAuthenticated()") // Đảm bảo chỉ người đã đăng nhập mới được gọi
+    @PreAuthorize("isAuthenticated()") // Chỉ cho phép user đã đăng nhập
     public ResponseEntity<?> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         try {
-            // Get current authenticated user
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication(); // Lấy Authentication từ SecurityContext
             if (authentication == null || authentication.getPrincipal() == null) {
-                System.out.println("UpdateProfile: Authentication is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
             }
 
-            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-            Long currentUserId = userDetails.getId();
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal(); // Lấy UserDetails
+            Long currentUserId = userDetails.getId(); // Lấy ID user hiện tại
 
             if (currentUserId == null) {
-                System.out.println("UpdateProfile: User ID is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
             }
 
-            System.out.println("UpdateProfile: Processing request for user ID: " + currentUserId);
-
-            // Validate request
             if (request == null) {
-                System.out.println("UpdateProfile: Request body is null");
                 return ResponseEntity.badRequest().body(new MessageResponse("Request không hợp lệ"));
             }
 
-            // Call service to update and persist to database
-            authService.updateProfile(currentUserId, request);
+            authService.updateProfile(currentUserId, request); // Cập nhật profile (Partial Update: chỉ update field có giá trị)
             return ResponseEntity.ok(new MessageResponse("Cập nhật hồ sơ thành công"));
 
-        } catch (IllegalArgumentException e) {
-            // Validation errors
-            System.out.println("UpdateProfile: IllegalArgumentException - " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
         } catch (RuntimeException e) {
-            // Business logic errors
-            System.out.println("UpdateProfile: RuntimeException - " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
         } catch (Exception e) {
-            // Unexpected errors - Log the real error to console
-            System.out.println("UpdateProfile: Unexpected error - " + e.getClass().getName() + ": " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(500).body(new MessageResponse("Lỗi hệ thống: " + e.getMessage()));
         }
     }
 
-    // New endpoint for avatar upload
+    // Upload avatar
     @PostMapping("/avatar")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file) {
+    @PreAuthorize("isAuthenticated()") // Chỉ cho phép user đã đăng nhập
+    public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file) { // @RequestParam → Nhận file từ form-data
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         Long currentUserId = userDetails.getId();
 
         try {
-            String avatarUrl = fileStorageService.storeAvatar(file, currentUserId);
-            User updatedUser = authService.updateAvatarUrl(currentUserId, avatarUrl);
+            String avatarUrl = fileStorageService.storeAvatar(file, currentUserId); // Lưu file vào thư mục uploads → Trả về URL
+            User updatedUser = authService.updateAvatarUrl(currentUserId, avatarUrl); // Cập nhật avatarUrl vào database
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Avatar uploaded successfully");
             response.put("avatarUrl", avatarUrl);
@@ -136,52 +108,33 @@ public class UserController {
         }
     }
 
-    // Endpoint for changing password
+    // Đổi mật khẩu
     @PutMapping("/change-password")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()") // Chỉ cho phép user đã đăng nhập
     public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         try {
-            // Get current authenticated user
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || authentication.getPrincipal() == null) {
-                System.out.println("ChangePassword: Authentication is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Chưa đăng nhập"));
             }
 
             UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-            Long currentUserId = userDetails.getId();
+            Long currentUserId = userDetails.getId(); // Lấy ID user hiện tại
 
             if (currentUserId == null) {
-                System.out.println("ChangePassword: User ID is null");
                 return ResponseEntity.status(401).body(new MessageResponse("Không thể xác định người dùng"));
             }
 
-            System.out.println("ChangePassword: Processing request for user ID: " + currentUserId);
-
-            // Validate request
             if (request == null) {
-                System.out.println("ChangePassword: Request body is null");
                 return ResponseEntity.badRequest().body(new MessageResponse("Request không hợp lệ"));
             }
 
-            // Call service
-            authService.changePassword(currentUserId, request);
+            authService.changePassword(currentUserId, request); // Verify old password → Encode new password → Save
             return ResponseEntity.ok(new MessageResponse("Đổi mật khẩu thành công"));
 
-        } catch (IllegalArgumentException e) {
-            // Return 400 Bad Request for wrong password/validation errors, so frontend can show the red alert
-            System.out.println("ChangePassword: IllegalArgumentException - " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
         } catch (RuntimeException e) {
-            // Other runtime exceptions
-            System.out.println("ChangePassword: RuntimeException - " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
         } catch (Exception e) {
-            // Unexpected errors (NullPointerException, etc.) - Log the real error to console
-            System.out.println("ChangePassword: Unexpected error - " + e.getClass().getName() + ": " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(500).body(new MessageResponse("Lỗi hệ thống: " + e.getMessage()));
         }
     }

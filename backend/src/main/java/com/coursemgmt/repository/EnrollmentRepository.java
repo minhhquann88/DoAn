@@ -49,15 +49,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     // Get enrollments by course
     List<Enrollment> findByCourseId(Long courseId);
     
-    // Get monthly enrollment count for a course
-    @Query("SELECT MONTH(e.enrolledAt) as month, " +
-           "YEAR(e.enrolledAt) as year, " +
-           "COUNT(e) as count " +
-           "FROM Enrollment e " +
-           "WHERE e.course.id = :courseId AND YEAR(e.enrolledAt) = :year " +
-           "GROUP BY MONTH(e.enrolledAt), YEAR(e.enrolledAt) " +
-           "ORDER BY month")
-    List<Object[]> getMonthlyEnrollmentsByCourse(@Param("courseId") Long courseId, @Param("year") int year);
     
     // Count enrollments by instructor's courses in a date range
     @Query("SELECT COUNT(e) FROM Enrollment e " +

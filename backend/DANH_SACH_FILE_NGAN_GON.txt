@@ -1,0 +1,142 @@
+================================================================================
+DANH SÁCH FILE BACKEND - 3 MODULE ĐỒ ÁN
+================================================================================
+
+📋 MODULE 1: XÁC THỰC & QUẢN LÝ NGƯỜI DÙNG
+================================================================================
+
+CONTROLLER:
+- backend/src/main/java/com/coursemgmt/controller/AuthController.java
+- backend/src/main/java/com/coursemgmt/controller/UserController.java
+- backend/src/main/java/com/coursemgmt/controller/AdminUserController.java
+
+SERVICE:
+- backend/src/main/java/com/coursemgmt/service/AuthService.java
+- backend/src/main/java/com/coursemgmt/service/AdminUserService.java
+- backend/src/main/java/com/coursemgmt/service/EmailService.java
+
+MODEL:
+- backend/src/main/java/com/coursemgmt/model/User.java
+- backend/src/main/java/com/coursemgmt/model/Role.java
+- backend/src/main/java/com/coursemgmt/model/ERole.java
+- backend/src/main/java/com/coursemgmt/model/PasswordResetToken.java
+
+REPOSITORY:
+- backend/src/main/java/com/coursemgmt/repository/UserRepository.java
+- backend/src/main/java/com/coursemgmt/repository/RoleRepository.java
+- backend/src/main/java/com/coursemgmt/repository/PasswordResetTokenRepository.java
+
+SECURITY:
+- backend/src/main/java/com/coursemgmt/security/WebSecurityConfig.java
+- backend/src/main/java/com/coursemgmt/security/jwt/JwtUtils.java
+- backend/src/main/java/com/coursemgmt/security/jwt/AuthTokenFilter.java
+- backend/src/main/java/com/coursemgmt/security/jwt/AuthEntryPointJwt.java
+- backend/src/main/java/com/coursemgmt/security/services/UserDetailsServiceImpl.java
+- backend/src/main/java/com/coursemgmt/security/services/UserDetailsImpl.java
+
+DTO (tìm trong thư mục dto/):
+- LoginRequest.java, RegisterRequest.java, JwtResponse.java
+- ForgotPasswordRequest.java, ResetPasswordRequest.java
+- ProfileResponse.java, UpdateProfileRequest.java, ChangePasswordRequest.java
+- AdminUserDTO.java, MessageResponse.java
+
+================================================================================
+📚 MODULE 2: QUẢN LÝ KHÓA HỌC & NỘI DUNG
+================================================================================
+
+CONTROLLER:
+- backend/src/main/java/com/coursemgmt/controller/CourseController.java
+- backend/src/main/java/com/coursemgmt/controller/AdminCourseController.java
+- backend/src/main/java/com/coursemgmt/controller/ChapterController.java
+- backend/src/main/java/com/coursemgmt/controller/ContentAccessController.java
+- backend/src/main/java/com/coursemgmt/controller/CategoryController.java
+- backend/src/main/java/com/coursemgmt/controller/AdminCategoryController.java
+
+SERVICE:
+- backend/src/main/java/com/coursemgmt/service/CourseService.java
+- backend/src/main/java/com/coursemgmt/service/ContentService.java
+- backend/src/main/java/com/coursemgmt/service/FileStorageService.java
+- backend/src/main/java/com/coursemgmt/service/VideoDurationService.java
+- backend/src/main/java/com/coursemgmt/service/SlideConversionService.java
+
+MODEL:
+- backend/src/main/java/com/coursemgmt/model/Course.java
+- backend/src/main/java/com/coursemgmt/model/Chapter.java
+- backend/src/main/java/com/coursemgmt/model/Lesson.java
+- backend/src/main/java/com/coursemgmt/model/Category.java
+- backend/src/main/java/com/coursemgmt/model/ECourseStatus.java
+- backend/src/main/java/com/coursemgmt/model/EContentType.java
+
+REPOSITORY:
+- backend/src/main/java/com/coursemgmt/repository/CourseRepository.java
+- backend/src/main/java/com/coursemgmt/repository/ChapterRepository.java
+- backend/src/main/java/com/coursemgmt/repository/LessonRepository.java
+- backend/src/main/java/com/coursemgmt/repository/CategoryRepository.java
+
+DTO (tìm trong thư mục dto/):
+- CourseRequest.java, CourseResponse.java
+- ChapterRequest.java, ChapterResponse.java
+- LessonRequest.java, LessonResponse.java
+- CourseStatisticsResponse.java, CourseAnalyticsResponse.java
+
+================================================================================
+🎓 MODULE 3: HỌC TẬP & ĐÁNH GIÁ
+================================================================================
+
+CONTROLLER:
+- backend/src/main/java/com/coursemgmt/controller/EnrollmentController.java
+- backend/src/main/java/com/coursemgmt/controller/ReviewController.java
+- backend/src/main/java/com/coursemgmt/controller/CertificateController.java
+- backend/src/main/java/com/coursemgmt/controller/ContentAccessController.java
+
+SERVICE:
+- backend/src/main/java/com/coursemgmt/service/EnrollmentService.java
+- backend/src/main/java/com/coursemgmt/service/ContentService.java (phần theo dõi tiến độ)
+- backend/src/main/java/com/coursemgmt/service/ReviewService.java
+- backend/src/main/java/com/coursemgmt/service/CertificateService.java
+- backend/src/main/java/com/coursemgmt/service/PdfGeneratorService.java
+- backend/src/main/java/com/coursemgmt/service/StudentDashboardService.java
+
+MODEL:
+- backend/src/main/java/com/coursemgmt/model/Enrollment.java
+- backend/src/main/java/com/coursemgmt/model/User_Progress.java
+- backend/src/main/java/com/coursemgmt/model/Review.java
+- backend/src/main/java/com/coursemgmt/model/Certificate.java
+- backend/src/main/java/com/coursemgmt/model/EEnrollmentStatus.java
+
+REPOSITORY:
+- backend/src/main/java/com/coursemgmt/repository/EnrollmentRepository.java
+- backend/src/main/java/com/coursemgmt/repository/UserProgressRepository.java
+- backend/src/main/java/com/coursemgmt/repository/ReviewRepository.java
+- backend/src/main/java/com/coursemgmt/repository/CertificateRepository.java
+
+DTO (tìm trong thư mục dto/):
+- EnrollmentDTO.java, EnrollmentCreateRequest.java, EnrollmentUpdateRequest.java
+- StudentLearningHistoryDTO.java, MonthlyStudentStatsDTO.java
+- ReviewDTO.java, ReviewRequest.java, CourseRatingDTO.java
+- CertificateDTO.java, CertificateRequest.java
+
+================================================================================
+🔗 FILE HỖ TRỢ CHUNG
+================================================================================
+
+CONFIG:
+- backend/src/main/java/com/coursemgmt/config/WebMvcConfig.java
+- backend/src/main/java/com/coursemgmt/config/DataLoader.java
+
+EXCEPTION:
+- backend/src/main/java/com/coursemgmt/exception/GlobalExceptionHandler.java
+- backend/src/main/java/com/coursemgmt/exception/ResourceNotFoundException.java
+
+================================================================================
+📖 HƯỚNG DẪN ĐỌC CODE
+================================================================================
+
+1. Bắt đầu với MODEL để hiểu cấu trúc dữ liệu
+2. Xem REPOSITORY để hiểu cách truy vấn database
+3. Nghiên cứu SERVICE để hiểu business logic
+4. Xem CONTROLLER để hiểu API endpoints
+5. Đọc DTO để hiểu cấu trúc request/response
+
+================================================================================
+

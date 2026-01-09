@@ -21,20 +21,14 @@ public class AdminCategoryController {
     @Autowired
     private CategoryRepository categoryRepository;
 
-    /**
-     * GET /api/v1/admin/categories
-     * Lấy tất cả danh mục (Admin only)
-     */
+    // Lấy tất cả danh mục (Admin only)
     @GetMapping
     public ResponseEntity<List<Category>> getAllCategories() {
         List<Category> categories = categoryRepository.findAll();
         return ResponseEntity.ok(categories);
     }
 
-    /**
-     * GET /api/v1/admin/categories/{id}
-     * Lấy danh mục theo ID (Admin only)
-     */
+    // Lấy danh mục theo ID (Admin only)
     @GetMapping("/{id}")
     public ResponseEntity<Category> getCategoryById(@PathVariable Long id) {
         return categoryRepository.findById(id)
@@ -42,10 +36,7 @@ public class AdminCategoryController {
             .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * POST /api/v1/admin/categories
-     * Tạo danh mục mới (Admin only)
-     */
+    // Tạo danh mục mới (Admin only)
     @PostMapping
     public ResponseEntity<?> createCategory(@Valid @RequestBody Map<String, String> request) {
         String name = request.get("name");
@@ -56,7 +47,6 @@ public class AdminCategoryController {
                 .body(Map.of("message", "Tên danh mục không được để trống"));
         }
         
-        // Kiểm tra trùng tên
         if (categoryRepository.existsByName(name.trim())) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("message", "Tên danh mục đã tồn tại"));
@@ -72,10 +62,7 @@ public class AdminCategoryController {
         return ResponseEntity.status(HttpStatus.CREATED).body(savedCategory);
     }
 
-    /**
-     * PUT /api/v1/admin/categories/{id}
-     * Cập nhật danh mục (Admin only)
-     */
+    // Cập nhật danh mục (Admin only)
     @PutMapping("/{id}")
     public ResponseEntity<?> updateCategory(
             @PathVariable Long id,
@@ -87,7 +74,6 @@ public class AdminCategoryController {
                 String description = request.get("description");
                 
                 if (name != null && !name.trim().isEmpty()) {
-                    // Kiểm tra trùng tên (trừ chính nó)
                     if (!category.getName().equals(name.trim()) && categoryRepository.existsByName(name.trim())) {
                         return ResponseEntity.status(HttpStatus.CONFLICT)
                             .body(Map.of("message", "Tên danh mục đã tồn tại"));
@@ -106,17 +92,13 @@ public class AdminCategoryController {
                 .body(Map.of("message", "Không tìm thấy danh mục")));
     }
 
-    /**
-     * DELETE /api/v1/admin/categories/{id}
-     * Xóa danh mục (Admin only)
-     */
+    // Xóa danh mục (Admin only)
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCategory(@PathVariable Long id) {
         if (!categoryRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
         
-        // Kiểm tra xem có khóa học nào đang sử dụng category này không
         Category category = categoryRepository.findById(id).orElse(null);
         if (category != null && category.getCourses() != null && !category.getCourses().isEmpty()) {
             return ResponseEntity.status(HttpStatus.CONFLICT)

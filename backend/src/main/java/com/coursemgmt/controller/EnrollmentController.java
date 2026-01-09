@@ -21,11 +21,7 @@ public class EnrollmentController {
     @Autowired
     private EnrollmentService enrollmentService;
 
-    /**
-     * 1. Lấy danh sách enrollment theo course
-     * GET /api/v1/enrollments/course/{courseId}
-     * Security: Only Admin or Course Owner (Instructor) can access
-     */
+    // Lấy danh sách enrollment theo course
     @GetMapping("/course/{courseId}")
     @PreAuthorize("hasRole('ADMIN') or @courseSecurityService.isInstructor(authentication, #courseId)")
     public ResponseEntity<Page<EnrollmentDTO>> getEnrollmentsByCourse(
@@ -39,11 +35,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(enrollments);
     }
 
-    /**
-     * 2. Lấy danh sách enrollment theo student
-     * GET /api/v1/enrollments/student/{studentId}
-     * Security: Only Admin or the student themselves can access
-     */
+    // Lấy danh sách enrollment theo student
     @GetMapping("/student/{studentId}")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('STUDENT') and @courseSecurityService.isStudentOwner(authentication, #studentId))")
     public ResponseEntity<Page<EnrollmentDTO>> getEnrollmentsByStudent(
@@ -57,20 +49,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(enrollments);
     }
 
-    /**
-     * 3. Lấy chi tiết enrollment
-     * GET /api/v1/enrollments/{id}
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<EnrollmentDTO> getEnrollmentById(@PathVariable Long id) {
-        EnrollmentDTO enrollment = enrollmentService.getEnrollmentById(id);
-        return ResponseEntity.ok(enrollment);
-    }
-
-    /**
-     * 4. Tạo enrollment mới
-     * POST /api/v1/enrollments
-     */
+    // Tạo enrollment mới
     @PostMapping
     public ResponseEntity<EnrollmentDTO> createEnrollment(
         @Valid @RequestBody EnrollmentCreateRequest request
@@ -79,10 +58,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(created);
     }
 
-    /**
-     * 5. Cập nhật trạng thái enrollment
-     * PATCH /api/v1/enrollments/{id}
-     */
+    // Cập nhật trạng thái enrollment
     @PatchMapping("/{id}")
     public ResponseEntity<EnrollmentDTO> updateEnrollment(
         @PathVariable Long id,
@@ -92,21 +68,14 @@ public class EnrollmentController {
         return ResponseEntity.ok(updated);
     }
 
-    /**
-     * 6. Xóa học viên khỏi khóa học (Admin only)
-     * DELETE /api/v1/enrollments/{id}
-     */
+    // Xóa học viên khỏi khóa học (Admin only)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> removeEnrollment(@PathVariable Long id) {
         enrollmentService.removeEnrollment(id);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * 7. Lấy lịch sử học tập của học viên
-     * GET /api/v1/enrollments/student/{studentId}/history
-     * Security: Only Admin or the student themselves can access
-     */
+    // Lấy lịch sử học tập của học viên
     @GetMapping("/student/{studentId}/history")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('STUDENT') and @courseSecurityService.isStudentOwner(authentication, #studentId))")
     public ResponseEntity<StudentLearningHistoryDTO> getStudentLearningHistory(
@@ -117,11 +86,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(history);
     }
 
-    /**
-     * 9. Lấy danh sách học viên của giảng viên hiện tại (My Students)
-     * GET /api/v1/enrollments/my-students
-     * Security: Only Instructors can access their own students
-     */
+    // Lấy danh sách học viên của giảng viên hiện tại (My Students)
     @GetMapping("/my-students")
     @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<Page<EnrollmentDTO>> getMyStudents(
@@ -133,18 +98,6 @@ public class EnrollmentController {
         Pageable pageable = PageRequest.of(page, size);
         Page<EnrollmentDTO> enrollments = enrollmentService.getMyStudents(userDetails.getId(), courseId, pageable);
         return ResponseEntity.ok(enrollments);
-    }
-
-    /**
-     * 8. Thống kê học viên mới theo tháng
-     * GET /api/v1/enrollments/stats/monthly?year=2025
-     */
-    @GetMapping("/stats/monthly")
-    public ResponseEntity<MonthlyStudentStatsDTO> getMonthlyStudentStats(
-        @RequestParam(defaultValue = "2025") int year
-    ) {
-        MonthlyStudentStatsDTO stats = enrollmentService.getMonthlyStudentStats(year);
-        return ResponseEntity.ok(stats);
     }
 }
 

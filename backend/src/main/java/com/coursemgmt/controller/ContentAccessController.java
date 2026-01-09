@@ -26,7 +26,7 @@ public class ContentAccessController {
     @Autowired
     private CourseSecurityService courseSecurityService;
 
-    // API để Học viên (đã đăng ký) hoặc Giảng viên xem toàn bộ nội dung khóa học
+    // Lấy toàn bộ nội dung khóa học (Học viên đã đăng ký hoặc Giảng viên)
     @GetMapping("/courses/{courseId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChapterResponse>> getCourseContent(@PathVariable Long courseId,
@@ -35,28 +35,16 @@ public class ContentAccessController {
         return ResponseEntity.ok(content);
     }
 
-    // API để Học viên đánh dấu "Đã hoàn thành"
+    // Đánh dấu "Đã hoàn thành"
     @PostMapping("/lessons/{lessonId}/complete")
     @PreAuthorize("hasRole('STUDENT') and @courseSecurityService.isEnrolled(authentication, #lessonId)")
     public ResponseEntity<MessageResponse> markLessonAsCompleted(@PathVariable Long lessonId,
                                                                  @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        try {
-            System.out.println("DEBUG ContentAccessController: markLessonAsCompleted called for lessonId=" + lessonId);
-            if (userDetails != null) {
-                System.out.println("DEBUG ContentAccessController: userId=" + userDetails.getId() + ", username=" + userDetails.getUsername());
-            } else {
-                System.out.println("DEBUG ContentAccessController: userDetails is null!");
-            }
-            contentService.markLessonAsCompleted(lessonId, userDetails);
-            return ResponseEntity.ok(new MessageResponse("Lesson marked as completed!"));
-        } catch (Exception e) {
-            System.err.println("ERROR in markLessonAsCompleted: " + e.getMessage());
-            e.printStackTrace();
-            throw e; // Re-throw to be handled by GlobalExceptionHandler
-        }
+        contentService.markLessonAsCompleted(lessonId, userDetails);
+        return ResponseEntity.ok(new MessageResponse("Lesson marked as completed!"));
     }
 
-    // API để cập nhật tiến độ xem video (Auto-Progress: Auto-complete khi >90%)
+    // Cập nhật tiến độ xem video (Auto-Progress: Auto-complete khi >90%)
     @PostMapping("/lessons/{lessonId}/progress")
     @PreAuthorize("hasRole('STUDENT') and @courseSecurityService.isEnrolled(authentication, #lessonId)")
     public ResponseEntity<MessageResponse> updateLessonProgress(@PathVariable Long lessonId,
@@ -66,8 +54,7 @@ public class ContentAccessController {
         return ResponseEntity.ok(new MessageResponse("Progress updated successfully!"));
     }
 
-    // API public để lấy preview lesson đầu tiên của khóa học (cho trang chi tiết)
-    // Không cần authentication - cho phép mọi người xem preview
+    // Lấy preview lesson đầu tiên của khóa học (cho trang chi tiết)
     @GetMapping("/courses/{courseId}/preview")
     public ResponseEntity<com.coursemgmt.dto.LessonResponse> getPreviewLesson(@PathVariable Long courseId) {
         com.coursemgmt.dto.LessonResponse previewLesson = contentService.getPreviewLesson(courseId);

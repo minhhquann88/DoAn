@@ -32,14 +32,6 @@ public interface CertificateRepository extends JpaRepository<Certificate, Long> 
     @Query("SELECT c FROM Certificate c WHERE c.enrollment.course.id = :courseId")
     Page<Certificate> findByEnrollmentCourseId(@Param("courseId") Long courseId, Pageable pageable);
     
-    // Đếm số certificate đã cấp theo khoảng thời gian
-    @Query("SELECT COUNT(c) FROM Certificate c WHERE " +
-           "c.issuedAt BETWEEN :startDate AND :endDate")
-    Long countCertificatesByDateRange(
-        @Param("startDate") LocalDateTime startDate,
-        @Param("endDate") LocalDateTime endDate
-    );
-    
     // Thống kê certificate theo tháng
     @Query("SELECT MONTH(c.issuedAt) as month, COUNT(c) as total " +
            "FROM Certificate c WHERE YEAR(c.issuedAt) = :year " +

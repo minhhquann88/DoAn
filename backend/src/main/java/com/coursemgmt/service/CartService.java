@@ -42,9 +42,6 @@ public class CartService {
     @Autowired
     private TransactionRepository transactionRepository;
 
-    @Autowired
-    private VNPayService vnPayService;
-
     /**
      * Lấy hoặc tạo Cart cho user hiện tại
      */
@@ -130,17 +127,11 @@ public class CartService {
 
     /**
      * Xóa tất cả items khỏi giỏ hàng
-     * Uses orphanRemoval on Cart.items for automatic deletion
      */
     @Transactional
     public void clearCart(Long userId) {
-        Cart cart = cartRepository.findByUserIdWithItems(userId)
-                .orElse(getOrCreateCart(userId));
-        
-        if (cart.getItems() != null && !cart.getItems().isEmpty()) {
-            cart.getItems().clear();
-            cartRepository.save(cart);
-        }
+        Cart cart = getOrCreateCart(userId);
+        cartItemRepository.deleteByCart(cart);
     }
 
     /**
@@ -167,53 +158,37 @@ public class CartService {
             }
         }
 
+        // Create one transaction for the total amount
+        // Use the first course as the main course (for Transaction entity requirement)
+        // When payment succeeds, we'll create enrollments for all courses in cart
+        Course firstCourse = cart.getItems().get(0).getCourse();
+        
         // Calculate total amount
         Double totalAmount = cart.getItems().stream()
                 .mapToDouble(item -> item.getCourse().getPrice())
                 .sum();
 
-        // Generate unique transaction code (shared by all transactions in this cart checkout)
-        String transactionCode = generateTransactionCode();
+        // Create main transaction with total amount
+        Transaction mainTransaction = new Transaction();
+        mainTransaction.setUser(user);
+        mainTransaction.setCourse(firstCourse); // Use first course (required by entity)
+        mainTransaction.setAmount(totalAmount);
+        mainTransaction.setStatus(ETransactionStatus.PENDING);
+        mainTransaction.setPaymentGateway(EPaymentGateway.VNPAY);
+        mainTransaction.setCreatedAt(LocalDateTime.now());
         
-        // Create a transaction for EACH course in the cart
-        // All transactions share the same transactionCode for tracking
-        for (CartItem item : cart.getItems()) {
-            Course course = item.getCourse();
-            
-            Transaction transaction = new Transaction();
-            transaction.setUser(user);
-            transaction.setCourse(course);
-            transaction.setAmount(course.getPrice()); // Individual course price
-            transaction.setStatus(ETransactionStatus.PENDING);
-            transaction.setPaymentGateway(EPaymentGateway.VNPAY);
-            transaction.setCreatedAt(LocalDateTime.now());
-            transaction.setTransactionCode(transactionCode); // Same code for all
-            
-            transactionRepository.save(transaction);
-        }
+        // Generate unique transaction code
+        String transactionCode = generateTransactionCode();
+        mainTransaction.setTransactionCode(transactionCode);
+        
+        Transaction savedTransaction = transactionRepository.save(mainTransaction);
 
-        // Generate VNPay payment URL with total amount
-        try {
-            // Build order info from course titles
-            String orderInfo = "Thanh toan gio hang: " + 
-                cart.getItems().stream()
-                    .map(item -> item.getCourse().getTitle())
-                    .limit(3) // Limit to first 3 courses to avoid URL too long
-                    .collect(Collectors.joining(", "));
-            
-            if (cart.getItems().size() > 3) {
-                orderInfo += " va " + (cart.getItems().size() - 3) + " khoa hoc khac";
-            }
-            
-            // Sử dụng return URL từ biến môi trường (VNPayService)
-            String returnUrl = vnPayService.getDefaultReturnUrl();
-            String paymentUrl = vnPayService.createPaymentUrl(
-                transactionCode, // Use transactionCode as vnp_TxnRef
-                totalAmount, // Total amount for all courses
-                orderInfo,
-                returnUrl,
-                null // Let user choose payment method on VNPay (QR, ATM, etc.)
-            );
+        // MOCK LOGIC: Return mock payment URL
+        // In real implementation, this would call VNPay/MoMo API with total amount
+        String paymentUrl = "http://localhost:3000/payment/mock-gateway?txnCode=" + 
+                          transactionCode + 
+                          "&amount=" + totalAmount +
+                          "&cartId=" + cart.getId(); // Pass cartId to clear cart after payment
 
         return Map.of(
             "paymentUrl", paymentUrl,
@@ -221,11 +196,6 @@ public class CartService {
             "amount", totalAmount.toString(),
             "cartId", cart.getId().toString()
         );
-        } catch (Exception e) {
-            System.err.println("ERROR: Failed to create VNPay URL: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Không thể tạo URL thanh toán: " + e.getMessage());
-        }
     }
 
     /**

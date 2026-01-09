@@ -9,12 +9,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
@@ -25,10 +23,7 @@ public class CertificateController {
     @Autowired
     private CertificateService certificateService;
 
-    /**
-     * 1. Cấp chứng chỉ mới
-     * POST /api/v1/certificates
-     */
+    // Cấp chứng chỉ mới
     @PostMapping
     public ResponseEntity<CertificateDTO> issueCertificate(
         @Valid @RequestBody CertificateRequest request
@@ -37,10 +32,7 @@ public class CertificateController {
         return new ResponseEntity<>(certificate, HttpStatus.CREATED);
     }
 
-    /**
-     * 2. Lấy tất cả certificate (có phân trang)
-     * GET /api/v1/certificates
-     */
+    // Lấy tất cả certificate (có phân trang)
     @GetMapping
     public ResponseEntity<Page<CertificateDTO>> getAllCertificates(
         @RequestParam(defaultValue = "0") int page,
@@ -57,42 +49,27 @@ public class CertificateController {
         return ResponseEntity.ok(certificates);
     }
 
-    /**
-     * 3. Lấy certificate theo ID
-     * GET /api/v1/certificates/{id}
-     */
+    // Lấy certificate theo ID
     @GetMapping("/{id}")
     public ResponseEntity<CertificateDTO> getCertificateById(@PathVariable Long id) {
         CertificateDTO certificate = certificateService.getCertificateById(id);
         return ResponseEntity.ok(certificate);
     }
 
-    /**
-     * 4. Download certificate PDF by code (phải đặt trước /code/{code} để tránh conflict)
-     * GET /api/v1/certificates/code/{code}/download
-     */
+    // Download certificate PDF by code
     @GetMapping("/code/{code}/download")
     public ResponseEntity<?> downloadCertificateByCode(@PathVariable String code) {
-        System.out.println("========================================");
-        System.out.println("Download Certificate by Code: " + code);
-        System.out.println("========================================");
         return certificateService.downloadCertificateByCode(code);
     }
 
-    /**
-     * 5. Lấy certificate theo code (để verify)
-     * GET /api/v1/certificates/code/{code}
-     */
+    // Lấy certificate theo code (để verify)
     @GetMapping("/code/{code}")
     public ResponseEntity<CertificateDTO> getCertificateByCode(@PathVariable String code) {
         CertificateDTO certificate = certificateService.getCertificateByCode(code);
         return ResponseEntity.ok(certificate);
     }
 
-    /**
-     * 6. Verify certificate
-     * GET /api/v1/certificates/verify/{code}
-     */
+    // Verify certificate
     @GetMapping("/verify/{code}")
     public ResponseEntity<Map<String, Object>> verifyCertificate(@PathVariable String code) {
         boolean isValid = certificateService.verifyCertificate(code);
@@ -103,10 +80,7 @@ public class CertificateController {
         ));
     }
 
-    /**
-     * 7. Lấy tất cả certificate của user
-     * GET /api/v1/certificates/user/{userId}
-     */
+    // Lấy tất cả certificate của user
     @GetMapping("/user/{userId}")
     public ResponseEntity<Page<CertificateDTO>> getUserCertificates(
         @PathVariable Long userId,
@@ -118,54 +92,13 @@ public class CertificateController {
         return ResponseEntity.ok(certificates);
     }
 
-    /**
-     * 8. Lấy certificate của 1 course
-     * GET /api/v1/certificates/course/{courseId}
-     */
-    @GetMapping("/course/{courseId}")
-    public ResponseEntity<Page<CertificateDTO>> getCourseCertificates(
-        @PathVariable Long courseId,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size
-    ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "issuedAt"));
-        Page<CertificateDTO> certificates = certificateService.getCourseCertificates(courseId, pageable);
-        return ResponseEntity.ok(certificates);
-    }
-
-    /**
-     * 9. Thống kê số certificate theo thời gian
-     * GET /api/v1/certificates/stats
-     */
-    @GetMapping("/stats")
-    public ResponseEntity<Map<String, Object>> getCertificateStats(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate
-    ) {
-        Long count = certificateService.countCertificatesByDateRange(startDate, endDate);
-        return ResponseEntity.ok(Map.of(
-            "startDate", startDate,
-            "endDate", endDate,
-            "totalCertificates", count
-        ));
-    }
-
-    /**
-     * 10. Download certificate PDF by ID
-     * GET /api/v1/certificates/{id}/download
-     */
+    // Download certificate PDF by ID
     @GetMapping("/{id}/download")
     public ResponseEntity<?> downloadCertificateById(@PathVariable Long id) {
-        System.out.println("========================================");
-        System.out.println("Download Certificate by ID: " + id);
-        System.out.println("========================================");
         return certificateService.downloadCertificateById(id);
     }
 
-    /**
-     * 11. Thu hồi certificate (Admin only)
-     * DELETE /api/v1/certificates/{id}
-     */
+    // Thu hồi certificate (Admin only)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> revokeCertificate(@PathVariable Long id) {
         certificateService.revokeCertificate(id);

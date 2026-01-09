@@ -22,12 +22,6 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long> {
 
     List<Meeting> findByStatus(EMeetingStatus status);
 
-    @Query("SELECT m FROM Meeting m WHERE m.course.id = :courseId ORDER BY m.startTime DESC")
-    List<Meeting> findByCourseIdOrderByStartTimeDesc(Long courseId);
-
-    @Query("SELECT m FROM Meeting m WHERE m.instructor.id = :instructorId ORDER BY m.startTime DESC")
-    List<Meeting> findByInstructorIdOrderByStartTimeDesc(Long instructorId);
-
     boolean existsByMeetingCode(String meetingCode);
 }
 
