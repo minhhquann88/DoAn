@@ -21,27 +21,18 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * Service to convert PowerPoint slides (PPT, PPTX) to PDF format.
- * Uses Apache POI to read slides and PDFBox to generate PDF.
- */
+// Service để chuyển đổi file PowerPoint (PPT, PPTX) sang định dạng PDF
+// Sử dụng Apache POI để đọc slide và PDFBox để tạo PDF
 @Service
 public class SlideConversionService {
 
     private static final Logger logger = LoggerFactory.getLogger(SlideConversionService.class);
 
-    // Target resolution for slide images (1.0 = original, higher = better quality but slower)
-    // Using 1.5 for balance between quality and speed
+    // Tỷ lệ phóng to cho hình ảnh slide (1.0 = gốc, cao hơn = chất lượng tốt hơn nhưng chậm hơn)
+    // Sử dụng 1.5 để cân bằng giữa chất lượng và tốc độ
     private static final double SCALE = 1.5;
 
-    /**
-     * Convert a slide file to PDF format.
-     * Supports: .pptx, .ppt
-     * 
-     * @param inputFile Path to the input slide file
-     * @param outputFile Path where the PDF will be saved
-     * @return true if conversion successful, false otherwise
-     */
+    // Chuyển đổi file slide sang định dạng PDF, hỗ trợ .pptx và .ppt
     public boolean convertToPdf(Path inputFile, Path outputFile) {
         String fileName = inputFile.getFileName().toString().toLowerCase();
         
@@ -51,8 +42,7 @@ public class SlideConversionService {
             } else if (fileName.endsWith(".ppt")) {
                 return convertPptToPdf(inputFile, outputFile);
             } else if (fileName.endsWith(".odp")) {
-                // ODP conversion is more complex, for now just copy the file
-                // and let the user know PDF is recommended
+                // Chuyển đổi ODP phức tạp hơn, hiện tại chưa hỗ trợ đầy đủ
                 logger.warn("ODP conversion not fully supported. Please use PDF format directly.");
                 return false;
             } else {
@@ -65,9 +55,7 @@ public class SlideConversionService {
         }
     }
 
-    /**
-     * Convert PPTX (PowerPoint 2007+) to PDF
-     */
+    // Chuyển đổi file PPTX (PowerPoint 2007+) sang PDF
     private boolean convertPptxToPdf(Path inputFile, Path outputFile) throws IOException {
         logger.info("Starting PPTX to PDF conversion: {}", inputFile.getFileName());
         long startTime = System.currentTimeMillis();
@@ -88,7 +76,7 @@ public class SlideConversionService {
                 slideIndex++;
                 logger.debug("Converting slide {}/{}", slideIndex, totalSlides);
                 
-                // Create buffered image for the slide
+                // Tạo hình ảnh buffer cho slide
                 BufferedImage img = new BufferedImage(
                     (int) width, 
                     (int) height, 
@@ -97,30 +85,29 @@ public class SlideConversionService {
                 
                 Graphics2D graphics = img.createGraphics();
                 
-                // Set rendering hints for speed (not max quality)
+                // Thiết lập rendering hints để tối ưu tốc độ
                 graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
                 graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 
-                // Fill background with white
+                // Tô nền màu trắng
                 graphics.setPaint(Color.WHITE);
                 graphics.fill(new Rectangle2D.Double(0, 0, width, height));
                 
-                // Scale and draw the slide
+                // Phóng to và vẽ slide
                 graphics.scale(SCALE, SCALE);
                 try {
                     slide.draw(graphics);
                 } catch (Exception e) {
                     logger.warn("Error rendering slide {}: {}", slideIndex, e.getMessage());
-                    // Continue with blank slide if rendering fails
                 }
                 graphics.dispose();
                 
-                // Add the image as a PDF page
+                // Thêm hình ảnh vào PDF như một trang mới
                 addImageToPdf(pdf, img);
             }
             
-            // Save PDF
+            // Lưu file PDF
             pdf.save(outputFile.toFile());
             long duration = System.currentTimeMillis() - startTime;
             logger.info("Successfully converted PPTX to PDF: {} slides in {}ms", totalSlides, duration);
@@ -131,9 +118,7 @@ public class SlideConversionService {
         }
     }
 
-    /**
-     * Convert PPT (PowerPoint 97-2003) to PDF
-     */
+    // Chuyển đổi file PPT (PowerPoint 97-2003) sang PDF
     private boolean convertPptToPdf(Path inputFile, Path outputFile) throws IOException {
         logger.info("Starting PPT to PDF conversion: {}", inputFile.getFileName());
         long startTime = System.currentTimeMillis();
@@ -154,7 +139,7 @@ public class SlideConversionService {
                 slideIndex++;
                 logger.debug("Converting slide {}/{}", slideIndex, totalSlides);
                 
-                // Create buffered image for the slide
+                // Tạo hình ảnh buffer cho slide
                 BufferedImage img = new BufferedImage(
                     (int) width, 
                     (int) height, 
@@ -163,16 +148,16 @@ public class SlideConversionService {
                 
                 Graphics2D graphics = img.createGraphics();
                 
-                // Set rendering hints for speed
+                // Thiết lập rendering hints để tối ưu tốc độ
                 graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
                 graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 
-                // Fill background with white
+                // Tô nền màu trắng
                 graphics.setPaint(Color.WHITE);
                 graphics.fill(new Rectangle2D.Double(0, 0, width, height));
                 
-                // Scale and draw the slide
+                // Phóng to và vẽ slide
                 graphics.scale(SCALE, SCALE);
                 try {
                     slide.draw(graphics);
@@ -181,11 +166,11 @@ public class SlideConversionService {
                 }
                 graphics.dispose();
                 
-                // Add the image as a PDF page
+                // Thêm hình ảnh vào PDF như một trang mới
                 addImageToPdf(pdf, img);
             }
             
-            // Save PDF
+            // Lưu file PDF
             pdf.save(outputFile.toFile());
             long duration = System.currentTimeMillis() - startTime;
             logger.info("Successfully converted PPT to PDF: {} slides in {}ms", totalSlides, duration);
@@ -196,50 +181,39 @@ public class SlideConversionService {
         }
     }
 
-    /**
-     * Add a BufferedImage as a new page in the PDF document
-     */
+    // Thêm hình ảnh BufferedImage vào PDF như một trang mới
     private void addImageToPdf(PDDocument pdf, BufferedImage image) throws IOException {
-        // Create a page with the same aspect ratio as the image
+        // Tạo trang với tỷ lệ khung hình giống với hình ảnh
         float imageWidth = image.getWidth();
         float imageHeight = image.getHeight();
         
-        // Scale to fit standard page while maintaining aspect ratio
+        // Tạo kích thước trang phù hợp với hình ảnh
         PDRectangle pageSize = new PDRectangle(imageWidth, imageHeight);
         PDPage page = new PDPage(pageSize);
         pdf.addPage(page);
         
-        // Convert BufferedImage to PDImageXObject
+        // Chuyển đổi BufferedImage sang PDImageXObject
         PDImageXObject pdImage = LosslessFactory.createFromImage(pdf, image);
         
-        // Draw the image on the page
+        // Vẽ hình ảnh lên trang
         try (PDPageContentStream contentStream = new PDPageContentStream(pdf, page)) {
             contentStream.drawImage(pdImage, 0, 0, imageWidth, imageHeight);
         }
     }
 
-    /**
-     * Check if a file needs conversion to PDF
-     */
+    // Kiểm tra xem file có cần chuyển đổi sang PDF không
     public boolean needsConversion(String fileName) {
         String lower = fileName.toLowerCase();
         return lower.endsWith(".ppt") || lower.endsWith(".pptx");
     }
 
-    /**
-     * Check if a file is already a PDF
-     */
+    // Kiểm tra xem file đã là PDF chưa
     public boolean isPdf(String fileName) {
         return fileName.toLowerCase().endsWith(".pdf");
     }
 
-    /**
-     * Convert slide file to PDF and return the PDF path.
-     * If already PDF, returns the input path.
-     * 
-     * @param inputPath Path to the input slide file
-     * @return Path to the PDF file (converted or original)
-     */
+    // Chuyển đổi file slide sang PDF và trả về đường dẫn file PDF
+    // Nếu file đã là PDF thì trả về đường dẫn gốc
     public Path convertAndGetPdfPath(Path inputPath) throws IOException {
         String fileName = inputPath.getFileName().toString();
         
@@ -251,14 +225,14 @@ public class SlideConversionService {
             throw new IOException("Unsupported file format: " + fileName);
         }
         
-        // Create output path with .pdf extension
+        // Tạo đường dẫn output với đuôi .pdf
         String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
         Path outputPath = inputPath.getParent().resolve(baseName + ".pdf");
         
         boolean success = convertToPdf(inputPath, outputPath);
         
         if (success) {
-            // Delete original file after successful conversion
+            // Xóa file gốc sau khi chuyển đổi thành công
             try {
                 Files.delete(inputPath);
                 logger.info("Deleted original file after conversion: {}", inputPath.getFileName());
@@ -271,4 +245,3 @@ public class SlideConversionService {
         }
     }
 }
-

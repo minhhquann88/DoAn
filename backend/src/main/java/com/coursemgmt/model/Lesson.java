@@ -24,12 +24,12 @@ public class Lesson {
 
     private String documentUrl;
 
-    private String slideUrl; // URL cho slide bài giảng (PPT, PPTX, ODP)
+    private String slideUrl;
 
-    @Lob // Dùng cho nội dung text dài
+    @Lob
     private String content;
 
-    private Integer position; // Thứ tự bài học
+    private Integer position;
 
     private Integer durationInMinutes;
 

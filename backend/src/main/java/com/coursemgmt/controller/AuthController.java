@@ -20,19 +20,20 @@ public class AuthController {
     // Đăng nhập người dùng
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        // @Valid → Validate dữ liệu đầu vào, @RequestBody → Convert JSON → Java Object
-        JwtResponse jwtResponse = authService.loginUser(loginRequest); // Gọi service xử lý đăng nhập → Trả về JWT token
-        return ResponseEntity.ok(jwtResponse); // Trả về 200 OK với JWT token
+        // @Valid: Validate dữ liệu đầu vào
+        // @RequestBody: Convert JSON → Java Object
+        JwtResponse jwtResponse = authService.loginUser(loginRequest);
+        return ResponseEntity.ok(jwtResponse); // Trả về JWT token
     }
 
     // Đăng ký người dùng mới
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
-            authService.registerUser(registerRequest); // Gọi service tạo user mới
-            return ResponseEntity.ok(new MessageResponse("User registered successfully!")); // Thành công → 200 OK
+            authService.registerUser(registerRequest);
+            return ResponseEntity.ok(new MessageResponse("User registered successfully!")); 
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage())); // Lỗi → 400 Bad Request
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage())); 
         }
     }
 

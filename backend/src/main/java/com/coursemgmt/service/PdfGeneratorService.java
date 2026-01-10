@@ -18,8 +18,8 @@ import java.nio.file.StandardCopyOption;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Service để generate PDF certificate
- * Sử dụng OpenHTMLToPDF để convert HTML sang PDF
+ * Service để tạo file PDF chứng chỉ
+ * Sử dụng OpenHTMLToPDF để chuyển đổi HTML sang PDF
  */
 @Service
 public class PdfGeneratorService {
@@ -30,29 +30,13 @@ public class PdfGeneratorService {
     @Value("${certificate.base-url:http://localhost:8080/certificates}")
     private String baseUrl;
 
-    /**
-     * Generate PDF certificate từ HTML content và trả về byte array
-     * 
-     * @param certificate Certificate entity
-     * @return PDF file as byte array
-     * @throws IOException Nếu có lỗi khi generate PDF
-     */
+    // Tạo file PDF chứng chỉ từ thông tin certificate và trả về dạng byte array
     public byte[] generateCertificatePdf(Certificate certificate) throws IOException {
-        // Generate HTML content
         String htmlContent = generateCertificateHtmlContent(certificate);
-        
-        // Convert HTML to PDF using OpenHTMLToPDF
         return convertHtmlToPdf(htmlContent);
     }
 
-    /**
-     * Convert HTML content to PDF byte array
-     * Sử dụng PdfRendererBuilder để render HTML thành PDF
-     * 
-     * @param htmlContent HTML content as string
-     * @return PDF as byte array
-     * @throws IOException If PDF generation fails
-     */
+    // Chuyển đổi nội dung HTML sang PDF dạng byte array
     private byte[] convertHtmlToPdf(String htmlContent) throws IOException {
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
@@ -71,10 +55,8 @@ public class PdfGeneratorService {
         }
     }
     
-    /**
-     * Load font hỗ trợ tiếng Việt cho OpenHTMLToPDF
-     * Ưu tiên: Noto Sans > Arial Unicode MS > DejaVu Sans > Arial > Times New Roman
-     */
+    // Tải font hỗ trợ tiếng Việt cho OpenHTMLToPDF
+    // Ưu tiên: Noto Sans > Arial Unicode MS > DejaVu Sans > Arial > Times New Roman
     private void loadVietnameseFont(PdfRendererBuilder builder) throws IOException {
         // Danh sách các font có thể hỗ trợ tiếng Việt
         String[] fontPaths = {
@@ -104,14 +86,12 @@ public class PdfGeneratorService {
             File fontFile = new File(fontPath);
             if (fontFile.exists() && fontFile.isFile()) {
                 try {
-                    // Load font với tên "Noto Sans" hoặc "Arial Unicode MS" hoặc "DejaVu Sans"
                     String fontName = getFontName(fontPath);
                     builder.useFont(fontFile, fontName);
                     fontLoaded = true;
-                    System.out.println("Loaded font: " + fontPath + " as " + fontName);
                     break;
                 } catch (Exception e) {
-                    System.err.println("Failed to load font from " + fontPath + ": " + e.getMessage());
+                    // Bỏ qua nếu không load được font này, thử font tiếp theo
                 }
             }
         }
@@ -138,10 +118,9 @@ public class PdfGeneratorService {
                                 String fontName = getFontName(fontFile.getAbsolutePath());
                                 builder.useFont(fontFile, fontName);
                                 fontLoaded = true;
-                                System.out.println("Loaded font: " + fontFile.getAbsolutePath() + " as " + fontName);
                                 break;
                             } catch (Exception e) {
-                                System.err.println("Failed to load font: " + e.getMessage());
+                                // Bỏ qua nếu không load được font này, thử font tiếp theo
                             }
                         }
                     }
@@ -154,10 +133,9 @@ public class PdfGeneratorService {
                                 try {
                                     builder.useFont(fontFile, "Arial Unicode MS");
                                     fontLoaded = true;
-                                    System.out.println("Loaded font: " + fontFile.getAbsolutePath() + " as Arial Unicode MS");
                                     break;
                                 } catch (Exception e) {
-                                    System.err.println("Failed to load font: " + e.getMessage());
+                                    // Bỏ qua nếu không load được font này, thử font tiếp theo
                                 }
                             }
                         }
@@ -176,22 +154,14 @@ public class PdfGeneratorService {
                     Files.copy(fontStream, tempFont, StandardCopyOption.REPLACE_EXISTING);
                     builder.useFont(tempFont.toFile(), "Noto Sans");
                     fontLoaded = true;
-                    System.out.println("Loaded font from classpath: fonts/NotoSans-Regular.ttf");
                 }
             } catch (Exception e) {
-                System.err.println("Failed to load font from classpath: " + e.getMessage());
+                // Bỏ qua nếu không load được font từ classpath
             }
-        }
-        
-        // Nếu vẫn không load được, sử dụng font mặc định (có thể không hỗ trợ đầy đủ tiếng Việt)
-        if (!fontLoaded) {
-            System.err.println("Warning: No Vietnamese font found. PDF may display incorrectly for Vietnamese text.");
         }
     }
     
-    /**
-     * Lấy tên font từ đường dẫn file
-     */
+    // Lấy tên font từ đường dẫn file
     private String getFontName(String fontPath) {
         String fileName = new File(fontPath).getName().toLowerCase();
         if (fileName.contains("noto")) {
@@ -210,14 +180,7 @@ public class PdfGeneratorService {
         return "Noto Sans"; // Default
     }
     
-    /**
-     * Generate PDF certificate và lưu vào file, trả về URL
-     * Method helper để tương thích với code cũ
-     * 
-     * @param certificate Certificate entity
-     * @return URL của file PDF đã được lưu
-     * @throws IOException Nếu có lỗi khi generate hoặc lưu PDF
-     */
+    // Tạo file PDF chứng chỉ và lưu vào thư mục, trả về URL của file
     public String generateCertificatePdfAndSave(Certificate certificate) throws IOException {
         // Convert to absolute path to match WebMvcConfig
         java.nio.file.Path storageDir = java.nio.file.Paths.get(storagePath).toAbsolutePath().normalize();
@@ -244,10 +207,7 @@ public class PdfGeneratorService {
         return baseUrl + "/" + filename;
     }
 
-    /**
-     * Generate HTML content for certificate
-     * Có thể convert sang PDF bằng Flying Saucer
-     */
+    // Tạo nội dung HTML cho chứng chỉ
     private String generateCertificateHtmlContent(Certificate certificate) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
         
@@ -369,9 +329,7 @@ public class PdfGeneratorService {
                 """, safeUserName, safeCourseTitle, safeInstructorName, safeIssuedDate, safeCertificateCode);
     }
     
-    /**
-     * Escape HTML special characters to prevent XSS and ensure proper rendering
-     */
+    // Chuyển đổi các ký tự đặc biệt HTML để tránh XSS và đảm bảo hiển thị đúng
     private String escapeHtml(String text) {
         if (text == null) {
             return "";

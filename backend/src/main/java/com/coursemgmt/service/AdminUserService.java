@@ -48,12 +48,6 @@ public class AdminUserService {
         return new PageImpl<>(dtoList, pageable, userPage.getTotalElements());
     }
 
-    // Lấy user theo ID
-    public Optional<AdminUserDTO> getUserById(Long id) {
-        return userRepository.findById(id)
-                .map(AdminUserDTO::fromEntity);
-    }
-
     // Cập nhật trạng thái user (Active/Locked)
     public AdminUserDTO updateUserStatus(Long userId, Boolean isEnabled, String lockReason) {
         // Bước 1: Tìm user theo ID

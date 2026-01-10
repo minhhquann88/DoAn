@@ -23,10 +23,8 @@ public class ContentAccessController {
     @Autowired
     private ContentService contentService;
 
-    @Autowired
-    private CourseSecurityService courseSecurityService;
 
-    // Lấy toàn bộ nội dung khóa học (Học viên đã đăng ký hoặc Giảng viên)
+    // Lấy toàn bộ nội dung khóa học
     @GetMapping("/courses/{courseId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChapterResponse>> getCourseContent(@PathVariable Long courseId,
@@ -40,8 +38,8 @@ public class ContentAccessController {
     @PreAuthorize("hasRole('STUDENT') and @courseSecurityService.isEnrolled(authentication, #lessonId)")
     public ResponseEntity<MessageResponse> markLessonAsCompleted(@PathVariable Long lessonId,
                                                                  @AuthenticationPrincipal UserDetailsImpl userDetails) {
-        contentService.markLessonAsCompleted(lessonId, userDetails);
-        return ResponseEntity.ok(new MessageResponse("Lesson marked as completed!"));
+            contentService.markLessonAsCompleted(lessonId, userDetails);
+            return ResponseEntity.ok(new MessageResponse("Lesson marked as completed!"));
     }
 
     // Cập nhật tiến độ xem video (Auto-Progress: Auto-complete khi >90%)

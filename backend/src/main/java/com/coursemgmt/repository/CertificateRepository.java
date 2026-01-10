@@ -8,8 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -31,19 +29,6 @@ public interface CertificateRepository extends JpaRepository<Certificate, Long> 
     // Tìm tất cả certificate của 1 course
     @Query("SELECT c FROM Certificate c WHERE c.enrollment.course.id = :courseId")
     Page<Certificate> findByEnrollmentCourseId(@Param("courseId") Long courseId, Pageable pageable);
-    
-    // Thống kê certificate theo tháng
-    @Query("SELECT MONTH(c.issuedAt) as month, COUNT(c) as total " +
-           "FROM Certificate c WHERE YEAR(c.issuedAt) = :year " +
-           "GROUP BY MONTH(c.issuedAt) ORDER BY month")
-    List<Object[]> countCertificatesByMonth(@Param("year") int year);
-    
-    // Top courses có nhiều certificate nhất
-    @Query("SELECT c.enrollment.course.id, c.enrollment.course.title, COUNT(c) as total " +
-           "FROM Certificate c " +
-           "GROUP BY c.enrollment.course.id, c.enrollment.course.title " +
-           "ORDER BY total DESC")
-    List<Object[]> findTopCertifiedCourses(Pageable pageable);
     
     // Fetch certificate with enrollment and related entities (for PDF generation)
     @Query("SELECT c FROM Certificate c " +

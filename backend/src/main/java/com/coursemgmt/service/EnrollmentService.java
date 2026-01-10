@@ -64,13 +64,6 @@ public class EnrollmentService {
         return enrollments.map(this::convertToDTO);
     }
 
-    // Lấy enrollment theo ID
-    public EnrollmentDTO getEnrollmentById(Long enrollmentId) {
-        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
-            .orElseThrow(() -> new RuntimeException("Enrollment not found with id: " + enrollmentId));
-        return convertToDTO(enrollment);
-    }
-
     // Tạo enrollment mới
     @Transactional
     public EnrollmentDTO createEnrollment(EnrollmentCreateRequest request) {
@@ -80,9 +73,7 @@ public class EnrollmentService {
         Course course = courseRepository.findById(request.getCourseId())
             .orElseThrow(() -> new RuntimeException("Course not found with id: " + request.getCourseId()));
         
-        Optional<Enrollment> existing = enrollmentRepository
-            .findByUserIdAndCourseId(request.getStudentId(), request.getCourseId());
-        
+        Optional<Enrollment> existing = enrollmentRepository.findByUserIdAndCourseId(request.getStudentId(), request.getCourseId());
         if (existing.isPresent()) {
             throw new RuntimeException("Student already enrolled in this course");
         }
@@ -123,15 +114,6 @@ public class EnrollmentService {
         
         Enrollment updated = enrollmentRepository.save(enrollment);
         return convertToDTO(updated);
-    }
-
-    // Xóa học viên khỏi khóa học (Admin only)
-    @Transactional
-    public void removeEnrollment(Long enrollmentId) {
-        Enrollment enrollment = enrollmentRepository.findById(enrollmentId)
-            .orElseThrow(() -> new RuntimeException("Enrollment not found with id: " + enrollmentId));
-        
-        enrollmentRepository.delete(enrollment);
     }
 
     // Lấy lịch sử học tập của học viên

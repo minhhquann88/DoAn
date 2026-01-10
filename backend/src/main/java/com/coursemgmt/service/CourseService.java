@@ -2,7 +2,6 @@ package com.coursemgmt.service;
 
 import com.coursemgmt.dto.CourseRequest;
 import com.coursemgmt.dto.CourseResponse;
-import com.coursemgmt.dto.CourseStatisticsResponse;
 import com.coursemgmt.exception.ResourceNotFoundException;
 import com.coursemgmt.model.*;
 import com.coursemgmt.model.EEnrollmentStatus;
@@ -204,28 +203,6 @@ public class CourseService {
         courseRepository.delete(course);
     }
 
-    // Chuyển quyền sở hữu khóa học (Admin only)
-    @Transactional
-    public Course transferCourseOwnership(Long courseId, Long newInstructorId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found!"));
-        
-        User newInstructor = userRepository.findById(newInstructorId)
-                .orElseThrow(() -> new RuntimeException("Instructor not found!"));
-        
-        boolean isLecturer = newInstructor.getRoles().stream()
-                .anyMatch(role -> role.getName() == ERole.ROLE_LECTURER);
-        
-        if (!isLecturer) {
-            throw new RuntimeException("User is not a lecturer!");
-        }
-        
-        course.setInstructor(newInstructor);
-        course.setUpdatedAt(LocalDateTime.now());
-        
-        return courseRepository.save(course);
-    }
-
     // Lấy thông tin chi tiết khóa học
     public CourseResponse getCourseById(Long courseId) {
         Course course = courseRepository.findById(courseId)
@@ -367,7 +344,7 @@ public class CourseService {
         } else if (minPrice != null || maxPrice != null) {
             spec = spec.and(CourseRepository.priceRange(minPrice, maxPrice));
         }
-
+        
         Page<Course> coursePage = courseRepository.findAll(spec, pageable);
 
         Long currentUserId = getCurrentUserId();
@@ -403,74 +380,43 @@ public class CourseService {
         return new PageImpl<>(dtos, pageable, coursePage.getTotalElements());
     }
 
-    // Thống kê khóa học
-    public CourseStatisticsResponse getCourseStatistics(Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found!"));
-
-        Long totalEnrollments = enrollmentRepository.countByCourseId(courseId);
-
-        return new CourseStatisticsResponse(courseId, course.getTitle(), totalEnrollments);
-    }
-    
-
     // Giảng viên tự publish khóa học
     @Transactional
     public Course publishCourse(Long courseId, UserDetailsImpl userDetails) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found!"));
 
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> role.equals(ERole.ROLE_ADMIN.name()));
-
-        if (!isAdmin && (course.getInstructor() == null || !course.getInstructor().getId().equals(userDetails.getId()))) {
+        if (course.getInstructor() == null || !course.getInstructor().getId().equals(userDetails.getId())) {
             throw new RuntimeException("You are not authorized to publish this course.");
         }
-
         if (course.getStatus() != ECourseStatus.DRAFT) {
             throw new RuntimeException("Only DRAFT courses can be published. Current status: " + course.getStatus());
         }
-
         List<Chapter> chapters = chapterRepository.findByCourseIdOrderByPositionAsc(courseId);
         if (chapters == null || chapters.isEmpty()) {
             throw new RuntimeException("Khóa học phải có ít nhất 1 chương trước khi xuất bản. Vui lòng thêm nội dung cho khóa học.");
         }
-
         for (Chapter chapter : chapters) {
             List<Lesson> lessons = lessonRepository.findByChapterIdOrderByPositionAsc(chapter.getId());
             if (lessons == null || lessons.isEmpty()) {
                 throw new RuntimeException("Chương \"" + chapter.getTitle() + "\" phải có ít nhất 1 bài học. Vui lòng thêm bài học cho chương này.");
             }
         }
-
+        
         course.setStatus(ECourseStatus.PUBLISHED);
         course.setIsPublished(true);
         course.setUpdatedAt(LocalDateTime.now());
-        
-        Course savedCourse = courseRepository.save(course);
-
-        try {
-            String courseUrl = "http://localhost:3000/courses/" + savedCourse.getId();
-            newsletterService.sendNewCourseNotification(savedCourse.getTitle(), courseUrl);
-        } catch (Exception e) {
-            // Không throw exception để không ảnh hưởng đến việc publish khóa học
-        }
-        
-        return savedCourse;
+        return courseRepository.save(course);
     }
 
-    // Giảng viên gỡ khóa học (Unpublish) - PUBLISHED -> DRAFT
+    // Giảng viên gỡ khóa học  - PUBLISHED -> DRAFT
     @Transactional
     public Course unpublishCourse(Long courseId, UserDetailsImpl userDetails) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found!"));
 
-        boolean isAdmin = userDetails.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(role -> role.equals(ERole.ROLE_ADMIN.name()));
 
-        if (!isAdmin && !course.getInstructor().getId().equals(userDetails.getId())) {
+        if ( !course.getInstructor().getId().equals(userDetails.getId())) {
             throw new RuntimeException("You are not authorized to unpublish this course.");
         }
 
@@ -497,25 +443,25 @@ public class CourseService {
             
             return enrollments.stream()
                     .map(enrollment -> {
-                        Course course = enrollment.getCourse();
-                        if (course == null) {
-                            return null;
-                        }
-                        
-                        CourseResponse dto = CourseResponse.fromEntity(course);
-                        Long enrollmentCount = enrollmentRepository.countByCourseId(course.getId());
-                        dto.setEnrollmentCount(enrollmentCount != null ? enrollmentCount : 0L);
-                        
-                        Double avgRating = reviewRepository.getAverageRatingByCourseId(course.getId());
-                        Long reviewCount = reviewRepository.countByCourseId(course.getId());
-                        dto.setRating(avgRating != null ? avgRating : 0.0);
-                        dto.setReviewCount(reviewCount != null ? reviewCount : 0L);
-                        
-                        dto.setIsEnrolled(true);
+                            Course course = enrollment.getCourse();
+                            if (course == null) {
+                                return null;
+                            }
+                            
+                            CourseResponse dto = CourseResponse.fromEntity(course);
+                            Long enrollmentCount = enrollmentRepository.countByCourseId(course.getId());
+                            dto.setEnrollmentCount(enrollmentCount != null ? enrollmentCount : 0L);
+                            
+                            Double avgRating = reviewRepository.getAverageRatingByCourseId(course.getId());
+                            Long reviewCount = reviewRepository.countByCourseId(course.getId());
+                            dto.setRating(avgRating != null ? avgRating : 0.0);
+                            dto.setReviewCount(reviewCount != null ? reviewCount : 0L);
+                            
+                            dto.setIsEnrolled(true);
                         dto.setEnrollmentProgress(enrollment.getProgress() != null ? enrollment.getProgress() : 0.0);
                         dto.setEnrollmentStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : "IN_PROGRESS");
-                        
-                        return dto;
+                            
+                            return dto;
                     })
                     .filter(dto -> dto != null)
                     .collect(Collectors.toList());

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -39,7 +40,6 @@ public class ContentService {
     @Autowired
     private CertificateService certificateService;
 
-    private static final Logger logger = Logger.getLogger(ContentService.class.getName());
 
     // --- Quản lý Chapter ---
 
@@ -93,7 +93,6 @@ public class ContentService {
         
         // Tự động tính duration nếu có video URL (không áp dụng cho YOUTUBE)
         if (request.getContentType() == EContentType.YOUTUBE) {
-            // YouTube không cần duration, set = 0
             lesson.setDurationInMinutes(0);
         } else {
             Integer duration = calculateDuration(request);
@@ -284,12 +283,11 @@ public class ContentService {
         }
     }
 
-    // Lấy toàn bộ nội dung (chapters + lessons) của 1 khóa học
+    // Lấy toàn bộ nội dung  của 1 khóa học
     public List<ChapterResponse> getCourseContent(Long courseId, UserDetailsImpl userDetails) {
         if (userDetails == null) {
             throw new RuntimeException("User not authenticated");
         }
-        
         User user = userRepository.findById(userDetails.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userDetails.getId()));
         Course course = courseRepository.findById(courseId)
@@ -307,8 +305,10 @@ public class ContentService {
         if (!isInstructor && enrollment == null) {
             throw new AccessDeniedException("Bạn chưa đăng ký khóa học này! Vui lòng đăng ký để xem nội dung.");
         }
-        
+
+        // Lấy danh sách bài học đã hoàn thành
         Set<Long> completedLessonIds = Set.of();
+
         if (enrollment != null) {
             try {
                 Set<User_Progress> progressSet = userProgressRepository.findByEnrollmentWithLesson(enrollment);
@@ -333,15 +333,16 @@ public class ContentService {
                                 return null;
                             }
                         })
-                        .filter(id -> id != null)
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toSet());
             } catch (Exception e) {
                 completedLessonIds = Set.of();
             }
         }
-
+        // Tạo Set các lessonId đã hoàn thành
         final Set<Long> finalCompletedLessonIds = completedLessonIds;
 
+        // Lấy danh sách chapters và lessons
         List<Chapter> chapters;
         try {
             chapters = chapterRepository.findByCourseIdWithLessons(courseId);
@@ -353,6 +354,7 @@ public class ContentService {
             throw new RuntimeException("Không thể tải nội dung khóa học: " + e.getMessage(), e);
         }
 
+        // Xử lý từng chương
         try {
             List<Chapter> sortedChapters = chapters.stream()
                     .sorted((c1, c2) -> {
@@ -360,7 +362,7 @@ public class ContentService {
                         int pos2 = c2.getPosition() != null ? c2.getPosition() : Integer.MAX_VALUE;
                         return Integer.compare(pos1, pos2);
                     })
-                    .collect(Collectors.toList());
+                    .toList();
             
             return sortedChapters.stream().map(chapter -> {
                 List<Lesson> sortedLessons = chapter.getLessons().stream()
@@ -369,7 +371,7 @@ public class ContentService {
                             int pos2 = l2.getPosition() != null ? l2.getPosition() : Integer.MAX_VALUE;
                             return Integer.compare(pos1, pos2);
                         })
-                        .collect(Collectors.toList());
+                        .toList();
 
                 List<LessonResponse> lessonResponses = new java.util.ArrayList<>();
                 Lesson previousLesson = null;
@@ -388,17 +390,17 @@ public class ContentService {
                             } else {
                                 int currentChapterIndex = sortedChapters.indexOf(chapter);
                                 Chapter previousChapter = sortedChapters.get(currentChapterIndex - 1);
-                                
+
                                 List<Lesson> previousChapterLessons = previousChapter.getLessons().stream()
                                         .sorted((l1, l2) -> {
                                             int pos1 = l1.getPosition() != null ? l1.getPosition() : Integer.MAX_VALUE;
                                             int pos2 = l2.getPosition() != null ? l2.getPosition() : Integer.MAX_VALUE;
                                             return Integer.compare(pos1, pos2);
                                         })
-                                        .collect(Collectors.toList());
-                                
+                                        .toList();
+
                                 if (!previousChapterLessons.isEmpty()) {
-                                    Lesson lastLessonInPreviousChapter = previousChapterLessons.get(previousChapterLessons.size() - 1);
+                                    Lesson lastLessonInPreviousChapter = previousChapterLessons.getLast();
                                     boolean lastLessonCompleted = finalCompletedLessonIds.contains(lastLessonInPreviousChapter.getId());
                                     isLocked = !lastLessonCompleted;
                                 } else {
@@ -406,8 +408,7 @@ public class ContentService {
                                 }
                             }
                         } else {
-                            boolean previousLessonCompleted = previousLesson != null && 
-                                    finalCompletedLessonIds.contains(previousLesson.getId());
+                            boolean previousLessonCompleted = finalCompletedLessonIds.contains(previousLesson.getId());
                             isLocked = !previousLessonCompleted;
                         }
                     }

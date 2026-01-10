@@ -102,29 +102,6 @@ public class FileStorageService {
         }
     }
 
-    public Resource loadFileAsResource(String fileName) {
-        try {
-            Path filePath = this.avatarStorageLocation.resolve(fileName).normalize();
-            Resource resource = new UrlResource(filePath.toUri());
-            if (resource.exists()) {
-                return resource;
-            } else {
-                throw new ResourceNotFoundException("File not found " + fileName);
-            }
-        } catch (MalformedURLException ex) {
-            throw new ResourceNotFoundException("File not found " + fileName);
-        }
-    }
-
-    public void deleteFile(String fileName) {
-        try {
-            Path filePath = this.avatarStorageLocation.resolve(fileName).normalize();
-            Files.deleteIfExists(filePath);
-        } catch (IOException ex) {
-            throw new RuntimeException("Could not delete file " + fileName, ex);
-        }
-    }
-
     public String storeCourseImage(MultipartFile file, Long courseId) {
         // Normalize file name
         String originalFileName = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
@@ -154,29 +131,6 @@ public class FileStorageService {
             return courseImageBaseUrl + "/" + fileName;
         } catch (IOException ex) {
             throw new RuntimeException("Could not store file " + fileName + ". Please try again!", ex);
-        }
-    }
-
-    public Resource loadCourseImageAsResource(String fileName) {
-        try {
-            Path filePath = this.courseImageStorageLocation.resolve(fileName).normalize();
-            Resource resource = new UrlResource(filePath.toUri());
-            if (resource.exists()) {
-                return resource;
-            } else {
-                throw new ResourceNotFoundException("File not found " + fileName);
-            }
-        } catch (MalformedURLException ex) {
-            throw new ResourceNotFoundException("File not found " + fileName);
-        }
-    }
-
-    public void deleteCourseImage(String fileName) {
-        try {
-            Path filePath = this.courseImageStorageLocation.resolve(fileName).normalize();
-            Files.deleteIfExists(filePath);
-        } catch (IOException ex) {
-            throw new RuntimeException("Could not delete file " + fileName, ex);
         }
     }
 

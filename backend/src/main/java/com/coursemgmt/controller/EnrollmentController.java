@@ -68,13 +68,6 @@ public class EnrollmentController {
         return ResponseEntity.ok(updated);
     }
 
-    // Xóa học viên khỏi khóa học (Admin only)
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> removeEnrollment(@PathVariable Long id) {
-        enrollmentService.removeEnrollment(id);
-        return ResponseEntity.noContent().build();
-    }
-
     // Lấy lịch sử học tập của học viên
     @GetMapping("/student/{studentId}/history")
     @PreAuthorize("hasRole('ADMIN') or (hasRole('STUDENT') and @courseSecurityService.isStudentOwner(authentication, #studentId))")

@@ -65,34 +65,6 @@ public class FileController {
     }
 
     /**
-     * Download lesson documents (force download)
-     */
-    @GetMapping("/download/documents/{fileName:.+}")
-    public ResponseEntity<Resource> downloadDocument(@PathVariable String fileName, HttpServletRequest request) {
-        Resource resource = fileStorageService.loadLessonDocumentAsResource(fileName);
-
-        // Determine content type
-        String contentType = null;
-        try {
-            contentType = request.getServletContext().getMimeType(resource.getFile().getAbsolutePath());
-        } catch (IOException ex) {
-            // Could not determine file type
-        }
-
-        if (contentType == null) {
-            contentType = "application/octet-stream";
-        }
-
-        // Encode filename for Content-Disposition header
-        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"")
-                .body(resource);
-    }
-
-    /**
      * Serve lesson videos for inline viewing
      */
     @GetMapping("/view/videos/{fileName:.+}")

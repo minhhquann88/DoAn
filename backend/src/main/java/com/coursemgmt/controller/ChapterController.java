@@ -7,7 +7,6 @@ import com.coursemgmt.dto.LessonResponse;
 import com.coursemgmt.dto.MessageResponse;
 import com.coursemgmt.model.Chapter;
 import com.coursemgmt.model.Lesson;
-import com.coursemgmt.security.services.CourseSecurityService;
 import com.coursemgmt.security.services.UserDetailsImpl;
 import com.coursemgmt.service.ContentService;
 import com.coursemgmt.service.FileStorageService;
@@ -32,8 +31,6 @@ public class ChapterController {
     @Autowired
     private ContentService contentService;
 
-    @Autowired
-    private CourseSecurityService courseSecurityService;
 
     @Autowired
     private FileStorageService fileStorageService;
